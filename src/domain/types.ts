@@ -1,4 +1,4 @@
-export type TarotPosition = "Зов" | "Путь" | "Дар маршрута";
+export type TarotPosition = "Зов" | "Дар" | "Путь";
 
 export type TransportMode = "avia" | "railway" | "bus";
 
@@ -35,12 +35,7 @@ export interface TarotCardDefinition {
 
 export interface DrawnTarotCard extends TarotCardDefinition {
   position: TarotPosition;
-}
-
-export interface TarotSpread {
-  seed: string;
-  cards: DrawnTarotCard[];
-  archetypes: TarotArchetype[];
+  reversed: boolean;
 }
 
 export interface TravelAtlasItem {

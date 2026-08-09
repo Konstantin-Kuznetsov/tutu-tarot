@@ -1,8 +1,9 @@
-import type { DestinationSelection, TarotArchetype, TripIntent } from "@/domain/types";
+import type { ArchetypeWeights } from "@/domain/tarot/engine";
+import type { DestinationSelection, TripIntent } from "@/domain/types";
 import { travelAtlas } from "./atlas";
 
 export interface DestinationSelectionInput extends TripIntent {
-  archetypes: TarotArchetype[];
+  archetypeWeights: ArchetypeWeights;
 }
 
 function monthToSeason(month: number): string {
@@ -16,12 +17,16 @@ export function selectDestination(input: DestinationSelectionInput): Destination
   const month = Number(input.dateFrom.slice(5, 7));
   const season = monthToSeason(month);
   const scored = travelAtlas.map((destination) => {
-    const archetypeHits = destination.tarotArchetypes.filter((tag) =>
-      input.archetypes.includes(tag),
+    const archetypeHits = destination.tarotArchetypes.filter(
+      (tag) => (input.archetypeWeights[tag] ?? 0) > 0,
+    );
+    const archetypeScore = archetypeHits.reduce(
+      (total, tag) => total + (input.archetypeWeights[tag] ?? 0),
+      0,
     );
     const seasonScore = destination.season.includes(season) ? 2 : 0;
     const sourceScore = destination.source === "provereno.tutu" ? 1.5 : destination.source === "geo.tutu" ? 1 : 0;
-    const score = archetypeHits.length * 3 + seasonScore + sourceScore;
+    const score = archetypeScore * 3 + seasonScore + sourceScore;
 
     return {
       destination,
