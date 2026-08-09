@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { pickSeptember10to17 } from "./helpers";
 
 // Regression coverage for a 2026-08-09 review finding: a reversed card's
 // name and figcaption were invisible even though `figcaption.textContent`
@@ -72,8 +73,7 @@ test("a reversed card shows its name, its separated flag, and its meaning, with 
 
   await page.goto("/");
   await page.getByLabel("Город вылета").fill("Москва");
-  await page.getByLabel("Дата начала").fill("2026-09-10");
-  await page.getByLabel("Дата конца").fill("2026-09-17");
+  await pickSeptember10to17(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
 

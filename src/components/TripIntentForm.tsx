@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateRangeCalendar, type DateRange } from "@/components/DateRangeCalendar";
 import type { TripIntent } from "@/domain/types";
 
 // The entire entry screen ("01 Вход.dc.html" in the Claude Design project),
@@ -10,13 +11,13 @@ import type { TripIntent } from "@/domain/types";
 //
 // The mockup's ticket has 4 columns (city / "when" link / travelers /
 // button) because its date range is a single field linking out to a
-// calendar screen. This keeps the pre-existing two separate date inputs
-// instead (5 columns total) — Task 10 is what turns them into the
-// mockup's calendar, not this task, per the brief.
+// calendar screen ("04 Календарь.dc.html"). Task 10 folds that separate
+// screen into a single popover field here instead — same one-field-not-two
+// idea, without a page navigation — so the ticket now matches the mockup's
+// column count.
 export function TripIntentForm({ onSubmit }: { onSubmit(intent: TripIntent): void }) {
   const [departureCity, setDepartureCity] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [range, setRange] = useState<DateRange>({ from: null, to: null });
   const [travelerCount, setTravelerCount] = useState(2);
 
   return (
@@ -34,10 +35,11 @@ export function TripIntentForm({ onSubmit }: { onSubmit(intent: TripIntent): voi
           className="ticket"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!range.from || !range.to) return;
             onSubmit({
               departureCity: departureCity.trim(),
-              dateFrom,
-              dateTo,
+              dateFrom: range.from,
+              dateTo: range.to,
               travelerCount,
             });
           }}
@@ -57,28 +59,7 @@ export function TripIntentForm({ onSubmit }: { onSubmit(intent: TripIntent): voi
             />
           </div>
           <div className="field">
-            <label className="lab" htmlFor="dateFrom">
-              Дата начала
-            </label>
-            <input
-              id="dateFrom"
-              type="date"
-              value={dateFrom}
-              onChange={(event) => setDateFrom(event.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label className="lab" htmlFor="dateTo">
-              Дата конца
-            </label>
-            <input
-              id="dateTo"
-              type="date"
-              value={dateTo}
-              onChange={(event) => setDateTo(event.target.value)}
-              required
-            />
+            <DateRangeCalendar value={range} onChange={setRange} />
           </div>
           <div className="field">
             <label className="lab" htmlFor="travelerCount">
@@ -94,7 +75,7 @@ export function TripIntentForm({ onSubmit }: { onSubmit(intent: TripIntent): voi
               required
             />
           </div>
-          <button type="submit" className="btn">
+          <button type="submit" className="btn" disabled={!range.from || !range.to}>
             Начать расклад
           </button>
         </form>
