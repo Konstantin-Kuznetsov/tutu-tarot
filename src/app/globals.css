@@ -73,6 +73,10 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
+  /* The mockup sets these through the `font:` shorthand. Without them the page
+     falls back to the browser's 16px/normal rhythm and --lh-body has no consumer. */
+  font-size: var(--fs-m);
+  line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
 }
 
