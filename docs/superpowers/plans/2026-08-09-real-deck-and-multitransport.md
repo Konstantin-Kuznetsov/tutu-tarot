@@ -1618,7 +1618,100 @@ git commit -m "feat: render real tarot artwork with orientation"
 
 ---
 
-### Task 8: The road block in the result
+### Task 8: Visual shell and entry screen
+
+**Files:**
+- Modify: `src/app/globals.css`
+- Modify: `src/app/layout.tsx`
+- Modify: `src/app/page.tsx`
+- Modify: `src/components/TripIntentForm.tsx`
+- Test: `tests/components/entry-screen.test.tsx` (create)
+- Modify: `tests/e2e/ritual-flow.spec.ts`
+
+**Interfaces:**
+- Consumes: `docs/design/tokens.css` and the Claude Design mockups.
+- Produces: the shared visual language every later screen sits on. No new exported types.
+
+This task exists because a browser check after Task 7 found the approved design was never ported: the page rendered in a default sans-serif with a plain two-column layout and no card fan, while colours and the gold button had arrived piecemeal. Tasks 9, 10 and 11 restyle parts of a shell that did not exist. This builds it.
+
+Read `01 Вход.dc.html` from the Claude Design project `33d8a5c9-0f76-4610-9f1c-45c9a1461ea7` with the `DesignSync` tool's `get_file` method before writing anything. It is the source of truth for this screen.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/components/entry-screen.test.tsx`:
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import Page from "@/app/page";
+
+describe("entry screen", () => {
+  it("presents the service line, the title and the promise", () => {
+    render(<Page />);
+    expect(screen.getByText(/Туту · сервис путешествий/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Таро-турагент" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the deck fan above the title", () => {
+    render(<Page />);
+    expect(screen.getByTestId("deck-fan").querySelectorAll(".back")).toHaveLength(3);
+  });
+
+  it("keeps the honest fine print", () => {
+    render(<Page />);
+    expect(screen.getByText(/Билеты, поезда и отели — настоящие/i)).toBeInTheDocument();
+  });
+
+  it("carries no prototype navigation", () => {
+    render(<Page />);
+    expect(document.querySelector(".proto-nav")).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npm run test -- tests/components/entry-screen.test.tsx`
+Expected: FAIL — none of the service line, the fan or the fine print exists yet.
+
+- [ ] **Step 3: Port the tokens wholesale**
+
+Copy the `:root` block and the shared primitives (`.table`, `.caps`, `.rule`, `.diamond`, `.back`, `.btn`, and the `prefers-reduced-motion` block) from `docs/design/tokens.css` into `src/app/globals.css`, replacing any values Task 7 introduced by hand. `.back` must be the single shared card-back implementation — the fan on this screen and the face-down tarot card are the same object, and Task 7's fix round already established that rule.
+
+- [ ] **Step 4: Load the fonts through next/font**
+
+In `src/app/layout.tsx`, load **Prata** (display) and **Manrope** (UI) with `next/font/google` so they are self-hosted, requesting the `cyrillic` and `latin` subsets. Both ship a Cyrillic subset — verified 2026-08-09 against the Google Fonts CSS API. Expose them as the CSS variables the tokens expect (`--font-display`, `--font-ui`) rather than as class names, so the ported CSS keeps working unchanged. Do not port the mockup's `<link rel="stylesheet">` tags to `fonts.googleapis.com`: an external request at runtime is exactly what this project avoids.
+
+- [ ] **Step 5: Rebuild the entry screen**
+
+Rebuild `src/app/page.tsx` and `src/components/TripIntentForm.tsx` to the mockup: the three-card fan (`data-testid="deck-fan"`, three `.back` elements at the mockup's rotations), the `.caps` service line, the `h1` in the display font, the promise line, the horizontal `.ticket` form with `.field` cells divided by `--line-soft`, the gold submit button inside the ticket, the `.rule` with its diamond, and the fine print. Below 760px the ticket becomes a single column, exactly as the mockup's media query does.
+
+**Do not port `.proto-nav` or any link between screens.** The mockup's four screens link to each other by hand; the product is one page.
+
+Keep the form's existing behaviour and its submitted payload unchanged — the date inputs stay as they are here and are replaced by the calendar in Task 10.
+
+- [ ] **Step 6: Extend the e2e check**
+
+In `tests/e2e/ritual-flow.spec.ts`, assert on both the desktop and mobile projects that the entry screen shows the title and the fan, and that the page has no horizontal overflow: `document.documentElement.scrollWidth <= window.innerWidth + 1`. The ticket layout is the most likely thing to push the page sideways at 375px.
+
+- [ ] **Step 7: Run everything**
+
+Run: `npm run test -- tests/components/entry-screen.test.tsx`, then `npm run test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm run test:e2e`.
+Expected: all PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/app/globals.css src/app/layout.tsx src/app/page.tsx src/components/TripIntentForm.tsx tests/components/entry-screen.test.tsx tests/e2e/ritual-flow.spec.ts
+git commit -m "feat: port the approved visual language and entry screen"
+```
+
+---
+
+### Task 9: The road block in the result
 
 **Files:**
 - Modify: `src/components/TravelResult.tsx`
@@ -1711,7 +1804,7 @@ git commit -m "feat: lead the result with the road the card chose"
 
 ---
 
-### Task 9: Date range calendar
+### Task 10: Date range calendar
 
 **Files:**
 - Create: `src/components/DateRangeCalendar.tsx`
@@ -1973,7 +2066,7 @@ git commit -m "feat: pick the trip as one range on a calendar"
 
 ---
 
-### Task 10: One continuous flow
+### Task 11: One continuous flow
 
 **Files:**
 - Modify: `src/components/RitualStage.tsx`
@@ -2000,7 +2093,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RitualStage } from "@/components/RitualStage";
 
-// Task 9 disables the submit button until both endpoints are chosen, so the
+// Task 10 disables the submit button until both endpoints are chosen, so the
 // dates must be picked through the calendar before submitting.
 function fillAndSubmit() {
   fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
@@ -2160,7 +2253,7 @@ git commit -m "feat: run the ritual as one continuous flow"
 
 ---
 
-### Task 11: Live verification against real Tutu MCP
+### Task 12: Live verification against real Tutu MCP
 
 **Files:**
 - Create: `scripts/smoke-ritual.mjs`
@@ -2264,10 +2357,16 @@ git commit -m "test: smoke the ritual against live tutu mcp"
 
 ## Plan Self-Review
 
-**Spec coverage.** Every spec section maps to a task: two-phase ritual → 3 and 6; deck and orientation → 1 and 3; images → 2; multitransport and error-as-text → 4; availability and sanity filter → 5; result presentation → 8; calendar → 9; continuous flow → 10; determinism and degenerate cases → tests in 3, 5 and 6; testing section → distributed, plus 11 for the live contract check.
+**Spec coverage.** Every spec section maps to a task: two-phase ritual → 3 and 6; deck and orientation → 1 and 3; images → 2; multitransport and error-as-text → 4; availability and sanity filter → 5; visual shell and entry screen → 8; result presentation → 9; calendar → 10; continuous flow → 11; determinism and degenerate cases → tests in 3, 5 and 6; testing section → distributed, plus 12 for the live contract check.
 
-**Added after the spec was approved.** Task 10 is not in the spec — the continuous flow was agreed separately once the design arrived, on the argument that the wait for MCP is the third card rather than dead time to disguise. It replaces the fixed minimum ritual duration introduced before this plan.
+**Added after the spec was approved.** Task 11 is not in the spec — the continuous flow was agreed separately once the design arrived, on the argument that the wait for MCP is the third card rather than dead time to disguise. It replaces the fixed minimum ritual duration introduced before this plan.
 
 **Type consistency.** `TransportMode` values are `avia | railway | bus` everywhere, including the MCP `modes` argument. `ModesSummary` is defined in Task 4 and consumed unchanged in 5 and 6. `drawPathCard(seed, usableModes, excludeIds)` has the same signature in Tasks 3 and 6. `RoadChoice` is defined in Task 6 and consumed in 8. `spreadCards` replaces `cards` in Task 6 and every later reference uses `spreadCards`.
 
 **Known transient state.** Tasks 1 and 3 knowingly leave `npm run test` red between them, because the type change ripples through the narrator and components before Task 6 repairs them. This is stated in both tasks so an implementer does not "fix" it by weakening the deck.
+
+**Added mid-execution.** Task 8 was inserted after a browser check following Task 7
+showed the approved design had never been ported: the page rendered in a default
+sans-serif with no card fan and no ticket form, while colours and the gold button
+had arrived piecemeal. Tasks 9-11 restyle parts of a shell that did not exist, so
+the shell is built first. Later tasks were renumbered accordingly.
