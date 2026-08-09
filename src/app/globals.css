@@ -35,3 +35,79 @@ input {
 .ritual-surface {
   width: min(100%, 1080px);
 }
+
+.ritual-layout {
+  width: min(100%, 1120px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 32px;
+  align-items: end;
+}
+
+.ritual-copy h1 {
+  margin: 0 0 12px;
+  font-size: 48px;
+  letter-spacing: 0;
+}
+
+.ritual-copy p,
+.ritual-status {
+  color: var(--muted);
+}
+
+.intent-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(197, 155, 77, 0.34);
+  border-radius: 8px;
+  background: rgba(21, 16, 22, 0.82);
+}
+
+.intent-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.intent-form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(244, 237, 247, 0.22);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #201826;
+  color: var(--ink);
+}
+
+.intent-form button,
+.ritual-layout button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--brass);
+  color: #151016;
+  cursor: pointer;
+}
+
+.result-shell {
+  padding: 18px;
+  border: 1px solid rgba(26, 143, 122, 0.38);
+  border-radius: 8px;
+  background: rgba(26, 143, 122, 0.12);
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    place-items: start;
+  }
+
+  .ritual-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ritual-copy h1 {
+    font-size: 36px;
+  }
+}
