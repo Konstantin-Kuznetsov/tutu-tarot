@@ -29,50 +29,17 @@ function summaryFor(input: PredictionInput): string {
   return `Предсказание ведет в ${destination.region}. Источник маршрута (${destination.source}): ${destination.sourceUrl}. Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
 }
 
-const allowedAtmosphericWords = new Set([
-  "Ветер",
-  "Тихий",
-  "Камень",
-  "Высота",
-  "Дорога",
-  "Тишина",
-  "Свет",
-  "Север",
-  "Вода",
-  "Воздух",
-  "Здесь",
-  "Пусть",
-  "Путь",
-  "Шорох",
-  "Ритм",
-  "И",
-  "Но",
-  "Это",
-]);
+type FlavorKey = "stone_silence" | "north_light" | "warm_road" | "old_city";
 
-function selectedMetadata(input: PredictionInput): string[] {
-  const { destination } = input.selection;
-  return [
-    destination.name,
-    destination.region,
-    destination.routeTitle,
-    destination.anchorPlace,
-    destination.nearestTransportHub,
-    destination.hotelSearchCity,
-    ...destination.tags,
-  ];
-}
+const flavorCopy: Record<FlavorKey, string> = {
+  stone_silence: "Камень и тишина собирают маршрут в один ясный знак.",
+  north_light: "Северный свет оставляет в дороге ощущение простора.",
+  warm_road: "Теплая дорога раскрывается постепенно, шаг за шагом.",
+  old_city: "Старый ритм города помогает услышать историю места.",
+};
 
-function isAcceptedAtmosphericFragment(text: string, input: PredictionInput): boolean {
-  if (text.length > 240 || /[\n\r]|https?:\/\/|\d/.test(text)) return false;
-
-  const allowedMetadataWords = new Set(
-    selectedMetadata(input).flatMap((term) => term.match(/[А-ЯЁ][а-яё-]+/g) ?? []),
-  );
-  const capitalizedWords = text.match(/[А-ЯЁ][а-яё-]+/g) ?? [];
-  return capitalizedWords.every(
-    (word) => allowedAtmosphericWords.has(word) || allowedMetadataWords.has(word),
-  );
+function flavorFor(text: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(flavorCopy, text) ? flavorCopy[text as FlavorKey] : undefined;
 }
 
 function appOpening(input: PredictionInput): string {
@@ -111,7 +78,7 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
         input: [
           {
             role: "system",
-            content: "Write theatrical Russian tarot travel copy. Do not invent destinations. Do not claim supernatural certainty.",
+            content: "Return exactly one flavor key from this allowlist and nothing else: stone_silence, north_light, warm_road, old_city. Do not return prose, destinations, URLs, or claims of supernatural certainty.",
           },
           {
             role: "user",
@@ -128,12 +95,12 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
 
     if (!response.ok) return templatePrediction(input);
     const data = (await response.json()) as { output_text?: string };
-    const text = data.output_text?.trim();
-    if (!text || !isAcceptedAtmosphericFragment(text, input)) return templatePrediction(input);
+    const flavor = flavorFor(data.output_text?.trim() ?? "");
+    if (!flavor) return templatePrediction(input);
 
     return {
       headline: `Карты указывают на ${input.selection.destination.name}`,
-      opening: `${appOpening(input)} ${text}`,
+      opening: `${appOpening(input)} ${flavor}`,
       cardReadings: input.spread.cards.map((card) => ({
         position: card.position,
         cardName: card.name,

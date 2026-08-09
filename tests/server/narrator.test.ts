@@ -60,22 +60,31 @@ describe("createPrediction", () => {
     expect(result.summary).toContain("Пермский край");
   });
 
-  it("accepts safe AI flavor while app data supplies the route", async () => {
-    mockAiText("Тихий ветер усиливает ощущение высоты и дороги.");
+  it("accepts a valid flavor key while app data supplies the route", async () => {
+    mockAiText("stone_silence");
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
     expect(result.opening).toContain("Усьвинские Столбы");
-    expect(result.opening).toContain("Тихий ветер усиливает ощущение высоты и дороги.");
+    expect(result.opening).toContain("Камень и тишина собирают маршрут в один ясный знак.");
   });
 
-  it("falls back when AI narration introduces an unknown alternate destination", async () => {
-    mockAiText("Усьвинские Столбы уступают Сочи место в этом маршруте.");
+  it("ignores free text with a lowercase alternate destination", async () => {
+    mockAiText("сочи зовет сильнее, чем выбранный маршрут");
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
     expect(result.opening).toContain("Усьвинские Столбы");
-    expect(result.opening).not.toContain("Сочи");
+    expect(result.opening).not.toContain("сочи");
+  });
+
+  it("ignores free text with a Latin alternate destination", async () => {
+    mockAiText("Sochi is the better destination");
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.opening).toContain("Усьвинские Столбы");
+    expect(result.opening).not.toContain("Sochi");
   });
 
   it("falls back when AI narration names a different known destination", async () => {
