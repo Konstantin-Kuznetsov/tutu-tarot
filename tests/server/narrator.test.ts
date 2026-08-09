@@ -12,11 +12,43 @@ function createInput(overrides: Partial<PredictionInput> = {}): PredictionInput 
     },
     spread: {
       seed: "москва|2026-09-10|2026-09-17|2",
-      archetypes: ["cliffs", "road"],
       cards: [
-        { id: "tower", name: "Башня", position: "Зов", archetypes: ["cliffs"], meaning: "камень и высота" },
-        { id: "chariot", name: "Колесница", position: "Путь", archetypes: ["road"], meaning: "дорога" },
-        { id: "hermit", name: "Отшельник", position: "Дар маршрута", archetypes: ["solitude"], meaning: "тишина" },
+        {
+          id: "tower",
+          number: 16,
+          name: "Башня",
+          image: "/tarot/16-tower.webp",
+          archetypes: ["cliffs"],
+          transport: ["avia"],
+          meaning: "камень и высота",
+          meaningReversed: "обвал случился раньше, теперь строят заново",
+          position: "Зов",
+          reversed: false,
+        },
+        {
+          id: "chariot",
+          number: 7,
+          name: "Колесница",
+          image: "/tarot/07-chariot.webp",
+          archetypes: ["road"],
+          transport: ["avia"],
+          meaning: "дорога",
+          meaningReversed: "рывок не выходит, дорога сопротивляется",
+          position: "Дар",
+          reversed: false,
+        },
+        {
+          id: "hermit",
+          number: 9,
+          name: "Отшельник",
+          image: "/tarot/09-hermit.webp",
+          archetypes: ["solitude"],
+          transport: ["railway"],
+          meaning: "тишина",
+          meaningReversed: "одиночество тяготит, нужен попутчик",
+          position: "Путь",
+          reversed: false,
+        },
       ],
     },
     selection: {
@@ -38,6 +70,11 @@ function createInput(overrides: Partial<PredictionInput> = {}): PredictionInput 
         sourceUrl: "https://ru.wikipedia.org/wiki/Усьвинские_Столбы",
         oracleHook: "Каменные столбы обещают путь к тишине.",
       },
+    },
+    roadChoice: {
+      mode: "railway",
+      reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.",
+      best: null,
     },
     offers: { transport: [], hotels: [] },
     aiApiKey: undefined,
@@ -110,5 +147,28 @@ describe("createPrediction", () => {
 
     expect(result.summary).toContain("https://ru.wikipedia.org/wiki/Усьвинские_Столбы");
     expect(result.summary).not.toContain("подтверждается источниками Туту");
+  });
+
+  it("appends the road choice's reason to the summary without exposing it to the AI prompt", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: "stone_silence" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.summary).toContain("«Отшельник» сажает к окну — дорога будет долгой и созерцательной.");
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    const userMessage = JSON.parse(requestBody.input[1].content);
+    expect(userMessage).not.toHaveProperty("roadChoice");
+  });
+
+  it("falls back to the fog reason when no road exists", async () => {
+    const result = await createPrediction(
+      createInput({ roadChoice: { mode: null, reason: "Дорога скрыта туманом: карты не увидели ни одного пути.", best: null } }),
+    );
+
+    expect(result.summary).toContain("туманом");
   });
 });

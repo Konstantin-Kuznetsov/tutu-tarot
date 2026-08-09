@@ -7,7 +7,6 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
       body: JSON.stringify({
         ritualId: "demo",
         seed: "москва|2026-09-10|2026-09-17|2",
-        cards: [],
         spreadCards: [
           { id: "tower", name: "Башня", position: "Зов", meaning: "камень и высота", archetypes: ["cliffs"] },
           { id: "chariot", name: "Колесница", position: "Путь", meaning: "дорога", archetypes: ["road"] },
@@ -20,6 +19,7 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
           summary: "Дорога подтверждается Туту.",
           cardReadings: [],
         },
+        roadChoice: { mode: "railway", reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.", best: null },
         transportOffers: [
           {
             id: "transport-0",

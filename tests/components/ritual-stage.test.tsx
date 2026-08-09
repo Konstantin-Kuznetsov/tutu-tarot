@@ -5,7 +5,6 @@ import { RitualStage } from "@/components/RitualStage";
 const ritualResponse = {
   ritualId: "demo",
   seed: "москва|2026-09-10|2026-09-17|2",
-  cards: [],
   spreadCards: [],
   destination: { name: "Усьвинские Столбы", region: "Пермский край" },
   prediction: {
@@ -14,6 +13,7 @@ const ritualResponse = {
     summary: "Дорога подтверждается Туту.",
     cardReadings: [],
   },
+  roadChoice: { mode: null, reason: "Дорога скрыта туманом.", best: null },
   transportOffers: [],
   hotelOffers: [],
   sourceLinks: [],

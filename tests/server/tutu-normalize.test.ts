@@ -320,7 +320,8 @@ describe("Tutu offer normalization", () => {
     const fetchMock = vi.fn()
       .mockImplementationOnce((_url: string, init?: RequestInit) => {
         transportSignal = init?.signal ?? undefined;
-        if (!transportSignal) return Promise.reject(new Error("missing abort signal"));
+        const signal = transportSignal;
+        if (!signal) return Promise.reject(new Error("missing abort signal"));
         // Create a Promise that rejects when the signal aborts
         return new Promise<Response>((_resolve, reject) => {
           // Handle abort event - reject with the error message a real fetch produces
@@ -328,9 +329,9 @@ describe("Tutu offer normalization", () => {
           const abortHandler = () => {
             reject(new Error("This operation was aborted"));
           };
-          transportSignal.addEventListener("abort", abortHandler, { once: true });
+          signal.addEventListener("abort", abortHandler, { once: true });
           // Also check if already aborted (race condition)
-          if (transportSignal.aborted) {
+          if (signal.aborted) {
             reject(new Error("This operation was aborted"));
           }
         });

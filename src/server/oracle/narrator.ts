@@ -1,14 +1,21 @@
-import type { DestinationSelection, TarotSpread, TripIntent } from "@/domain/types";
+import type { DestinationSelection, DrawnTarotCard, TripIntent } from "@/domain/types";
+import type { RoadChoice } from "@/server/ritual/runRitual";
 
 export interface OfferHighlights {
   transport: string[];
   hotels: string[];
 }
 
+export interface CardSpread {
+  seed: string;
+  cards: DrawnTarotCard[];
+}
+
 export interface PredictionInput {
   intent: TripIntent;
-  spread: TarotSpread;
+  spread: CardSpread;
   selection: DestinationSelection;
+  roadChoice: RoadChoice;
   offers: OfferHighlights;
   aiApiKey?: string;
 }
@@ -26,7 +33,8 @@ export interface PredictionText {
 
 function summaryFor(input: PredictionInput): string {
   const { destination } = input.selection;
-  return `Предсказание ведет в ${destination.region}. Источник маршрута (${destination.source}): ${destination.sourceUrl}. Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
+  const baseSummary = `Предсказание ведет в ${destination.region}. Источник маршрута (${destination.source}): ${destination.sourceUrl}. Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
+  return [baseSummary, input.roadChoice.reason].filter(Boolean).join(" ");
 }
 
 type FlavorKey = "stone_silence" | "north_light" | "warm_road" | "old_city";

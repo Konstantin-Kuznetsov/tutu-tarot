@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { runRitual } from "@/server/ritual/runRitual";
 
+// The Tutu MCP search budget is 18s (src/server/tutu/mcpClient.ts); 30s leaves
+// room for narration and cold start. Do not raise past what the deployment
+// plan allows.
+export const maxDuration = 30;
+
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 function isCalendarDate(value: string): boolean {
