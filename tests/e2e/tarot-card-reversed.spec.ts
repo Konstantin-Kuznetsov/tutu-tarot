@@ -80,6 +80,11 @@ test("a reversed card shows its name, its separated flag, and its meaning, with 
   const cards = page.getByTestId("spread-card");
   await expect(cards).toHaveCount(3);
 
+  // Let .spread-card-shell's own card-reveal animation settle before
+  // measuring boxes below -- see the identical comment in
+  // tarot-card-geometry.spec.ts for why this is needed since Task 11.
+  await page.waitForTimeout(1000);
+
   const uprightCard = cards.nth(0); // "Башня"
   const reversedCard = cards.nth(1); // "Звезда", reversed
 

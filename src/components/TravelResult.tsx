@@ -45,20 +45,42 @@ function RoadHero({ best }: { best: NormalizedOffer }) {
   );
 }
 
+// Fixed rather than computed from position-in-array, so a block that
+// doesn't render (spread, when the reading carries no cards) leaves a gap
+// in the sequence instead of shifting every later block's delay — a
+// harmless, purely cosmetic difference from a perfectly gap-free stagger.
+const BLOCK_INDEX = {
+  prediction: 0,
+  spread: 1,
+  road: 2,
+  otherRoads: 3,
+  hotels: 4,
+  sources: 5,
+} as const;
+
+function blockIndexStyle(index: number): CSSProperties {
+  return { "--block-index": index } as CSSProperties;
+}
+
 export function TravelResult({ result }: { result: RitualResultViewModel }) {
   const { roadChoice } = result;
   const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
 
   return (
     <section className="travel-result">
-      <div className="prediction-panel" data-block="prediction">
+      <div className="prediction-panel" data-block="prediction" style={blockIndexStyle(BLOCK_INDEX.prediction)}>
         <p className="result-kicker">Предсказанный маршрут</p>
         <h2>{result.prediction.headline}</h2>
         <p>{result.prediction.opening}</p>
         <p>{result.prediction.summary}</p>
       </div>
       {result.spreadCards?.length ? (
-        <section className="spread-panel" data-block="spread" aria-label="Расклад карт">
+        <section
+          className="spread-panel"
+          data-block="spread"
+          aria-label="Расклад карт"
+          style={blockIndexStyle(BLOCK_INDEX.spread)}
+        >
           <div className="spread-panel__header">
             <p className="result-kicker">Расклад карт</p>
             <h3>Три знака дороги</h3>
@@ -72,7 +94,12 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           </div>
         </section>
       ) : null}
-      <section className="road" data-block="road" aria-label="Дорога, которую выбрала карта">
+      <section
+        className="road"
+        data-block="road"
+        aria-label="Дорога, которую выбрала карта"
+        style={blockIndexStyle(BLOCK_INDEX.road)}
+      >
         <h3 className="sec"><span>Дорога, которую выбрала карта</span></h3>
         {roadChoice.best ? (
           <article className="road__card">
@@ -89,14 +116,27 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           </div>
         )}
       </section>
-      <OfferList
-        title="Билеты по предсказанию"
-        offers={result.transportOffers}
-        excludeId={roadChoice.best?.id}
-        dataBlock="other-roads"
-      />
-      <OfferList title="Где остановиться" offers={result.hotelOffers} dataBlock="hotels" />
-      <div className="proof-links" data-block="sources" aria-label="Подтверждения Туту">
+      {/* OfferList renders its own [data-block] section; --block-index is set
+          on this wrapper and inherited down to it (custom properties
+          inherit through the DOM by default), which staggers it without
+          OfferList needing to know about the ritual's animation scheme. */}
+      <div style={blockIndexStyle(BLOCK_INDEX.otherRoads)}>
+        <OfferList
+          title="Билеты по предсказанию"
+          offers={result.transportOffers}
+          excludeId={roadChoice.best?.id}
+          dataBlock="other-roads"
+        />
+      </div>
+      <div style={blockIndexStyle(BLOCK_INDEX.hotels)}>
+        <OfferList title="Где остановиться" offers={result.hotelOffers} dataBlock="hotels" />
+      </div>
+      <div
+        className="proof-links"
+        data-block="sources"
+        aria-label="Подтверждения Туту"
+        style={blockIndexStyle(BLOCK_INDEX.sources)}
+      >
         {result.sourceLinks.map((link) => (
           <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
             {link.label}

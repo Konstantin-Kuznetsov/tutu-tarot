@@ -71,6 +71,19 @@ test("a face-down card renders at 100/172, and the revealed face fully covers th
   const cards = page.getByTestId("spread-card");
   await expect(cards).toHaveCount(3);
 
+  // Let .spread-card-shell's own card-reveal animation settle (620ms
+  // duration + up to 240ms stagger delay = 860ms worst case) before
+  // measuring. toHaveCount(3) only proves the nodes exist, not that their
+  // entrance animation (which includes rotateX/rotateZ -- see @keyframes
+  // card-reveal) has finished; a box measured mid-rotation is foreshortened
+  // and reads a smaller ratio/width than the settled shape. This test never
+  // needed the wait before Task 11 (pure luck in the margin between DOM
+  // commit and the boundingBox() calls below), but Task 11's dealing scene
+  // (RitualScene) now loads two real tarot card images during the pre
+  // -reveal wait, and that extra decode/render load reliably eats the
+  // margin this test was quietly depending on.
+  await page.waitForTimeout(1000);
+
   for (let i = 0; i < 3; i += 1) {
     const card = cards.nth(i);
     const back = card.locator(".tarot-card__back");

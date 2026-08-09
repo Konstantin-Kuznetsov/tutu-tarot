@@ -1,10 +1,9 @@
 import { RitualStage } from "@/components/RitualStage";
 
-// RitualStage now owns its own top-level markup per stage — the entry
-// screen (idle) is a self-contained `.table > main.enter` a la the mockup,
-// while every later stage keeps its own `.app-shell` wrapper. Wrapping it
-// in another <main> here would both nest <main> elements and fight the
-// entry screen's own min-height:100vh centering.
+// RitualStage renders the whole flow on one surface (ticket, dealing scene,
+// result) and owns the single <main> in the document — TripIntentForm's own
+// `.table > main.enter`, stays mounted the entire time. Wrapping it in
+// another <main> here would nest <main> elements for no reason.
 export default function HomePage() {
   return <RitualStage />;
 }

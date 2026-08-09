@@ -178,3 +178,88 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
     "https://hotel.tutu.ru/offers/details/example",
   );
 });
+
+// Task 11: the wait for Tutu MCP IS the third card. RitualStage reveals the
+// two seed cards on their own timers (DEAL_STEP_MS = 900ms and 900ms*2 =
+// 1800ms -- see its own comments) entirely independent of the network, so
+// the checkpoint below sits at 2000ms: past both seed-card reveals, still
+// well short of the mocked response. The mock is delayed 2800ms -- past
+// CONSULT_AFTER_MS (3000ms) is deliberately avoided here so this test stays
+// about the reveal-gating specifically; the "Оракул сверяется..." copy has
+// its own coverage in tests/components/ritual-flow.test.tsx. Runs on both
+// configured projects (desktop, mobile) since this file's tests always do.
+test("holds the third card until Tutu MCP answers, on one page throughout", async ({ page }) => {
+  await page.route("**/api/ritual", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2800));
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ritualId: "demo",
+        seed: "москва|2026-10-10|2026-10-17|2",
+        spreadCards: [
+          {
+            id: "tower", number: 16, name: "Башня", image: "/tarot/16-tower.webp", position: "Зов",
+            reversed: false, archetypes: ["cliffs"], transport: ["avia"],
+            meaning: "камень и высота", meaningReversed: "обвал случился раньше, теперь строят заново",
+          },
+          {
+            id: "star", number: 17, name: "Звезда", image: "/tarot/17-star.webp", position: "Дар",
+            reversed: false, archetypes: ["north", "water"], transport: ["railway"],
+            meaning: "северный свет и надежда", meaningReversed: "свет тусклый",
+          },
+          {
+            id: "hermit", number: 9, name: "Отшельник", image: "/tarot/09-hermit.webp", position: "Путь",
+            reversed: false, archetypes: ["solitude"], transport: ["railway"],
+            meaning: "тишина", meaningReversed: "одиночество тяготит, нужен попутчик",
+          },
+        ],
+        destination: { name: "Усьвинские Столбы", region: "Пермский край" },
+        prediction: {
+          headline: "Карты указывают на Усьвинские Столбы",
+          opening: "Башня зовет к камню.",
+          summary: "Дорога подтверждается Туту.",
+          cardReadings: [],
+        },
+        roadChoice: {
+          mode: "railway",
+          reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.",
+          best: {
+            id: "t-0", title: "Поезд: ФПК «Карелия»", price: "3481 RUB", mode: "railway",
+            url: "https://www.tutu.ru/poezda/",
+          },
+        },
+        transportOffers: [],
+        hotelOffers: [],
+        sourceLinks: [],
+        warnings: [],
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Город вылета").fill("Москва");
+  await pickFutureDateRange(page);
+  await page.getByLabel("Путешественники").fill("2");
+  await page.getByRole("button", { name: "Начать расклад" }).click();
+
+  // No separate screen at any point in the flow -- checked immediately
+  // after submit and again once the reading is fully revealed, below.
+  await expect(page.getByRole("navigation", { name: /экраны/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /результат/i })).toHaveCount(0);
+
+  // 2000ms: both seed cards' reveal timers (900ms, 1800ms) have fired, but
+  // the mocked response (2800ms) hasn't landed yet -- the third card must
+  // still be face-down.
+  await page.waitForTimeout(2000);
+  await expect(page.locator('[data-testid="tarot-card"][data-revealed="true"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="tarot-card"][data-revealed="false"]')).toHaveCount(1);
+
+  // After the response: the dealing scene is gone and TravelResult's own
+  // spread-panel shows all three cards revealed.
+  await expect(page.getByText("Карты указывают на Усьвинские Столбы")).toBeVisible();
+  await expect(page.getByTestId("spread-card")).toHaveCount(3);
+  await expect(page.locator('[data-testid="tarot-card"]')).toHaveCount(0);
+
+  await expect(page.getByRole("navigation", { name: /экраны/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /результат/i })).toHaveCount(0);
+});
