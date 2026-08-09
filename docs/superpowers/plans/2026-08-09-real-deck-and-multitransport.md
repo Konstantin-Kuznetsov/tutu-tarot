@@ -26,7 +26,7 @@ Spec: `docs/superpowers/specs/2026-08-09-real-deck-and-multitransport-design.md`
   - Mode literals are `avia | railway | bus | etrain`. `rail` fails validation.
   - Tool-level errors arrive as plain text inside `result.content[].text`, not as a JSON-RPC `error`.
   - `search_multitransport` returns `{ variants, meta }`; `meta.modes_summary` carries per-mode `count`, `min_price`, `min_duration_min`.
-- Run `npm run lint` and `npx tsc --noEmit` before every commit. Both must be clean.
+- Run `npm run lint` and `npx tsc --noEmit` before every commit. Both must be clean — **except in Tasks 1 and 3**, which deliberately leave the tree mid-refactor: the card type changes there, and its consumers (narrator, orchestration, components) are only repaired in Task 6. Those two tasks verify with their own focused test run instead, and each says so. From Task 6 onward the whole suite, lint and `tsc` must be clean at every commit. Do not "fix" a red tree in Tasks 1–3 by weakening the deck or the engine.
 - **Visual design is settled — do not invent one.** Tokens and shared primitives are in `docs/design/tokens.css`; port them into `src/app/globals.css` rather than inventing colours, spacing or timings. The full mockups for all four screens live in the Claude Design project `33d8a5c9-0f76-4610-9f1c-45c9a1461ea7` (files `01 Вход.dc.html`, `02 Ритуал.dc.html`, `03 Результат.dc.html`, `04 Календарь.dc.html`); read the relevant screen with the `DesignSync` tool's `get_file` method before writing any markup or CSS.
 - The mockups link to each other by hand and carry a `.proto-nav` block in the corner. That is prototype scaffolding. The product is one page with no navigation between screens — do not port `.proto-nav` or any cross-screen link.
 - Fonts are **Prata** (display) and **Manrope** (UI). Both ship a Cyrillic subset, verified 2026-08-09. Load them with `next/font/google` so they are self-hosted; do not port the mockup's `<link>` tags to Google Fonts.
@@ -2000,9 +2000,14 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RitualStage } from "@/components/RitualStage";
 
+// Task 9 disables the submit button until both endpoints are chosen, so the
+// dates must be picked through the calendar before submitting.
 function fillAndSubmit() {
   fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
-  // The calendar and traveller count keep whatever defaults the form holds.
+  fireEvent.click(screen.getByRole("button", { name: /Когда поедете/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Следующий месяц" }));
+  fireEvent.click(screen.getByRole("button", { name: "10" }));
+  fireEvent.click(screen.getByRole("button", { name: "17" }));
   fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
 }
 
