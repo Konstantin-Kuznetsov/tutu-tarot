@@ -46,4 +46,47 @@ describe("usableModes", () => {
   it("returns nothing when nothing exists", () => {
     expect(usableModes({}, week)).toEqual([]);
   });
+
+  describe("1/3 threshold boundary", () => {
+    it("keeps a mode that is exactly at the 1/3 budget", () => {
+      // week is 7 days = 10080 minutes; budget = 3360 minutes (1/3).
+      // minDurationMin: 3360 should be kept (rule is <=).
+      const modes = usableModes(
+        {
+          railway: { count: 5, minPrice: 1000, minDurationMin: 3360 },
+          bus: { count: 3, minPrice: 500, minDurationMin: 100 }, // sibling that qualifies
+        },
+        week,
+      );
+      expect(modes).toEqual(["railway", "bus"]);
+    });
+
+    it("drops a mode that exceeds the 1/3 budget by one minute", () => {
+      // minDurationMin: 3361 should be dropped (exceeds budget).
+      const modes = usableModes(
+        {
+          railway: { count: 5, minPrice: 1000, minDurationMin: 3361 },
+          bus: { count: 3, minPrice: 500, minDurationMin: 100 }, // sibling that qualifies
+        },
+        week,
+      );
+      expect(modes).toEqual(["bus"]);
+    });
+  });
+
+  describe("null minDurationMin (unknown duration)", () => {
+    it("keeps a mode with unknown duration and drops a mode with known bad duration", () => {
+      // When one mode has minDurationMin: null (unknown) and another has a known
+      // too-long duration, the known-bad is dropped while the unknown is kept.
+      // This is "fail open" behavior for missing data.
+      const modes = usableModes(
+        {
+          railway: { count: 2, minPrice: 20629, minDurationMin: 9330 }, // known bad (too long)
+          avia: { count: 10, minPrice: 5000, minDurationMin: null }, // unknown, kept
+        },
+        week,
+      );
+      expect(modes).toEqual(["avia"]);
+    });
+  });
 });
