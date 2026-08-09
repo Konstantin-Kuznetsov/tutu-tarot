@@ -34,10 +34,32 @@ async function callTool(endpoint: string, name: string, args: Record<string, unk
       }),
     });
     if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
-    return unwrapMcpResponse(await response.json(), name);
+    const raw = response.headers.get("content-type")?.includes("text/event-stream")
+      ? parseSseResponse(await response.text(), name)
+      : await response.json();
+    return unwrapMcpResponse(raw, name);
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function parseSseResponse(body: string, name: string): unknown {
+  for (const event of body.split(/\r?\n\r?\n/)) {
+    const data = event
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice("data:".length).replace(/^ /, ""))
+      .join("\n");
+    if (!data) continue;
+
+    try {
+      return JSON.parse(data);
+    } catch {
+      throw new Error(`Tutu MCP ${name} SSE data is not valid JSON`);
+    }
+  }
+
+  throw new Error(`Tutu MCP ${name} SSE response has no data payload`);
 }
 
 function unwrapMcpResponse(raw: unknown, name: string): unknown {

@@ -40,6 +40,19 @@ function contentResponse(payload: unknown): Response {
   });
 }
 
+function sseContentResponse(payload: unknown): Response {
+  return new Response(
+    `event: message\ndata: ${JSON.stringify({
+      jsonrpc: "2.0",
+      result: { content: [{ type: "text", text: JSON.stringify(payload) }] },
+    })}\n\n`,
+    {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    },
+  );
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -90,6 +103,23 @@ describe("Tutu offer normalization", () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       headers: { Accept: "application/json, text/event-stream" },
     });
+  });
+
+  it("unwraps SSE JSON-RPC result content for transport and hotels", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(sseContentResponse({
+        items: [{ title: "Москва - Пермь", price: { amount: 4200, currency: "RUB" } }],
+      }))
+      .mockResolvedValueOnce(sseContentResponse({
+        items: [{ name: "Отель Пермь", price: { amount: 6000, currency: "RUB" } }],
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+
+    expect(result.transport[0].title).toBe("Москва - Пермь");
+    expect(result.hotels[0].title).toBe("Отель Пермь");
+    expect(result.warnings).toEqual([]);
   });
 
   it("turns a JSON-RPC error into a warning and keeps successful hotels", async () => {
