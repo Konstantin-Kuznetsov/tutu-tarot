@@ -1,25 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TripIntentForm } from "@/components/TripIntentForm";
-
-// Opens the DateRangeCalendar popover and picks 10-17 September 2026 (the
-// dates the assertion below is pinned to). The panel opens on today's
-// month; step forward with the "next month" control until September 2026
-// is the first of the two visible months, then click its 10 and 17 — the
-// same disambiguation date-range-calendar.test.tsx uses, since both visible
-// months share every day number and an unscoped query would be ambiguous.
-function pickSeptember10to17() {
-  fireEvent.click(screen.getByRole("button", { name: /Когда поедете/ }));
-
-  const today = new Date();
-  const monthsToSeptember2026 = (2026 - today.getFullYear()) * 12 + (8 - today.getMonth());
-  for (let step = 0; step < monthsToSeptember2026; step += 1) {
-    fireEvent.click(screen.getByRole("button", { name: "Следующий месяц" }));
-  }
-
-  fireEvent.click(screen.getAllByRole("button", { name: "10" })[0]);
-  fireEvent.click(screen.getAllByRole("button", { name: "17" })[0]);
-}
+import { pickFutureDateRange } from "../support/pickFutureDateRange";
 
 describe("TripIntentForm", () => {
   it("submits normalized trip intent", () => {
@@ -27,14 +9,14 @@ describe("TripIntentForm", () => {
     render(<TripIntentForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: " Москва " } });
-    pickSeptember10to17();
+    const { from, to } = pickFutureDateRange();
     fireEvent.change(screen.getByLabelText("Путешественники"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
 
     expect(onSubmit).toHaveBeenCalledWith({
       departureCity: "Москва",
-      dateFrom: "2026-09-10",
-      dateTo: "2026-09-17",
+      dateFrom: from,
+      dateTo: to,
       travelerCount: 2,
     });
   });

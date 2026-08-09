@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { pickSeptember10to17 } from "./helpers";
+import { pickFutureDateRange } from "./helpers";
 
 // Regression coverage for a 2026-08-09 review finding: `.tarot-card__back`'s
 // `aspect-ratio: 100/172` was dead CSS (both dimensions were already forced
@@ -64,7 +64,7 @@ test("a face-down card renders at 100/172, and the revealed face fully covers th
 
   await page.goto("/");
   await page.getByLabel("Город вылета").fill("Москва");
-  await pickSeptember10to17(page);
+  await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
 

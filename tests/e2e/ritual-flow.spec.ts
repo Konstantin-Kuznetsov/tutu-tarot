@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { pickSeptember10to17 } from "./helpers";
+import { pickFutureDateRange } from "./helpers";
 
 // Runs under both the "desktop" and "mobile" Playwright projects configured
 // in playwright.config.ts, so this single test covers both viewport sizes.
@@ -73,7 +73,7 @@ test("result screen has no horizontal overflow at 375px even with a long unbroke
 
   await page.goto("/");
   await page.getByLabel("Город вылета").fill("Москва");
-  await pickSeptember10to17(page);
+  await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
 
@@ -150,7 +150,7 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
 
   await page.goto("/");
   await page.getByLabel("Город вылета").fill("Москва");
-  await pickSeptember10to17(page);
+  await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
 

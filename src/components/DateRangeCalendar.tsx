@@ -44,13 +44,27 @@ function nightsBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
+// Standard Russian pluralisation rule (mod 10 / mod 100), not a magnitude
+// threshold — a threshold like "n < 5" only happens to agree with the real
+// rule for 0-14 and diverges at every later number where n % 10 is 1
+// (except 11) or 2-4 (except 12-14): 21 nights is "ночь", 22 is "ночи", 25
+// is "ночей", and the twelve-month span this calendar covers reaches all of
+// them.
+export function nightsWord(nights: number): string {
+  const mod10 = nights % 10;
+  const mod100 = nights % 100;
+  if (mod10 === 1 && mod100 !== 11) return "ночь";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "ночи";
+  return "ночей";
+}
+
 function label(value: DateRange): string {
   if (!value.from) return "Когда поедете";
   const from = RANGE_FORMAT.format(new Date(`${value.from}T00:00:00`));
   if (!value.to) return `${from} — выберите возвращение`;
   const to = RANGE_FORMAT.format(new Date(`${value.to}T00:00:00`));
   const nights = nightsBetween(value.from, value.to);
-  return `${from} – ${to}, ${nights} ноч${nights === 1 ? "ь" : nights < 5 ? "и" : "ей"}`;
+  return `${from} – ${to}, ${nights} ${nightsWord(nights)}`;
 }
 
 export function DateRangeCalendar({ value, onChange }: DateRangeCalendarProps) {
@@ -75,7 +89,13 @@ export function DateRangeCalendar({ value, onChange }: DateRangeCalendarProps) {
   const minKey = toDateKey(today);
 
   function selectDay(key: string) {
-    if (!value.from || value.to || key < value.from) {
+    // `key <= value.from` (not `<`) also catches a second click on the
+    // already-selected start day: re-anchor there instead of falling
+    // through to "to: key", which would set to === from and hand back a
+    // 0-night range with the panel closed. A holiday needs at least one
+    // night, so the only way to "complete" a range is a click strictly
+    // after the start.
+    if (!value.from || value.to || key <= value.from) {
       onChange({ from: key, to: null });
       return;
     }
@@ -124,15 +144,22 @@ export function DateRangeCalendar({ value, onChange }: DateRangeCalendarProps) {
                         const disabled = key < minKey || key > maxKey;
                         const inRange =
                           Boolean(value.from && previewEnd && key > value.from && key < previewEnd);
-                        const edge = key === value.from || key === value.to;
+                        // value.from/value.to are both in scope right here, so the
+                        // start/end distinction the mockup's directional gradient
+                        // needs is available for free — see the CSS comment above
+                        // `.field .calendar` for how `data-position` drives it.
+                        const position =
+                          key === value.from ? "start" : key === value.to ? "end" : undefined;
+                        const edge = position !== undefined;
                         return (
                           <td key={dayIndex}>
                             <button
                               type="button"
                               disabled={disabled}
-                              aria-pressed={edge}
+                              aria-selected={edge}
                               data-in-range={inRange}
                               data-edge={edge}
+                              data-position={position}
                               onMouseEnter={() => setHovered(key)}
                               onClick={() => selectDay(key)}
                             >

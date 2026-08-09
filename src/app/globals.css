@@ -277,17 +277,12 @@ h1 {
    here are the component's own (calendar__*, a <table> per month), not a
    port of the mockup's markup. What IS carried over verbatim: the token
    values, the two-month layout, the weekday header with a dimmed weekend,
-   the hover ring on a plain day, and marking the picked range as one
-   continuous band with gold-circle endpoints.
-
-   One deliberate simplification: the mockup gives .start/.end opposite
-   half-gradients so the band visually flows into whichever side of the
-   circle continues the range. The component exposes only a single
-   `data-edge="true"` flag for both endpoints (no start/end distinction), so
-   that per-side gradient isn't reproducible from the DOM as given — both
-   endpoints instead get the same full-cell band fill as an "in range" day,
-   which still reads as one continuous strip with two emphasised (gold
-   circle) ends. */
+   the hover ring on a plain day, marking the picked range as one
+   continuous band with gold-circle endpoints, and — via the
+   `data-position="start"|"end"` attribute alongside `data-edge` — the
+   mockup's own directional half-gradient per endpoint (`.day.start` /
+   `.day.end`), so the band visually flows into whichever side of the gold
+   circle continues the range. */
 .field .calendar {
   position: relative;
   width: 100%;
@@ -415,10 +410,22 @@ h1 {
 }
 
 /* Continuous band: every day strictly between the endpoints, plus (see the
-   comment above the .field .calendar rule) the endpoints themselves. */
-.calendar__month button[data-in-range="true"],
-.calendar__month button[data-edge="true"] {
+   comment above the .field .calendar rule) the endpoints themselves. The
+   endpoints get a directional half-gradient instead of a flat fill (ported
+   verbatim from the mockup's .day.start/.day.end) so the band visually
+   flows into whichever side of the gold circle continues the range —
+   `data-position="start"` fills the trailing (right) half, `"end"` fills
+   the leading (left) half, matching the Monday-first, left-to-right grid. */
+.calendar__month button[data-in-range="true"] {
   background: var(--cloth-2);
+}
+
+.calendar__month button[data-position="start"] {
+  background: linear-gradient(90deg, transparent 0 50%, var(--cloth-2) 50%);
+}
+
+.calendar__month button[data-position="end"] {
+  background: linear-gradient(90deg, var(--cloth-2) 0 50%, transparent 50%);
 }
 
 .calendar__month button[data-edge="true"] {

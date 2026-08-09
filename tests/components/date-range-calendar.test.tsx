@@ -1,13 +1,37 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { DateRangeCalendar, toDateKey, type DateRange } from "@/components/DateRangeCalendar";
+import { DateRangeCalendar, nightsWord, toDateKey, type DateRange } from "@/components/DateRangeCalendar";
 
 describe("toDateKey", () => {
   it("uses local date parts, not UTC", () => {
     // 1 March 2026, 00:30 local. toISOString() would report 28 February for
     // every timezone east of UTC, which is all of Russia.
     expect(toDateKey(new Date(2026, 2, 1, 0, 30))).toBe("2026-03-01");
+  });
+});
+
+describe("nightsWord", () => {
+  // Standard Russian mod-10/mod-100 pluralisation, not a magnitude
+  // threshold. A threshold (the bug this replaces) happens to agree with
+  // the real rule up to 14 and then diverges — 21/22/25/101/111 are the
+  // cases that catch it, since this calendar spans twelve months forward
+  // and reaches all of them in ordinary use.
+  it.each([
+    [1, "ночь"],
+    [2, "ночи"],
+    [4, "ночи"],
+    [5, "ночей"],
+    [11, "ночей"],
+    [12, "ночей"],
+    [14, "ночей"],
+    [21, "ночь"],
+    [22, "ночи"],
+    [25, "ночей"],
+    [101, "ночь"],
+    [111, "ночей"],
+  ])("%i nights -> %s", (nights, expected) => {
+    expect(nightsWord(nights)).toBe(expected);
   });
 });
 
@@ -76,9 +100,52 @@ describe("DateRangeCalendar", () => {
     expect(onChange).toHaveBeenLastCalledWith({ from: expect.stringMatching(/-10$/), to: null });
   });
 
+  it("re-anchors instead of completing a 0-night range when the start day is clicked again", () => {
+    const onChange = open();
+    fireEvent.click(day("10"));
+    onChange.mockClear();
+
+    fireEvent.click(day("10"));
+
+    // Re-anchored at the same day, not "completed" into to === from.
+    expect(onChange).toHaveBeenLastCalledWith({ from: expect.stringMatching(/-10$/), to: null });
+    // A from/to-equal range would have closed the panel (see the
+    // "to"-branch in selectDay); staying open is proof the fix took the
+    // re-anchor branch, not the completion branch.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("closes on Escape", () => {
     open();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("marks the range endpoints with aria-selected and a directional data-position", () => {
+    open();
+    // Capture the trigger by reference: picking the end day closes the
+    // panel and rewrites the trigger's own accessible name to the label
+    // (e.g. "10 августа – 17 августа, 7 ночей"), so it can no longer be
+    // found by its empty-state name afterwards.
+    const trigger = screen.getByRole("button", { name: /Когда поедете/ });
+
+    fireEvent.click(day("10"));
+    fireEvent.click(day("17"));
+
+    // Re-open to inspect the already-picked range's rendered endpoints —
+    // completing the range closes the panel in the same update, so "end"
+    // is never observable mid-click, only once the panel is reopened.
+    fireEvent.click(trigger);
+
+    const start = day("10");
+    const end = day("17");
+    expect(start).toHaveAttribute("aria-selected", "true");
+    expect(start).toHaveAttribute("data-position", "start");
+    expect(end).toHaveAttribute("aria-selected", "true");
+    expect(end).toHaveAttribute("data-position", "end");
+
+    const inRangeDay = day("12");
+    expect(inRangeDay).toHaveAttribute("aria-selected", "false");
+    expect(inRangeDay).not.toHaveAttribute("data-position");
   });
 });
