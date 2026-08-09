@@ -18,6 +18,73 @@ test("entry screen shows the title and the deck fan with no horizontal overflow"
   expect(hasNoHorizontalOverflow).toBe(true);
 });
 
+// Regression coverage for a 2026-08-09 review finding: at 375px,
+// document.documentElement.scrollWidth measured 431px on the result screen.
+// Root cause was two-fold (see the fix in src/server/oracle/narrator.ts and
+// the .prediction-panel rule in globals.css): summaryFor() used to
+// concatenate a raw destination.sourceUrl into the prediction prose, and
+// .prediction-panel had no overflow-wrap, unlike .road__hero, .road__reason
+// and .offer-card, which all do. The narrator fix stops the URL from
+// reaching the prose at all; this test also proves the CSS half holds on
+// its own by mocking a prediction summary that contains a long unbroken
+// token another way (not a URL) — an assertion that would fail if
+// .prediction-panel's overflow-wrap were ever removed, even though nothing
+// in the real narrator emits a URL anymore.
+test("result screen has no horizontal overflow at 375px even with a long unbroken token in the prediction", async ({ page }) => {
+  // page.setViewportSize (not test.use, which can't be called inside a test
+  // body) pins the exact 375px width from the bug report regardless of
+  // which Playwright project (desktop/mobile) runs this file.
+  await page.setViewportSize({ width: 375, height: 812 });
+
+  await page.route("**/api/ritual", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ritualId: "demo",
+        seed: "москва|2026-09-10|2026-09-17|2",
+        spreadCards: [
+          {
+            id: "tower", number: 16, name: "Башня", image: "/tarot/16-tower.webp", position: "Зов",
+            reversed: false, archetypes: ["cliffs"], transport: ["avia"],
+            meaning: "камень и высота", meaningReversed: "обвал случился раньше, теперь строят заново",
+          },
+        ],
+        destination: { name: "Усьвинские Столбы", region: "Пермский край" },
+        prediction: {
+          headline: "Карты указывают на Усьвинские Столбы",
+          opening: "Башня зовет к камню.",
+          // Deliberately unbroken and much wider than a 375px viewport —
+          // stands in for whatever future regression might again put a
+          // long unbroken token in the prose (a URL or otherwise).
+          summary:
+            "Маршрут собран из открытых источников. Токенбезпробеловикоторыйничемнеразрывается" +
+            "иоченьдлинныйчтобыоднозначнопревыситьширинуэкранавтелефоневпортретнойориентации.",
+          cardReadings: [],
+        },
+        roadChoice: { mode: "railway", reason: "reason", best: null },
+        transportOffers: [],
+        hotelOffers: [],
+        sourceLinks: [],
+        warnings: [],
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Дата начала").fill("2026-09-10");
+  await page.getByLabel("Дата конца").fill("2026-09-17");
+  await page.getByLabel("Путешественники").fill("2");
+  await page.getByRole("button", { name: "Начать расклад" }).click();
+
+  await expect(page.getByText("Карты указывают на Усьвинские Столбы")).toBeVisible();
+
+  const hasNoHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  );
+  expect(hasNoHorizontalOverflow).toBe(true);
+});
+
 test("ritual flow reaches Tutu-backed result", async ({ page }) => {
   await page.route("**/api/ritual", async (route) => {
     await route.fulfill({

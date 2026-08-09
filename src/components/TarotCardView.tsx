@@ -30,7 +30,12 @@ export function TarotCardView({ card, revealed, testId }: TarotCardViewProps) {
           />
           <figcaption>
             <strong>{card.name}</strong>
-            {card.reversed ? <em className="tarot-card__flag">перевёрнутая</em> : null}
+            {card.reversed ? (
+              <>
+                {" "}
+                <em className="tarot-card__flag">перевёрнутая</em>
+              </>
+            ) : null}
             <p>{meaning}</p>
           </figcaption>
         </div>

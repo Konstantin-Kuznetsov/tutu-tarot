@@ -1,4 +1,4 @@
-import type { DestinationSelection, DrawnTarotCard, TripIntent } from "@/domain/types";
+import type { DestinationSelection, DrawnTarotCard, TravelAtlasItem, TripIntent } from "@/domain/types";
 import type { RoadChoice } from "@/server/ritual/runRitual";
 
 export interface OfferHighlights {
@@ -31,9 +31,33 @@ export interface PredictionText {
   summary: string;
 }
 
+// Source-sensitive, but deliberately carries no URL: raw links belong to the
+// dedicated proof-links block (see TravelResult's .proof-links, built from
+// RitualResult.sourceLinks), not to the oracle's prose. A long unbroken URL
+// inside .prediction-panel is also what caused a 2026-08-09 mobile overflow
+// (see .prediction-panel's overflow-wrap comment in globals.css).
+//
+// The three-way split matters, not just cosmetically: only "provereno.tutu"
+// is Tutu's own verified-route tier, so only that branch may claim
+// confirmation. "geo.tutu" is still Tutu's data (its own geo guide) but not
+// the verified tier, and "fallback" isn't Tutu data at all (e.g. Wikipedia)
+// — claiming Tutu confirmation there would regress a distinction earlier
+// work deliberately hardened (see runRitual's sourceLinks label, which only
+// grants "Проверенный маршрут Туту" to provereno.tutu).
+function sourceNoteFor(source: TravelAtlasItem["source"]): string {
+  switch (source) {
+    case "provereno.tutu":
+      return "Маршрут подтверждён проверенными маршрутами Туту.";
+    case "geo.tutu":
+      return "Маршрут собран по путеводителю Туту.";
+    case "fallback":
+      return "Маршрут собран из открытых источников.";
+  }
+}
+
 function summaryFor(input: PredictionInput): string {
   const { destination } = input.selection;
-  const baseSummary = `Предсказание ведет в ${destination.region}. Источник маршрута (${destination.source}): ${destination.sourceUrl}. Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
+  const baseSummary = `Предсказание ведет в ${destination.region}. ${sourceNoteFor(destination.source)} Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
   return [baseSummary, input.roadChoice.reason].filter(Boolean).join(" ");
 }
 

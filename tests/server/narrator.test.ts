@@ -142,11 +142,64 @@ describe("createPrediction", () => {
     expect(result.opening).toContain("каменная дорога");
   });
 
-  it("uses the actual source for fallback destinations in the summary", async () => {
+  it("never puts a raw URL in the summary", async () => {
     const result = await createPrediction(createInput());
 
-    expect(result.summary).toContain("https://ru.wikipedia.org/wiki/Усьвинские_Столбы");
-    expect(result.summary).not.toContain("подтверждается источниками Туту");
+    // The summary must stay source-aware without depending on a URL being
+    // present: raw links belong to the dedicated proof-links block
+    // (RitualResult.sourceLinks / TravelResult's .proof-links), not the
+    // oracle's prose. A bare URL here also caused a 2026-08-09 mobile
+    // horizontal-overflow bug (see .prediction-panel's overflow-wrap in
+    // globals.css for the CSS-side half of that fix).
+    expect(result.summary).not.toContain("http");
+    expect(result.summary).not.toContain(createInput().selection.destination.sourceUrl);
+  });
+
+  it("does not claim Tutu confirmation for a fallback destination", async () => {
+    const result = await createPrediction(createInput());
+
+    // "fallback" sources (e.g. Wikipedia here) are not Tutu data at all —
+    // claiming confirmation would regress a distinction earlier work
+    // deliberately hardened (see runRitual's sourceLinks label, which only
+    // grants "Проверенный маршрут Туту" to provereno.tutu destinations).
+    expect(result.summary).toContain("Маршрут собран из открытых источников.");
+    expect(result.summary).not.toContain("подтверждён");
+    expect(result.summary).not.toContain("Проверенный");
+  });
+
+  it("claims Tutu confirmation for a provereno.tutu destination", async () => {
+    const baseInput = createInput();
+    const result = await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: {
+          ...baseInput.selection.destination,
+          source: "provereno.tutu",
+          sourceUrl: "https://provereno.tutu.ru/example",
+        },
+      },
+    });
+
+    expect(result.summary).toContain("Маршрут подтверждён проверенными маршрутами Туту.");
+  });
+
+  it("credits Tutu's own geo guide without claiming the verified tier", async () => {
+    const baseInput = createInput();
+    const result = await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: {
+          ...baseInput.selection.destination,
+          source: "geo.tutu",
+          sourceUrl: "https://www.tutu.ru/geo/example",
+        },
+      },
+    });
+
+    expect(result.summary).toContain("Маршрут собран по путеводителю Туту.");
+    expect(result.summary).not.toContain("подтверждён");
   });
 
   it("appends the road choice's reason to the summary without exposing it to the AI prompt", async () => {
