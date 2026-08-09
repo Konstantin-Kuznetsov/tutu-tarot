@@ -1,5 +1,7 @@
 export type TarotPosition = "Зов" | "Путь" | "Дар маршрута";
 
+export type TransportMode = "avia" | "railway" | "bus";
+
 export type TarotArchetype =
   | "solitude"
   | "road"
@@ -22,10 +24,13 @@ export interface TripIntent {
 
 export interface TarotCardDefinition {
   id: string;
+  number: number;
   name: string;
-  image?: string;
+  image: string;
   archetypes: TarotArchetype[];
+  transport: TransportMode[];
   meaning: string;
+  meaningReversed: string;
 }
 
 export interface DrawnTarotCard extends TarotCardDefinition {
