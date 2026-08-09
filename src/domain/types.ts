@@ -64,3 +64,11 @@ export interface DestinationSelection {
   score: number;
   reasons: string[];
 }
+
+export interface ModeSummary {
+  count: number;
+  minPrice: number | null;
+  minDurationMin: number | null;
+}
+
+export type ModesSummary = Partial<Record<TransportMode, ModeSummary>>;

@@ -1,14 +1,50 @@
+import type { ModesSummary, TransportMode } from "@/domain/types";
+
 export interface NormalizedOffer {
   id: string;
   title: string;
   price?: string;
   subtitle?: string;
   url?: string;
+  mode?: TransportMode;
+}
+
+const MODES: TransportMode[] = ["avia", "railway", "bus"];
+
+function readMode(value: unknown): TransportMode | undefined {
+  return MODES.find((mode) => mode === value);
+}
+
+export function readModesSummary(raw: unknown): ModesSummary {
+  const meta = raw && typeof raw === "object" ? (raw as { meta?: unknown }).meta : undefined;
+  const source = meta && typeof meta === "object"
+    ? (meta as { modes_summary?: unknown }).modes_summary
+    : undefined;
+  if (!source || typeof source !== "object") return {};
+
+  const summary: ModesSummary = {};
+  for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+    const mode = readMode(key);
+    if (!mode || !value || typeof value !== "object") continue;
+
+    const record = value as { count?: unknown; min_price?: unknown; min_duration_min?: unknown };
+    if (typeof record.count !== "number" || record.count <= 0) continue;
+
+    summary[mode] = {
+      count: record.count,
+      minPrice: typeof record.min_price === "number" ? record.min_price : null,
+      minDurationMin: typeof record.min_duration_min === "number" ? record.min_duration_min : null,
+    };
+  }
+  return summary;
 }
 
 function readItems(raw: unknown): unknown[] {
   if (raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)) {
     return (raw as { items: unknown[] }).items;
+  }
+  if (raw && typeof raw === "object" && Array.isArray((raw as { variants?: unknown }).variants)) {
+    return (raw as { variants: unknown[] }).variants;
   }
   if (raw && typeof raw === "object" && Array.isArray((raw as { offers?: unknown }).offers)) {
     return (raw as { offers: unknown[] }).offers;
@@ -48,13 +84,14 @@ function transportTitle(record: Record<string, unknown>): string {
   const explicitTitle = readString(record.title);
   if (explicitTitle) return explicitTitle;
 
+  const labels: Record<string, string> = {
+    avia: "Авиабилеты",
+    railway: "Поезд",
+    bus: "Автобус",
+  };
+  const label = labels[String(record.transport)] ?? "Билеты";
   const carriers = readStringList(record.carriers);
-  if (carriers.length > 0) {
-    const label = record.transport === "avia" ? "Авиабилеты" : "Билеты";
-    return `${label}: ${carriers.join(", ")}`;
-  }
-
-  return "Вариант дороги";
+  return carriers.length > 0 ? `${label}: ${carriers.join(", ")}` : label;
 }
 
 export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
@@ -73,6 +110,7 @@ export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
         readString(record.checkout_url) ||
         readString(record.checkoutUrl) ||
         readString(record.url),
+      mode: readMode(record.transport),
     };
   });
 }
