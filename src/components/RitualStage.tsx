@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { TripIntent } from "@/domain/types";
 import { TripIntentForm } from "./TripIntentForm";
-import { RitualScene3D, type RitualVisualStage } from "./RitualScene3D";
-import { RitualSceneFallback } from "./RitualSceneFallback";
+import { RitualScene } from "./RitualScene";
+import type { RitualVisualStage } from "./RitualScene3D";
 
 type Stage = "idle" | "ritual-started" | "awaiting-result" | "result" | "error";
 
@@ -43,10 +43,7 @@ export function RitualStage() {
         <p>Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег.</p>
       </div>
       <div className="scene-shell">
-        <RitualScene3D stage={visualStage} />
-        <div className="reduced-motion-scene">
-          <RitualSceneFallback stage={visualStage} />
-        </div>
+        <RitualScene stage={visualStage} />
       </div>
       {stage === "idle" ? <TripIntentForm onSubmit={startRitual} /> : null}
       {stage === "ritual-started" || stage === "awaiting-result" ? <p className="ritual-status">Карты ложатся на стол...</p> : null}

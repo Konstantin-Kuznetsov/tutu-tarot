@@ -112,10 +112,6 @@ input {
   background: #120d14;
 }
 
-.reduced-motion-scene {
-  display: none;
-}
-
 .ritual-fallback {
   min-height: 280px;
   display: grid;
@@ -144,16 +140,6 @@ input {
   background: #e8d3a0;
   color: #151016;
   text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ritual-scene {
-    display: none;
-  }
-
-  .reduced-motion-scene {
-    display: block;
-  }
 }
 
 @media (max-width: 760px) {
