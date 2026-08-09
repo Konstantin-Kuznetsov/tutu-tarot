@@ -1,5 +1,4 @@
 import type { DestinationSelection, TarotSpread, TripIntent } from "@/domain/types";
-import { travelAtlas } from "@/domain/travel/atlas";
 
 export interface OfferHighlights {
   transport: string[];
@@ -30,24 +29,62 @@ function summaryFor(input: PredictionInput): string {
   return `Предсказание ведет в ${destination.region}. Источник маршрута (${destination.source}): ${destination.sourceUrl}. Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
 }
 
-function containsDestination(text: string, destinationName: string): boolean {
-  return text.toLocaleLowerCase("ru-RU").includes(destinationName.toLocaleLowerCase("ru-RU"));
+const allowedAtmosphericWords = new Set([
+  "Ветер",
+  "Тихий",
+  "Камень",
+  "Высота",
+  "Дорога",
+  "Тишина",
+  "Свет",
+  "Север",
+  "Вода",
+  "Воздух",
+  "Здесь",
+  "Пусть",
+  "Путь",
+  "Шорох",
+  "Ритм",
+  "И",
+  "Но",
+  "Это",
+]);
+
+function selectedMetadata(input: PredictionInput): string[] {
+  const { destination } = input.selection;
+  return [
+    destination.name,
+    destination.region,
+    destination.routeTitle,
+    destination.anchorPlace,
+    destination.nearestTransportHub,
+    destination.hotelSearchCity,
+    ...destination.tags,
+  ];
 }
 
-function isAcceptedNarration(text: string, input: PredictionInput): boolean {
-  const selectedDestination = input.selection.destination.name;
-  if (!containsDestination(text, selectedDestination)) return false;
+function isAcceptedAtmosphericFragment(text: string, input: PredictionInput): boolean {
+  if (text.length > 240 || /[\n\r]|https?:\/\/|\d/.test(text)) return false;
 
-  return travelAtlas.every(
-    (destination) => destination.name === selectedDestination || !containsDestination(text, destination.name),
+  const allowedMetadataWords = new Set(
+    selectedMetadata(input).flatMap((term) => term.match(/[А-ЯЁ][а-яё-]+/g) ?? []),
   );
+  const capitalizedWords = text.match(/[А-ЯЁ][а-яё-]+/g) ?? [];
+  return capitalizedWords.every(
+    (word) => allowedAtmosphericWords.has(word) || allowedMetadataWords.has(word),
+  );
+}
+
+function appOpening(input: PredictionInput): string {
+  const { destination } = input.selection;
+  return `Маршрут из города ${input.intent.departureCity} тянется к ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}.`;
 }
 
 function templatePrediction(input: PredictionInput): PredictionText {
   const { destination } = input.selection;
   return {
     headline: `Карты указывают на ${destination.name}`,
-    opening: `Маршрут из города ${input.intent.departureCity} тянется к месту, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}.`,
+    opening: appOpening(input),
     cardReadings: input.spread.cards.map((card) => ({
       position: card.position,
       cardName: card.name,
@@ -92,11 +129,11 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
     if (!response.ok) return templatePrediction(input);
     const data = (await response.json()) as { output_text?: string };
     const text = data.output_text?.trim();
-    if (!text || !isAcceptedNarration(text, input)) return templatePrediction(input);
+    if (!text || !isAcceptedAtmosphericFragment(text, input)) return templatePrediction(input);
 
     return {
       headline: `Карты указывают на ${input.selection.destination.name}`,
-      opening: text,
+      opening: `${appOpening(input)} ${text}`,
       cardReadings: input.spread.cards.map((card) => ({
         position: card.position,
         cardName: card.name,
