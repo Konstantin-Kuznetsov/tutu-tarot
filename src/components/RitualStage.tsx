@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { TripIntent } from "@/domain/types";
 import { TripIntentForm } from "./TripIntentForm";
+import { RitualScene3D, type RitualVisualStage } from "./RitualScene3D";
+import { RitualSceneFallback } from "./RitualSceneFallback";
 
 type Stage = "idle" | "ritual-started" | "awaiting-result" | "result" | "error";
 
@@ -14,6 +16,8 @@ interface RitualApiResult {
 export function RitualStage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [result, setResult] = useState<RitualApiResult | null>(null);
+  const visualStage: RitualVisualStage =
+    stage === "ritual-started" || stage === "awaiting-result" ? "dealing" : stage === "result" ? "result" : stage;
 
   async function startRitual(intent: TripIntent) {
     setStage("ritual-started");
@@ -37,6 +41,12 @@ export function RitualStage() {
       <div className="ritual-copy">
         <h1>Таро-турагент</h1>
         <p>Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег.</p>
+      </div>
+      <div className="scene-shell">
+        <RitualScene3D stage={visualStage} />
+        <div className="reduced-motion-scene">
+          <RitualSceneFallback stage={visualStage} />
+        </div>
       </div>
       {stage === "idle" ? <TripIntentForm onSubmit={startRitual} /> : null}
       {stage === "ritual-started" || stage === "awaiting-result" ? <p className="ritual-status">Карты ложатся на стол...</p> : null}
