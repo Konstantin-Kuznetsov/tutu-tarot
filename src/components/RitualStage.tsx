@@ -5,17 +5,13 @@ import type { TripIntent } from "@/domain/types";
 import { TripIntentForm } from "./TripIntentForm";
 import { RitualScene } from "./RitualScene";
 import type { RitualVisualStage } from "./RitualScene3D";
+import { TravelResult, type RitualResultViewModel } from "./TravelResult";
 
 type Stage = "idle" | "ritual-started" | "awaiting-result" | "result" | "error";
 
-interface RitualApiResult {
-  prediction: { headline: string; opening: string; summary: string };
-  destination: { name: string; region: string };
-}
-
 export function RitualStage() {
   const [stage, setStage] = useState<Stage>("idle");
-  const [result, setResult] = useState<RitualApiResult | null>(null);
+  const [result, setResult] = useState<RitualResultViewModel | null>(null);
   const visualStage: RitualVisualStage =
     stage === "ritual-started" || stage === "awaiting-result" ? "dealing" : stage === "result" ? "result" : stage;
 
@@ -28,7 +24,7 @@ export function RitualStage() {
         body: JSON.stringify(intent),
       });
       if (!response.ok) throw new Error("ritual_failed");
-      const data = (await response.json()) as RitualApiResult;
+      const data = (await response.json()) as RitualResultViewModel;
       setResult(data);
       setStage("result");
     } catch {
@@ -47,13 +43,7 @@ export function RitualStage() {
       </div>
       {stage === "idle" ? <TripIntentForm onSubmit={startRitual} /> : null}
       {stage === "ritual-started" || stage === "awaiting-result" ? <p className="ritual-status">Карты ложатся на стол...</p> : null}
-      {stage === "result" && result ? (
-        <div className="result-shell">
-          <p>{result.prediction.headline}</p>
-          <h2>{result.destination.name}</h2>
-          <p>{result.destination.region}</p>
-        </div>
-      ) : null}
+      {stage === "result" && result ? <TravelResult result={result} /> : null}
       {stage === "error" ? <button onClick={() => setStage("idle")}>Попробовать снова</button> : null}
     </section>
   );
