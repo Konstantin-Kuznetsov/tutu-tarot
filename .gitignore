@@ -1,0 +1,29 @@
+.DS_Store
+
+# Local env
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Superpowers brainstorming scratch files
+.superpowers/
+
+# Local skill/archive drops
+*.tar.gz
