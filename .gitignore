@@ -15,6 +15,9 @@ coverage/
 # Vercel
 .vercel/
 
+# Git worktrees
+.worktrees/
+
 # Logs
 *.log
 npm-debug.log*
