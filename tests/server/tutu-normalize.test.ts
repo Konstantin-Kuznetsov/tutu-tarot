@@ -40,16 +40,20 @@ function contentResponse(payload: unknown): Response {
   });
 }
 
-function sseContentResponse(payload: unknown): Response {
+function sseResponse(events: unknown[], contentType = "text/event-stream"): Response {
   return new Response(
-    `event: message\ndata: ${JSON.stringify({
-      jsonrpc: "2.0",
-      result: { content: [{ type: "text", text: JSON.stringify(payload) }] },
-    })}\n\n`,
+    events.map((event) => `event: message\ndata: ${JSON.stringify(event)}\n\n`).join(""),
     {
       status: 200,
-      headers: { "Content-Type": "text/event-stream" },
+      headers: { "Content-Type": contentType },
     },
+  );
+}
+
+function sseContentResponse(payload: unknown, id?: string, contentType?: string): Response {
+  return sseResponse(
+    [{ jsonrpc: "2.0", ...(id ? { id } : {}), result: { content: [{ type: "text", text: JSON.stringify(payload) }] } }],
+    contentType,
   );
 }
 
@@ -106,13 +110,79 @@ describe("Tutu offer normalization", () => {
   });
 
   it("unwraps SSE JSON-RPC result content for transport and hotels", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
+    const requestTime = Date.now();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(sseContentResponse({
         items: [{ title: "Москва - Пермь", price: { amount: 4200, currency: "RUB" } }],
-      }))
+      }, `search_multitransport-${requestTime}`))
       .mockResolvedValueOnce(sseContentResponse({
         items: [{ name: "Отель Пермь", price: { amount: 6000, currency: "RUB" } }],
-      }));
+      }, `search_hotels-${requestTime}`));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+
+    expect(result.transport[0].title).toBe("Москва - Пермь");
+    expect(result.hotels[0].title).toBe("Отель Пермь");
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("skips SSE notifications and unrelated response ids before the matching tool result", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
+    const requestTime = Date.now();
+    const transportId = `search_multitransport-${requestTime}`;
+    const hotelId = `search_hotels-${requestTime}`;
+    const progress = { jsonrpc: "2.0", method: "notifications/progress", params: { progress: 50 } };
+    const unexpectedResult = {
+      jsonrpc: "2.0",
+      id: "another-request",
+      result: { content: [{ type: "text", text: JSON.stringify({ items: [] }) }] },
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(sseResponse([
+        progress,
+        unexpectedResult,
+        {
+          jsonrpc: "2.0",
+          id: transportId,
+          result: { content: [{ type: "text", text: JSON.stringify({ items: [{ title: "Москва - Пермь" }] }) }] },
+        },
+      ]))
+      .mockResolvedValueOnce(sseResponse([
+        progress,
+        {
+          jsonrpc: "2.0",
+          id: hotelId,
+          result: { content: [{ type: "text", text: JSON.stringify({ items: [{ name: "Отель Пермь" }] }) }] },
+        },
+      ]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+
+    expect(result.transport[0].title).toBe("Москва - Пермь");
+    expect(result.hotels[0].title).toBe("Отель Пермь");
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("recognizes mixed-case SSE content types", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
+    const requestTime = Date.now();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(sseContentResponse(
+        { items: [{ title: "Москва - Пермь" }] },
+        `search_multitransport-${requestTime}`,
+        "Text/Event-Stream; charset=utf-8",
+      ))
+      .mockResolvedValueOnce(sseContentResponse(
+        { items: [{ name: "Отель Пермь" }] },
+        `search_hotels-${requestTime}`,
+        "Text/Event-Stream; charset=utf-8",
+      ));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });

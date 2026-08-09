@@ -18,6 +18,7 @@ export interface TutuSearchResult {
 async function callTool(endpoint: string, name: string, args: Record<string, unknown>): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
+  const requestId = `${name}-${Date.now()}`;
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -28,14 +29,15 @@ async function callTool(endpoint: string, name: string, args: Record<string, unk
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: `${name}-${Date.now()}`,
+        id: requestId,
         method: "tools/call",
         params: { name, arguments: args },
       }),
     });
     if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
-    const raw = response.headers.get("content-type")?.includes("text/event-stream")
-      ? parseSseResponse(await response.text(), name)
+    const contentType = response.headers.get("content-type")?.toLowerCase();
+    const raw = contentType?.includes("text/event-stream")
+      ? parseSseResponse(await response.text(), name, requestId)
       : await response.json();
     return unwrapMcpResponse(raw, name);
   } finally {
@@ -43,7 +45,7 @@ async function callTool(endpoint: string, name: string, args: Record<string, unk
   }
 }
 
-function parseSseResponse(body: string, name: string): unknown {
+function parseSseResponse(body: string, name: string, requestId: string): unknown {
   for (const event of body.split(/\r?\n\r?\n/)) {
     const data = event
       .split(/\r?\n/)
@@ -53,13 +55,25 @@ function parseSseResponse(body: string, name: string): unknown {
     if (!data) continue;
 
     try {
-      return JSON.parse(data);
+      const response = JSON.parse(data) as unknown;
+      if (isMatchingJsonRpcResponse(response, requestId)) return response;
     } catch {
       throw new Error(`Tutu MCP ${name} SSE data is not valid JSON`);
     }
   }
 
   throw new Error(`Tutu MCP ${name} SSE response has no data payload`);
+}
+
+function isMatchingJsonRpcResponse(value: unknown, requestId: string): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const response = value as Record<string, unknown>;
+  return (
+    response.jsonrpc === "2.0" &&
+    response.id === requestId &&
+    (Object.hasOwn(response, "result") || Object.hasOwn(response, "error"))
+  );
 }
 
 function unwrapMcpResponse(raw: unknown, name: string): unknown {
