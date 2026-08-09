@@ -11,6 +11,7 @@ node_modules/
 out/
 dist/
 coverage/
+test-results/
 
 # Vercel
 .vercel/
