@@ -32,3 +32,5 @@ pnpm-debug.log*
 
 # Local skill/archive drops
 *.tar.gz
+
+.cache/
