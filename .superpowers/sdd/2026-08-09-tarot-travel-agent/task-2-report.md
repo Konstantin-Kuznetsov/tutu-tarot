@@ -57,3 +57,23 @@
 
 - `npm run test` was also run. It reports 5 passing tests and one failure because the existing `tests/e2e/foundation-shell.spec.ts` Playwright test is collected by Vitest and calls Playwright's `test()` outside its runner. This is unrelated to Task 2 and was not modified.
 - npm emits the existing warning that the user config `always-auth` is unknown.
+
+## Pre-review fix: Vitest and Playwright collection
+
+### Fix
+
+- Updated `vitest.config.ts` to exclude `tests/e2e/**` while preserving Vitest's standard exclusions for `node_modules`, `.git`, and `dist`.
+- No domain behavior was changed.
+
+### Verification
+
+- `npm run test`
+  - PASS: 3 files, 5 tests.
+- `npm run test:e2e`
+  - PASS: 2 Playwright projects, 2 tests.
+- `npm run lint`
+  - PASS.
+- `npx tsc --noEmit`
+  - PASS.
+
+The first parallel verification attempt temporarily exposed that custom Vitest exclusions replace defaults and also raced lint with Playwright output. The final configuration and sequential reruns are clean. Playwright logged a non-failing Next.js `allowedDevOrigins` warning for `127.0.0.1`.
