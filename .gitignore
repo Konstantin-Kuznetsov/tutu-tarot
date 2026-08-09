@@ -8,9 +8,11 @@
 # Dependencies and build output
 node_modules/
 .next/
+tsconfig.tsbuildinfo
 out/
 dist/
 coverage/
+test-results/
 
 # Vercel
 .vercel/
