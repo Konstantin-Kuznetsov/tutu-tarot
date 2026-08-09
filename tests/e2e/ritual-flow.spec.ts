@@ -1,5 +1,23 @@
 import { expect, test } from "@playwright/test";
 
+// Runs under both the "desktop" and "mobile" Playwright projects configured
+// in playwright.config.ts, so this single test covers both viewport sizes.
+// The ticket form is the most likely thing to push the page sideways at a
+// mobile width (375px) — it collapses to a single column there, but a
+// missed case in that collapse (or a runaway grid track) would overflow
+// silently since nothing else in this suite measures page width.
+test("entry screen shows the title and the deck fan with no horizontal overflow", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Таро-турагент" })).toBeVisible();
+  await expect(page.getByTestId("deck-fan")).toBeVisible();
+
+  const hasNoHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  );
+  expect(hasNoHorizontalOverflow).toBe(true);
+});
+
 test("ritual flow reaches Tutu-backed result", async ({ page }) => {
   await page.route("**/api/ritual", async (route) => {
     await route.fulfill({

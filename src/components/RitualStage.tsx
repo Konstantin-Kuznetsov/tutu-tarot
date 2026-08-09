@@ -71,21 +71,34 @@ export function RitualStage() {
     }
   }
 
+  // The idle stage renders TripIntentForm alone, which now owns the whole
+  // entry screen (fan, service line, h1, promise, ticket form, fine print —
+  // see its own file). Every other stage keeps the pre-Task-8 shell
+  // (.app-shell > .ritual-layout with its own .ritual-copy h1) so it isn't
+  // left half-styled until Tasks 9 and 11 restyle it. Splitting the return
+  // this way, instead of always rendering .ritual-copy, is what keeps a
+  // single <h1>"Таро-турагент"</h1> in the document at idle — two would
+  // make getByRole("heading", …) throw on ambiguity.
+  if (stage === "idle") {
+    return <TripIntentForm onSubmit={startRitual} />;
+  }
+
   return (
-    <section className="ritual-layout" data-stage={stage}>
-      <div className="ritual-copy">
-        <h1>Таро-турагент</h1>
-        <p>Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег.</p>
-      </div>
-      {stage === "idle" ? <TripIntentForm onSubmit={startRitual} /> : null}
-      {showRitualScene ? (
-        <div className="scene-shell">
-          <RitualScene stage={visualStage} />
-          <p className="ritual-status">Карты ложатся на стол...</p>
+    <main className="app-shell">
+      <section className="ritual-layout" data-stage={stage}>
+        <div className="ritual-copy">
+          <h1>Таро-турагент</h1>
+          <p>Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег.</p>
         </div>
-      ) : null}
-      {stage === "result" && result ? <TravelResult result={result} /> : null}
-      {stage === "error" ? <button onClick={() => setStage("idle")}>Попробовать снова</button> : null}
-    </section>
+        {showRitualScene ? (
+          <div className="scene-shell">
+            <RitualScene stage={visualStage} />
+            <p className="ritual-status">Карты ложатся на стол...</p>
+          </div>
+        ) : null}
+        {stage === "result" && result ? <TravelResult result={result} /> : null}
+        {stage === "error" ? <button onClick={() => setStage("idle")}>Попробовать снова</button> : null}
+      </section>
+    </main>
   );
 }

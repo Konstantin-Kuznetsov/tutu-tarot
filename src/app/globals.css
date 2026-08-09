@@ -1,20 +1,66 @@
+/* Design tokens, ported wholesale from docs/design/tokens.css (source of
+ * truth: Claude Design project "Дизайн карточек и навигации",
+ * id 33d8a5c9-0f76-4610-9f1c-45c9a1461ea7, screen "01 Вход.dc.html"). This
+ * replaces the partial hand-picked set Task 7 introduced for `.back` alone.
+ *
+ * `color-scheme: dark` is not part of the mockup's token file — it is kept
+ * from Task 7 because native form controls (the ticket's date/number
+ * inputs) need it to render their built-in chrome (calendar icon, spin
+ * buttons) in a dark-appropriate style instead of light-on-dark.
+ */
 :root {
   color-scheme: dark;
-  --ink: #f4edf7;
-  --muted: #c8bed1;
-  --bg: #151016;
-  --wine: #7a1f35;
-  --jade: #1a8f7a;
-  --brass: #c59b4d;
 
-  /* Ported from docs/design/tokens.css, as needed by the card-back `.back`
-     treatment (see .tarot-card__back below). Port more of that file as later
-     tasks need them, rather than all at once. */
+  /* цвет: стол и ткань */
+  --bg: #0f0b15;
   --cloth: #191024;
   --cloth-2: #241735;
+  --line: #463357;
+  --line-soft: #2c1f3d;
+
+  /* золото и вино */
   --gold: #d9a441;
+  --gold-bright: #f2c66d;
   --gold-deep: #7d5c1e;
-  --r-card: 12px;
+  --wine: #8c3247;
+
+  /* текст */
+  --text: #f4edde;
+  --text-dim: #c9b89e;
+  --on-gold: #221503;
+
+  /* дуотон для сканов Райдера—Уэйта 1909: тени → света */
+  --duotone-shadows: #1d1426;
+  --duotone-lights: #e8c98a;
+
+  /* типографика */
+  --font-display: 'Prata', serif;
+  --font-ui: 'Manrope', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  --fs-xs: .8125rem;
+  --fs-s: .9375rem;
+  --fs-m: 1.0625rem;
+  --fs-l: 1.375rem;
+  --fs-xl: clamp(1.625rem, 3vw, 2.25rem);
+  --fs-hero: clamp(2.125rem, 5vw, 3.375rem);
+  --lh-tight: 1.15;
+  --lh-body: 1.55;
+  --track-caps: .14em;
+
+  /* отступы */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 72px;
+
+  /* радиусы */
+  --r-s: 6px; --r-m: 12px; --r-card: 12px; --r-pill: 999px;
+
+  /* тени */
+  --shadow-card: 0 14px 28px rgba(5, 2, 10, .55), 0 2px 6px rgba(5, 2, 10, .45);
+  --shadow-raise: 0 24px 48px rgba(5, 2, 10, .6);
+
+  /* движение */
+  --t-fast: 150ms; --t-med: 320ms; --t-slow: 700ms; --t-deal: 900ms;
+  --ease: cubic-bezier(.22, .61, .2, 1);
 }
 
 * {
@@ -25,13 +71,174 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--bg);
-  color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
 input {
   font: inherit;
+}
+
+/* Applies the display face to every heading in the app (not only the entry
+   screen's), so the "shared visual language every later screen sits on"
+   (Task 8's brief) also covers the ritual/result headings until Tasks 9 and
+   11 restyle those screens outright. .ritual-copy h1 below still wins on
+   margin/font-size (higher specificity, longhand vs this rule's shorthand),
+   so those stages keep their existing size — they just stop being Arial. */
+h1 {
+  margin: 0;
+  font: 400 var(--fs-hero) / var(--lh-tight) var(--font-display);
+}
+
+/* ── Shared primitives — ported verbatim from docs/design/tokens.css ──
+   `.back` is NOT here: it already lives further down this file (see its own
+   comment), unmodified since Task 7's fix round. It is the same shared
+   card-back the entry screen's fan below reuses. */
+.table {
+  min-height: 100vh;
+  background: var(--bg) repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .012) 3px 4px);
+}
+
+.caps {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.rule { display: flex; align-items: center; gap: var(--sp-3); width: 220px; }
+.rule::before, .rule::after { content: ""; height: 1px; flex: 1; background: var(--line-soft); }
+.diamond { width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); flex: none; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 15px 28px;
+  border-radius: var(--r-s);
+  border: 1px solid var(--gold-deep);
+  background: var(--gold);
+  color: var(--on-gold);
+  font: 700 var(--fs-s)/1 var(--font-ui);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.btn:hover { background: var(--gold-bright); color: var(--on-gold); }
+.btn:active { transform: translateY(1px); }
+
+/* ── Entry screen — ported from Claude Design "01 Вход.dc.html" ──
+   The mockup's `.proto-nav` (prototype screen switcher) and its inter-screen
+   links are deliberately not ported: the product is one page. */
+.enter {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-5);
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  gap: var(--sp-5);
+}
+
+.fan {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-2);
+}
+
+.fan .back {
+  width: 86px;
+  box-shadow: var(--shadow-card);
+}
+
+.fan .back:nth-child(1) {
+  transform: rotate(-10deg) translate(20px, 12px);
+}
+
+.fan .back:nth-child(2) {
+  z-index: 1;
+  transform: translateY(-2px);
+}
+
+.fan .back:nth-child(3) {
+  transform: rotate(10deg) translate(-20px, 12px);
+}
+
+.sub {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--text-dim);
+}
+
+/* Five columns, not the mockup's four: the mockup's single "Когда поедете"
+   field is a link out to a separate calendar screen, but this task keeps
+   TripIntentForm's existing two date inputs unchanged (they become the
+   calendar in Task 10) — so city/dateFrom/dateTo/travelers are each their
+   own .field, plus the button. */
+.ticket {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr .9fr auto;
+  text-align: left;
+  background: var(--cloth);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-card);
+  margin-top: var(--sp-3);
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  padding: 18px 22px;
+  border-right: 1px solid var(--line-soft);
+  min-width: 0;
+  align-content: center;
+}
+
+.field .lab {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.field input {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  font: 500 var(--fs-m)/1.3 var(--font-ui);
+  outline: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: #8d7fa0;
+}
+
+.field input:focus {
+  box-shadow: 0 1px 0 var(--gold);
+}
+
+.ticket .btn {
+  margin: 12px;
+  align-self: center;
+}
+
+.fine {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
 }
 
 .app-shell {
@@ -61,42 +268,16 @@ input {
 
 .ritual-copy p,
 .ritual-status {
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
-.intent-form {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid rgba(197, 155, 77, 0.34);
-  border-radius: 8px;
-  background: rgba(21, 16, 22, 0.82);
-}
-
-.intent-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-}
-
-.intent-form input {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid rgba(244, 237, 247, 0.22);
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #201826;
-  color: var(--ink);
-}
-
-.intent-form button,
 .ritual-layout button {
   min-height: 44px;
   border: 0;
   border-radius: 6px;
   padding: 10px 14px;
-  background: var(--brass);
-  color: #151016;
+  background: var(--gold);
+  color: var(--on-gold);
   cursor: pointer;
 }
 
@@ -334,7 +515,7 @@ input {
   background:
     radial-gradient(circle at 50% 20%, rgba(197, 155, 77, 0.38), transparent 24%),
     linear-gradient(135deg, #1a8f7a, #7a1f35);
-  color: var(--ink);
+  color: var(--text);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
   transform-style: preserve-3d;
 }
@@ -462,7 +643,7 @@ input {
 
 .result-kicker {
   margin: 0 0 8px;
-  color: var(--brass);
+  color: var(--gold);
 }
 
 .prediction-panel h2 {
@@ -507,7 +688,7 @@ input {
 }
 
 .proof-links a {
-  color: var(--ink);
+  color: var(--text);
   border-bottom: 1px solid rgba(197, 155, 77, 0.7);
   text-decoration: none;
 }
@@ -532,7 +713,7 @@ input {
   padding: 14px;
   border: 1px solid rgba(244, 237, 247, 0.18);
   border-radius: 8px;
-  color: var(--ink);
+  color: var(--text);
   text-decoration: none;
   background: rgba(244, 237, 247, 0.06);
 }
@@ -545,10 +726,31 @@ input {
 }
 
 .offer-card small {
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 @media (max-width: 760px) {
+  .enter {
+    padding: var(--sp-7) var(--sp-4);
+  }
+
+  .ticket {
+    grid-template-columns: 1fr;
+  }
+
+  .field {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .ticket .btn {
+    margin: 16px;
+  }
+
+  .fan .back {
+    width: 72px;
+  }
+
   .app-shell {
     place-items: start;
   }
@@ -648,5 +850,18 @@ input {
   .ritual-scene__card {
     opacity: 1;
     transform: rotate(var(--ritual-tilt, 0deg));
+  }
+}
+
+/* Generic reduced-motion kill switch, ported verbatim from
+   docs/design/tokens.css. Coexists with the block above: that one sets
+   explicit resting values for the ritual-deal/card-reveal animations
+   specifically, this one is the blanket fallback for anything else
+   (currently .btn's hover/active transitions) that later tasks add. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
   }
 }
