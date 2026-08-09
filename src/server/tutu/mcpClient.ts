@@ -20,7 +20,7 @@ async function callTool(endpoint: string, name: string, args: Record<string, unk
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
+      Accept: "application/json",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -30,7 +30,46 @@ async function callTool(endpoint: string, name: string, args: Record<string, unk
     }),
   });
   if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
-  return response.json();
+  return unwrapMcpResponse(await response.json(), name);
+}
+
+function unwrapMcpResponse(raw: unknown, name: string): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`Tutu MCP ${name} returned an invalid JSON-RPC response`);
+  }
+
+  const envelope = raw as { error?: unknown; result?: unknown };
+  if (envelope.error !== undefined && envelope.error !== null) {
+    const error = envelope.error;
+    const message =
+      error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : JSON.stringify(error);
+    throw new Error(`Tutu MCP ${name} failed: ${message}`);
+  }
+
+  const result = envelope.result;
+  if (Array.isArray(result)) return result;
+  if (!result || typeof result !== "object") {
+    throw new Error(`Tutu MCP ${name} response is missing a result`);
+  }
+
+  const content = (result as { content?: unknown }).content;
+  if (!Array.isArray(content)) return result;
+
+  const textBlock = content.find(
+    (item): item is { text: string } =>
+      Boolean(item) && typeof item === "object" && typeof (item as { text?: unknown }).text === "string",
+  );
+  if (!textBlock) {
+    throw new Error(`Tutu MCP ${name} result content has no text block`);
+  }
+
+  try {
+    return JSON.parse(textBlock.text);
+  } catch {
+    throw new Error(`Tutu MCP ${name} result content is not valid JSON`);
+  }
 }
 
 export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSearchResult> {
