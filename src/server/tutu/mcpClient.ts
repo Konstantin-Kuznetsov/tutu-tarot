@@ -35,7 +35,7 @@ function hotelFallback(input: TutuSearchInput): NormalizedOffer {
 
 async function callTool(endpoint: string, name: string, args: Record<string, unknown>): Promise<unknown> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const timeout = setTimeout(() => controller.abort(), 20_000);
   const requestId = `${name}-${Date.now()}`;
   try {
     const response = await fetch(endpoint, {

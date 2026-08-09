@@ -311,7 +311,7 @@ describe("Tutu offer normalization", () => {
     expect(result.warnings).toEqual(["network unavailable"]);
   });
 
-  it("aborts a stalled Tutu transport request after 12 seconds", async () => {
+  it("aborts a stalled Tutu transport request after 20 seconds", async () => {
     vi.useFakeTimers();
     let transportSignal: AbortSignal | undefined;
     const fetchMock = vi.fn()
@@ -326,7 +326,9 @@ describe("Tutu offer normalization", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const resultPromise = searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
-    await vi.advanceTimersByTimeAsync(12_000);
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(transportSignal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
     const result = await resultPromise;
 
     expect(transportSignal?.aborted).toBe(true);

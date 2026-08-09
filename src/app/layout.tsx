@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Таро-турагент",
-  description: "3D tarot ritual for Russian travel planning with Tutu routes.",
+  description: "Мистический подбор путешествий по России с маршрутами и отелями Туту.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
