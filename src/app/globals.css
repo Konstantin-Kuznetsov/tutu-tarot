@@ -1,0 +1,37 @@
+:root {
+  color-scheme: dark;
+  --ink: #f4edf7;
+  --muted: #c8bed1;
+  --bg: #151016;
+  --wine: #7a1f35;
+  --jade: #1a8f7a;
+  --brass: #c59b4d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.ritual-surface {
+  width: min(100%, 1080px);
+}
