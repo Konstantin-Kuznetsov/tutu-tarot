@@ -33,14 +33,7 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           <div className="spread-grid">
             {result.spreadCards.map((card, index) => (
               <div className="spread-card-shell" key={`${card.position}-${card.id}`} style={{ "--card-order": index } as CSSProperties}>
-                <TarotCardView
-                  id={card.id}
-                  name={card.name}
-                  position={card.position}
-                  meaning={card.meaning}
-                  revealed
-                  testId="spread-card"
-                />
+                <TarotCardView card={card} revealed testId="spread-card" />
               </div>
             ))}
           </div>

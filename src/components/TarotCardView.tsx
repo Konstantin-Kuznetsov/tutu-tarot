@@ -1,38 +1,40 @@
+import type { DrawnTarotCard } from "@/domain/types";
+
 interface TarotCardViewProps {
-  name: string;
+  card: DrawnTarotCard;
   revealed: boolean;
-  id?: string;
-  position?: string;
-  meaning?: string;
   testId?: string;
 }
 
-function symbolFor(id: string | undefined, name: string): string {
-  const key = id || name.toLocaleLowerCase("ru-RU");
-  if (key.includes("tower") || key.includes("баш")) return "△";
-  if (key.includes("chariot") || key.includes("колес")) return "◈";
-  if (key.includes("hermit") || key.includes("отш")) return "✦";
-  if (key.includes("star") || key.includes("звезд")) return "✶";
-  if (key.includes("sun") || key.includes("солн")) return "☉";
-  if (key.includes("lover") || key.includes("влюб")) return "◇";
-  if (key.includes("judgement") || key.includes("суд")) return "✧";
-  return "✺";
-}
+export function TarotCardView({ card, revealed, testId }: TarotCardViewProps) {
+  const meaning = card.reversed ? card.meaningReversed : card.meaning;
 
-export function TarotCardView({ name, revealed, id, position, meaning, testId }: TarotCardViewProps) {
   return (
-    <div className="tarot-card" data-revealed={revealed} data-card-id={id || name} data-testid={testId}>
-      <div className="tarot-card__back" aria-hidden={revealed}>
-        <span />
-      </div>
+    <figure
+      className="tarot-card"
+      data-revealed={revealed}
+      data-reversed={card.reversed}
+      data-card-id={card.id}
+      data-testid={testId ?? "tarot-card"}
+    >
+      <div className="tarot-card__back" aria-hidden={revealed} />
       {revealed ? (
         <div className="tarot-card__face">
-          {position ? <small>{position}</small> : null}
-          <span className="tarot-card__symbol" aria-hidden="true">{symbolFor(id, name)}</span>
-          <strong>{name}</strong>
-          {meaning ? <p>{meaning}</p> : null}
+          <small className="tarot-card__position">{card.position}</small>
+          <img
+            className="tarot-card__art"
+            src={card.image}
+            alt={`${card.name}${card.reversed ? ", перевёрнутая" : ""}`}
+            width={600}
+            height={1032}
+          />
+          <figcaption>
+            <strong>{card.name}</strong>
+            {card.reversed ? <em className="tarot-card__flag">перевёрнутая</em> : null}
+            <p>{meaning}</p>
+          </figcaption>
         </div>
       ) : null}
-    </div>
+    </figure>
   );
 }
