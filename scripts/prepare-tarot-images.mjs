@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
@@ -68,17 +68,37 @@ async function fetchOriginal(commonsName, cacheFile) {
   }
   const bytes = Buffer.from(await response.arrayBuffer());
 
-  // Validate that bytes are a decodable image before caching. This ensures
+  // Validate that bytes are a fully decodable image before caching. This ensures
   // bad responses (interstitials, maintenance pages, truncated bodies) are not
   // cached as if they were valid originals, which would cause the script to
-  // fail identically on every future run.
+  // fail identically on every future run. A header-only read via metadata()
+  // is insufficient — a truncated JPEG passes header validation but fails on
+  // full decode. We decode the full scan by resizing to a tiny width, which
+  // forces the entire source to be scanned.
   try {
-    await sharp(bytes).metadata();
+    await sharp(bytes).resize({ width: 32 }).toBuffer();
   } catch (err) {
     throw new Error(`${commonsName} -> failed to decode image: ${err.message}`);
   }
 
-  await writeFile(cacheFile, bytes);
+  // Write atomically: to a temp file first, then rename into the final cache
+  // path. rename() within one filesystem is atomic, so a killed process cannot
+  // leave a half-written file at the cache path where the early return would
+  // replay it.
+  const tempFile = `${cacheFile}.tmp`;
+  try {
+    await writeFile(tempFile, bytes);
+    await rename(tempFile, cacheFile);
+  } catch (err) {
+    // Clean up the temp file if writing or renaming failed.
+    try {
+      await unlink(tempFile);
+    } catch {
+      // Ignore errors during cleanup; the real error is thrown below.
+    }
+    throw err;
+  }
+
   await sleep(THROTTLE_MS);
   return bytes;
 }
