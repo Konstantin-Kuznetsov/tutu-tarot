@@ -1,0 +1,136 @@
+/* Design tokens and shared primitives.
+ *
+ * Source: Claude Design project "Дизайн карточек и навигации",
+ * id 33d8a5c9-0f76-4610-9f1c-45c9a1461ea7, screen "01 Вход.dc.html".
+ * The full mockups for all four screens live in that project; read them
+ * there rather than reconstructing them from this file.
+ *
+ * This file is the reference copy. Port it into src/app/globals.css.
+ * Fonts are loaded through next/font/google (self-hosted), NOT through the
+ * <link> tags the mockup uses — Prata and Manrope both ship a Cyrillic
+ * subset (verified 2026-08-09 against the Google Fonts CSS API).
+ */
+
+:root {
+  /* цвет: стол и ткань */
+  --bg: #0f0b15;
+  --cloth: #191024;
+  --cloth-2: #241735;
+  --line: #463357;
+  --line-soft: #2c1f3d;
+
+  /* золото и вино */
+  --gold: #d9a441;
+  --gold-bright: #f2c66d;
+  --gold-deep: #7d5c1e;
+  --wine: #8c3247;
+
+  /* текст */
+  --text: #f4edde;
+  --text-dim: #c9b89e;
+  --on-gold: #221503;
+
+  /* дуотон для сканов Райдера—Уэйта 1909: тени → света.
+     Эти два значения передаются в scripts/prepare-tarot-images.mjs. */
+  --duotone-shadows: #1d1426;
+  --duotone-lights: #e8c98a;
+
+  /* типографика */
+  --font-display: 'Prata', serif;
+  --font-ui: 'Manrope', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  --fs-xs: .8125rem;
+  --fs-s: .9375rem;
+  --fs-m: 1.0625rem;
+  --fs-l: 1.375rem;
+  --fs-xl: clamp(1.625rem, 3vw, 2.25rem);
+  --fs-hero: clamp(2.125rem, 5vw, 3.375rem);
+  --lh-tight: 1.15;
+  --lh-body: 1.55;
+  --track-caps: .14em;
+
+  /* отступы */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 72px;
+
+  /* радиусы */
+  --r-s: 6px; --r-m: 12px; --r-card: 12px; --r-pill: 999px;
+
+  /* тени */
+  --shadow-card: 0 14px 28px rgba(5, 2, 10, .55), 0 2px 6px rgba(5, 2, 10, .45);
+  --shadow-raise: 0 24px 48px rgba(5, 2, 10, .6);
+
+  /* движение */
+  --t-fast: 150ms; --t-med: 320ms; --t-slow: 700ms; --t-deal: 900ms;
+  --ease: cubic-bezier(.22, .61, .2, 1);
+}
+
+/* сукно: едва заметная фактура ткани, без пятен и орбов */
+.table {
+  min-height: 100vh;
+  background: var(--bg) repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .012) 3px 4px);
+}
+
+.caps {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.rule { display: flex; align-items: center; gap: var(--sp-3); width: 220px; }
+.rule::before, .rule::after { content: ""; height: 1px; flex: 1; background: var(--line-soft); }
+.diamond { width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); flex: none; }
+
+/* рубашка колоды — используется и в вее на входе, и в неоткрытых картах */
+.back {
+  aspect-ratio: 100/172;
+  border-radius: var(--r-card);
+  border: 1px solid var(--gold-deep);
+  position: relative;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
+    repeating-linear-gradient(-45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
+    var(--cloth-2);
+}
+
+.back::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 36%;
+  aspect-ratio: 1/1;
+  border: 1px solid var(--gold);
+  background: var(--cloth);
+  transform: rotate(45deg);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 15px 28px;
+  border-radius: var(--r-s);
+  border: 1px solid var(--gold-deep);
+  background: var(--gold);
+  color: var(--on-gold);
+  font: 700 var(--fs-s)/1 var(--font-ui);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.btn:hover { background: var(--gold-bright); color: var(--on-gold); }
+.btn:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
