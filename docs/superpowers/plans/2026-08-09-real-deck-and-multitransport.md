@@ -2082,6 +2082,16 @@ git commit -m "feat: pick the trip as one range on a calendar"
 
 The whole ritual happens on one surface. There is no navigation, no "show me the result" button, and the form never disappears — it recedes to a thin ticket strip so the user can still see what they asked for.
 
+**This task also ports the ritual screen's visuals, which no earlier task covered.**
+A browser check after Task 9 found the dealing scene still rendering the pre-design
+placeholder: three pastel yellow/mint/pink panels with heavy black sans-serif text,
+on a screen whose entry and result are already dark plum and gold. Read
+`02 Ритуал.dc.html` from the Claude Design project
+`33d8a5c9-0f76-4610-9f1c-45c9a1461ea7` with the `DesignSync` tool before touching
+`RitualScene.tsx`, and rebuild the scene to it. The cards being dealt are face-down
+`.back` cards — the same shared primitive as the entry-screen fan and the tarot
+card's back — not coloured panels with copy on them.
+
 The load-bearing idea: **the wait for MCP is the third card.** The first two cards flip on a timer because they only need the seed. The third cannot flip until the search reports which roads exist. Do not add a decorative delay and do not flip the third card early — the pause is the mechanism.
 
 - [ ] **Step 1: Write the failing test**
