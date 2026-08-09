@@ -93,7 +93,7 @@ describe("createPrediction", () => {
   it("returns template prediction when no AI key is configured", async () => {
     const result = await createPrediction(createInput());
 
-    expect(result.headline).toContain("Усьвинские Столбы");
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
     expect(result.cardReadings).toHaveLength(3);
     expect(result.summary).toContain("Пермский край");
   });
@@ -103,7 +103,7 @@ describe("createPrediction", () => {
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
-    expect(result.opening).toContain("Усьвинские Столбы");
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
     expect(result.opening).toContain("Камень и тишина собирают маршрут в один ясный знак.");
   });
 
@@ -112,7 +112,7 @@ describe("createPrediction", () => {
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
-    expect(result.opening).toContain("Усьвинские Столбы");
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
     expect(result.opening).not.toContain("сочи");
   });
 
@@ -121,7 +121,7 @@ describe("createPrediction", () => {
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
-    expect(result.opening).toContain("Усьвинские Столбы");
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
     expect(result.opening).not.toContain("Sochi");
   });
 
@@ -163,6 +163,8 @@ describe("createPrediction", () => {
     // deliberately hardened (see runRitual's sourceLinks label, which only
     // grants "Проверенный маршрут Туту" to provereno.tutu destinations).
     expect(result.summary).toContain("Маршрут собран из открытых источников.");
+    expect(result.summary).toContain("Пермский край");
+    expect(result.summary).toContain("Пермь");
     expect(result.summary).not.toContain("подтверждён");
     expect(result.summary).not.toContain("Проверенный");
   });

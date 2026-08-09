@@ -57,7 +57,7 @@ function sourceNoteFor(source: TravelAtlasItem["source"]): string {
 
 function summaryFor(input: PredictionInput): string {
   const { destination } = input.selection;
-  const baseSummary = `Предсказание ведет в ${destination.region}. ${sourceNoteFor(destination.source)} Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
+  const baseSummary = `Маршрут указывает путь: ${destination.region}. ${sourceNoteFor(destination.source)} Практическая часть маршрута: основное направление — ${destination.nearestTransportHub}, остановка в городе ${destination.hotelSearchCity}.`;
   return [baseSummary, input.roadChoice.reason].filter(Boolean).join(" ");
 }
 
@@ -76,13 +76,13 @@ function flavorFor(text: string): string | undefined {
 
 function appOpening(input: PredictionInput): string {
   const { destination } = input.selection;
-  return `Маршрут из города ${input.intent.departureCity} тянется к ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
+  return `Карты раскрывают путь из города ${input.intent.departureCity}: ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
 }
 
 function templatePrediction(input: PredictionInput): PredictionText {
   const { destination } = input.selection;
   return {
-    headline: `Карты указывают на ${destination.name}`,
+    headline: `Карты указывают: ${destination.name}`,
     opening: appOpening(input),
     cardReadings: input.spread.cards.map((card) => ({
       position: card.position,
@@ -131,7 +131,7 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
     if (!flavor) return templatePrediction(input);
 
     return {
-      headline: `Карты указывают на ${input.selection.destination.name}`,
+      headline: `Карты указывают: ${input.selection.destination.name}`,
       opening: `${appOpening(input)} ${flavor}`,
       cardReadings: input.spread.cards.map((card) => ({
         position: card.position,
