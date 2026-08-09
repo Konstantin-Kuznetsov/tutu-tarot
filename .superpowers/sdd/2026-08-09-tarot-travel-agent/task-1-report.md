@@ -100,3 +100,31 @@ The required build also passed with `npm run build`.
 ### Round 1 concerns
 
 - npm still prints the pre-existing environment warning about the unsupported `always-auth` user config; it is unrelated to project lint, test, or build behavior.
+
+## Round 2 Fix Report
+
+### Fix implemented
+
+- Added `tests/e2e/foundation-shell.spec.ts`, a minimal foundation smoke test that checks the page title, heading, and shell copy.
+- The existing Playwright `desktop` and `mobile` projects both execute this same focused test, covering the Task 1 browser contract without introducing ritual-flow behavior.
+
+### TDD and investigation evidence
+
+- Before the fix, `npm run test:e2e` found no test directory/spec and could not satisfy the E2E contract. In the restricted environment it also could not bind the configured local port until run with local-server permission.
+- After adding the spec and installing the missing local Chromium runtime, `npm run test:e2e` passed with `2 passed`: one desktop test and one mobile test.
+
+### Covering commands and results
+
+- `npm run test:e2e`: passed, 2 tests across desktop and mobile.
+- `npm run lint`: passed with no ESLint findings.
+- `npm run test -- tests/project-foundation.test.ts`: passed, 1 test file and 1 test.
+- `npm run build`: passed; Next.js compiled, type-checked, and prerendered `/` and `/_not-found`.
+
+### Round 2 self-review
+
+- The E2E spec asserts only stable foundation-shell behavior and does not reach into future ritual implementation.
+- No application code, server behavior, or Playwright project matrix was expanded beyond the required smoke coverage.
+
+### Round 2 concerns
+
+- The Playwright dev server logs a non-blocking Next.js warning about cross-origin development resources from `127.0.0.1`; both browser projects still pass. npm also continues to print the pre-existing `always-auth` environment warning.
