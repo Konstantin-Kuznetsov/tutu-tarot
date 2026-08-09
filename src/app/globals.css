@@ -321,7 +321,14 @@ input {
   min-height: 0;
   display: grid;
   place-items: center;
-  padding: 8px;
+  /* No padding here — it lives on .tarot-card__face instead (see its
+     comment). Both .tarot-card__back and .tarot-card__face size themselves
+     to 100% of *this* box, so keeping the inset in one place is what makes
+     their boxes actually coincide (a fixed 2026-08-09 review found back
+     rendering 8px larger than face on every edge because back's inset:0
+     resolved against this element's un-padded padding box while face's
+     100%/100% resolved against its padded content box). */
+  padding: 0;
   position: relative;
   overflow: hidden;
   background:
@@ -340,7 +347,11 @@ input {
   border-radius: 6px;
   grid-template-rows: auto 1fr auto;
   gap: 6px;
-  padding: 12px 10px;
+  /* 20px/18px = the old 12px/10px face padding plus the 8px that used to
+     live on .tarot-card itself (see that rule's comment) — the visual
+     inset around the label/art/caption is unchanged, it just now comes
+     from one place instead of two. */
+  padding: 20px 18px;
   position: relative;
   z-index: 1;
   background:
@@ -374,31 +385,29 @@ input {
   height: auto;
   aspect-ratio: 600 / 1032;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: var(--r-card);
 }
 
 .tarot-card[data-reversed="true"] .tarot-card__art {
   transform: rotate(180deg);
 }
 
-/* The card back is the `.back` primitive from docs/design/tokens.css —
-   same crosshatch and centred lozenge as the fan on the entry screen.
-   Reuse it; do not invent a second back. */
-.tarot-card__back {
+/* `.back` — ported verbatim from docs/design/tokens.css. This is the single
+   shared card-back look: same crosshatch and centred lozenge as the fan on
+   the entry screen and as a face-down card here. Do not fork a second copy;
+   extend it (as .tarot-card__back does below) instead. */
+.back {
   aspect-ratio: 100/172;
-  width: 100%;
-  height: 100%;
   border-radius: var(--r-card);
   border: 1px solid var(--gold-deep);
-  position: absolute;
-  inset: 0;
+  position: relative;
   background:
     repeating-linear-gradient(45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
     repeating-linear-gradient(-45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
     var(--cloth-2);
 }
 
-.tarot-card__back::after {
+.back::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -408,6 +417,30 @@ input {
   border: 1px solid var(--gold);
   background: var(--cloth);
   transform: rotate(45deg);
+}
+
+/* Adapts the shared `.back` look to sit layered under .tarot-card__face
+   inside .tarot-card (see TarotCardView, which mounts `class="back
+   tarot-card__back"`). Only `position` and `width` are added here —
+   `.back` already supplies `aspect-ratio: 100/172`, and deliberately
+   nothing here sets `height` or `inset`/`top`/`left`/etc.
+   `position: absolute` is required so the back doesn't take its own grid
+   row once .tarot-card__face is also mounted (both stay in the DOM at
+   once — .tarot-card__face is simply omitted before reveal). Leaving
+   inset/height unset is what makes `aspect-ratio` resolve at all: setting
+   `inset: 0` (as the old private copy did) fully determines both
+   dimensions from the containing block before aspect-ratio ever gets a
+   say, which is exactly why that copy rendered as a stretched rectangle
+   instead of a 100/172 card (see the 2026-08-09 review). With only width
+   fixed, height comes from aspect-ratio, and `place-items: center` on
+   .tarot-card (already there for exactly this) centers the resulting
+   shorter box — so back is always the correct card shape, and is always
+   fully contained inside .tarot-card__face's larger box (same width, same
+   x-position, centered on the y-axis) with no back pixels visible past
+   its edges. */
+.tarot-card__back {
+  position: absolute;
+  width: 100%;
 }
 
 .tarot-card__flag {
@@ -566,7 +599,10 @@ input {
   }
 
   .tarot-card__face {
-    padding: 9px 7px;
+    /* 17px/15px = the old 9px/7px mobile face padding plus the 8px that used
+       to live on .tarot-card (see the desktop rule's comment) — same
+       arithmetic, narrower base values. */
+    padding: 17px 15px;
   }
 
   .tarot-card__face p {

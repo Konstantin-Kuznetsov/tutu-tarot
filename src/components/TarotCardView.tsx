@@ -17,7 +17,7 @@ export function TarotCardView({ card, revealed, testId }: TarotCardViewProps) {
       data-card-id={card.id}
       data-testid={testId ?? "tarot-card"}
     >
-      <div className="tarot-card__back" aria-hidden={revealed} />
+      <div className="back tarot-card__back" aria-hidden={revealed} />
       {revealed ? (
         <div className="tarot-card__face">
           <small className="tarot-card__position">{card.position}</small>
