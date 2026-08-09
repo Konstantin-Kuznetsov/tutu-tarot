@@ -67,6 +67,17 @@ async function fetchOriginal(commonsName, cacheFile) {
     throw new Error(`${commonsName} -> HTTP ${response.status}`);
   }
   const bytes = Buffer.from(await response.arrayBuffer());
+
+  // Validate that bytes are a decodable image before caching. This ensures
+  // bad responses (interstitials, maintenance pages, truncated bodies) are not
+  // cached as if they were valid originals, which would cause the script to
+  // fail identically on every future run.
+  try {
+    await sharp(bytes).metadata();
+  } catch (err) {
+    throw new Error(`${commonsName} -> failed to decode image: ${err.message}`);
+  }
+
   await writeFile(cacheFile, bytes);
   await sleep(THROTTLE_MS);
   return bytes;
