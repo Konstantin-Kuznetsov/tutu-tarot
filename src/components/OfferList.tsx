@@ -14,13 +14,25 @@ export function OfferList({ title, offers }: { title: string; offers: Normalized
     <section className="offer-section">
       <h3>{title}</h3>
       <div className="offer-grid">
-        {offers.map((offer) => (
-          <a key={offer.id} className="offer-card" href={offer.url || "#"} target={offer.url ? "_blank" : undefined} rel={offer.url ? "noreferrer" : undefined}>
-            <span>{offer.title}</span>
-            {offer.subtitle ? <small>{offer.subtitle}</small> : null}
-            {offer.price ? <strong>{offer.price}</strong> : null}
-          </a>
-        ))}
+        {offers.map((offer) => {
+          const content = (
+            <>
+              <span>{offer.title}</span>
+              {offer.subtitle ? <small>{offer.subtitle}</small> : null}
+              {offer.price ? <strong>{offer.price}</strong> : null}
+            </>
+          );
+
+          return offer.url ? (
+            <a key={offer.id} className="offer-card" href={offer.url} target="_blank" rel="noreferrer">
+              {content}
+            </a>
+          ) : (
+            <div key={offer.id} className="offer-card">
+              {content}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

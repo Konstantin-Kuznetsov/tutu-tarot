@@ -182,12 +182,14 @@ input {
 
 .offer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .offer-card {
   min-height: 92px;
+  min-width: 0;
   display: grid;
   gap: 6px;
   padding: 14px;
@@ -196,6 +198,13 @@ input {
   color: var(--ink);
   text-decoration: none;
   background: rgba(244, 237, 247, 0.06);
+}
+
+.offer-card span,
+.offer-card small,
+.offer-card strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .offer-card small {
