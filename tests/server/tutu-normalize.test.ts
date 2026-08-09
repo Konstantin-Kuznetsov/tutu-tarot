@@ -42,6 +42,7 @@ function contentResponse(payload: unknown): Response {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("Tutu offer normalization", () => {
@@ -87,7 +88,7 @@ describe("Tutu offer normalization", () => {
     expect(result.hotels[0].title).toBe("Отель Пермь");
     expect(result.warnings).toEqual([]);
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json, text/event-stream" },
     });
   });
 
@@ -122,5 +123,27 @@ describe("Tutu offer normalization", () => {
     expect(result.transport).toEqual([]);
     expect(result.hotels[0].title).toBe("Отель Пермь");
     expect(result.warnings).toEqual(["network unavailable"]);
+  });
+
+  it("aborts a stalled Tutu transport request after 12 seconds", async () => {
+    vi.useFakeTimers();
+    let transportSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce((_url: string, init?: RequestInit) => {
+        transportSignal = init?.signal ?? undefined;
+        if (!transportSignal) return Promise.reject(new Error("missing abort signal"));
+        return new Promise<Response>((_resolve, reject) => {
+          transportSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        });
+      })
+      .mockResolvedValueOnce(contentResponse({ items: [{ name: "Отель Пермь" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resultPromise = searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+    await vi.advanceTimersByTimeAsync(12_000);
+    const result = await resultPromise;
+
+    expect(transportSignal?.aborted).toBe(true);
+    expect(result.hotels[0].title).toBe("Отель Пермь");
   });
 });

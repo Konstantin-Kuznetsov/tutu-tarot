@@ -16,21 +16,28 @@ export interface TutuSearchResult {
 }
 
 async function callTool(endpoint: string, name: string, args: Record<string, unknown>): Promise<unknown> {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: `${name}-${Date.now()}`,
-      method: "tools/call",
-      params: { name, arguments: args },
-    }),
-  });
-  if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
-  return unwrapMcpResponse(await response.json(), name);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: `${name}-${Date.now()}`,
+        method: "tools/call",
+        params: { name, arguments: args },
+      }),
+    });
+    if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
+    return unwrapMcpResponse(await response.json(), name);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function unwrapMcpResponse(raw: unknown, name: string): unknown {
