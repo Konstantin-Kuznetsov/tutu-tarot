@@ -24,6 +24,7 @@ const destination: TravelAtlasItem = {
   tarotArchetypes: [],
   source: "fallback",
   sourceUrl: "https://example.com",
+  oracleHook: "Тестовый знак маршрута.",
 };
 
 function jsonResponse(payload: unknown): Response {

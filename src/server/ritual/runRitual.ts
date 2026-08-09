@@ -9,6 +9,7 @@ export interface RitualResult {
   ritualId: string;
   seed: string;
   cards: DrawnTarotCard[];
+  spreadCards: DrawnTarotCard[];
   destination: TravelAtlasItem;
   prediction: PredictionText;
   transportOffers: NormalizedOffer[];
@@ -50,6 +51,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     ritualId: Buffer.from(spread.seed).toString("base64url").slice(0, 12),
     seed: spread.seed,
     cards: spread.cards,
+    spreadCards: spread.cards,
     destination: selection.destination,
     prediction,
     transportOffers: offers.transport,

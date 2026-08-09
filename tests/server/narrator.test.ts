@@ -36,6 +36,7 @@ function createInput(overrides: Partial<PredictionInput> = {}): PredictionInput 
         tarotArchetypes: ["cliffs", "road"],
         source: "fallback",
         sourceUrl: "https://ru.wikipedia.org/wiki/Усьвинские_Столбы",
+        oracleHook: "Каменные столбы обещают путь к тишине.",
       },
     },
     offers: { transport: [], hotels: [] },

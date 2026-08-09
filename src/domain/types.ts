@@ -54,6 +54,9 @@ export interface TravelAtlasItem {
   sourceUrl: string;
   geoUrl?: string;
   image?: string;
+  oracleHook: string;
+  routeDays?: number;
+  rating?: string;
 }
 
 export interface DestinationSelection {

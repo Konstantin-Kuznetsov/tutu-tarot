@@ -44,7 +44,7 @@ function flavorFor(text: string): string | undefined {
 
 function appOpening(input: PredictionInput): string {
   const { destination } = input.selection;
-  return `Маршрут из города ${input.intent.departureCity} тянется к ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}.`;
+  return `Маршрут из города ${input.intent.departureCity} тянется к ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
 }
 
 function templatePrediction(input: PredictionInput): PredictionText {
