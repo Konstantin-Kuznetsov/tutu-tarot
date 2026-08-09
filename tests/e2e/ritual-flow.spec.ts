@@ -26,9 +26,21 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
         ritualId: "demo",
         seed: "москва|2026-09-10|2026-09-17|2",
         spreadCards: [
-          { id: "tower", name: "Башня", position: "Зов", meaning: "камень и высота", archetypes: ["cliffs"] },
-          { id: "chariot", name: "Колесница", position: "Путь", meaning: "дорога", archetypes: ["road"] },
-          { id: "hermit", name: "Отшельник", position: "Дар маршрута", meaning: "тишина", archetypes: ["solitude"] },
+          {
+            id: "tower", number: 16, name: "Башня", image: "/tarot/16-tower.webp", position: "Зов",
+            reversed: false, archetypes: ["cliffs"], transport: ["avia"],
+            meaning: "камень и высота", meaningReversed: "обвал случился раньше, теперь строят заново",
+          },
+          {
+            id: "chariot", number: 7, name: "Колесница", image: "/tarot/07-chariot.webp", position: "Путь",
+            reversed: false, archetypes: ["road"], transport: ["avia"],
+            meaning: "дорога", meaningReversed: "рывок не выходит, дорога сопротивляется",
+          },
+          {
+            id: "hermit", number: 9, name: "Отшельник", image: "/tarot/09-hermit.webp", position: "Дар маршрута",
+            reversed: false, archetypes: ["solitude"], transport: ["railway"],
+            meaning: "тишина", meaningReversed: "одиночество тяготит, нужен попутчик",
+          },
         ],
         destination: { name: "Усьвинские Столбы", region: "Пермский край" },
         prediction: {
@@ -37,7 +49,17 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
           summary: "Дорога подтверждается Туту.",
           cardReadings: [],
         },
-        roadChoice: { mode: "railway", reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.", best: null },
+        roadChoice: {
+          mode: "railway",
+          reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.",
+          best: {
+            id: "t-0",
+            title: "Поезд: ФПК «Карелия»",
+            price: "3481 RUB",
+            mode: "railway",
+            url: "https://avia.tutu.ru/f/Moskva/Petrozavodsk/",
+          },
+        },
         transportOffers: [
           {
             id: "transport-0",
@@ -75,6 +97,11 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
   await expect(page.getByTestId("spread-card").nth(2)).toBeVisible();
   await expect(spread.getByText("Башня", { exact: true })).toBeVisible();
   await expect(spread.getByText("Зов", { exact: true })).toBeVisible();
+
+  const road = page.getByRole("region", { name: "Дорога, которую выбрала карта" });
+  await expect(road).toBeVisible();
+  await expect(road.getByRole("link")).toHaveAttribute("href", /tutu\.ru/);
+
   await expect(page.getByRole("link", { name: "Путеводитель Туту" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Москва - Пермь/ })).toHaveAttribute(
     "href",

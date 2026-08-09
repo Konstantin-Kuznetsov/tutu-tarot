@@ -116,6 +116,27 @@ h1 {
 .rule::before, .rule::after { content: ""; height: 1px; flex: 1; background: var(--line-soft); }
 .diamond { width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); flex: none; }
 
+/* Divider heading — flanking rules either side of the label. Shared by the
+   road section's own title and OfferList's h3 (both "Билеты по
+   предсказанию" and "Где остановиться"), so the three post-spread section
+   titles read as one family instead of the road looking like a one-off. */
+.sec {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  font: 400 var(--fs-l)/1.25 var(--font-display);
+  text-align: center;
+}
+
+.sec::before,
+.sec::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line-soft);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -685,6 +706,112 @@ h1 {
   width: 100%;
 }
 
+/* ── Road block — ported from "03 Результат.dc.html"'s `.route`/`.reason`,
+   adapted from its two-column card (text left, price+button right) into a
+   single clickable card (see RoadHero's comment in TravelResult.tsx for
+   why: nesting the mockup's `.btn` anchor inside a card-level anchor isn't
+   valid HTML, and this project already links whole cards elsewhere, e.g.
+   .offer-card). Colours, radius, shadow and the dashed-divider reason line
+   with its diamond marker are kept as-is from the mockup. */
+.road {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.road__card {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--cloth);
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-raise);
+}
+
+.road__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-6);
+  row-gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-2) 0;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.road__hero strong {
+  grid-column: 1;
+  min-width: 0;
+  font: 400 var(--fs-xl)/var(--lh-tight) var(--font-display);
+  overflow-wrap: anywhere;
+}
+
+.road__hero span {
+  grid-column: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.road__hero b {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font: 400 1.75rem/1 var(--font-display);
+  color: var(--gold-bright);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.road__reason {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin: var(--sp-2) 0 0;
+  padding-top: var(--sp-4);
+  border-top: 1px dashed var(--line);
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.road__reason::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--gold);
+  transform: rotate(45deg);
+  flex: none;
+}
+
+/* Fog state — reads as a considered "nothing here yet" moment (rule +
+   diamond flourish, the same one TripIntentForm's fine print sits under),
+   not an error: this is the ordinary result whenever Tutu MCP has nothing
+   usable to offer, not an edge case. */
+.road__fog {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-6) 0;
+  text-align: center;
+}
+
+.road__reason--fog {
+  max-width: 52ch;
+  margin: 0;
+  padding-top: 0;
+  border-top: 0;
+  justify-content: center;
+}
+
+.road__reason--fog::before {
+  display: none;
+}
+
 .proof-links {
   display: flex;
   flex-wrap: wrap;
@@ -731,6 +858,60 @@ h1 {
 
 .offer-card small {
   color: var(--text-dim);
+}
+
+/* Collapsed alternative-transport groups — ported from the mockup's
+   `.alt`/`details`/`summary`. Kept collapsed by default so the road hero
+   card above stays the visual payoff; these are the supporting cast. */
+.offer-groups {
+  display: grid;
+}
+
+.offer-group {
+  border-top: 1px solid var(--line-soft);
+}
+
+.offer-group:last-of-type {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.offer-group summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.offer-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.offer-group__chevron {
+  color: var(--gold);
+  transition: transform var(--t-med) var(--ease);
+  flex: none;
+}
+
+.offer-group[open] .offer-group__chevron {
+  transform: rotate(90deg);
+}
+
+.offer-group__label {
+  font: 600 var(--fs-m)/1.3 var(--font-ui);
+}
+
+.offer-group__count {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.offer-group .offer-grid {
+  padding-bottom: var(--sp-4);
 }
 
 @media (max-width: 760px) {
@@ -802,6 +983,20 @@ h1 {
   .spread-grid {
     grid-template-columns: repeat(3, minmax(96px, 1fr));
     gap: 8px;
+  }
+
+  .road__card {
+    padding: var(--sp-5);
+  }
+
+  .road__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .road__hero b {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
   }
 
   .tarot-card__face {

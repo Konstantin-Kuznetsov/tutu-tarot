@@ -1,31 +1,64 @@
 import type { PredictionText } from "@/server/oracle/narrator";
-import type { DrawnTarotCard } from "@/domain/types";
+import type { DrawnTarotCard, TransportMode } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { CSSProperties } from "react";
-import { OfferList } from "./OfferList";
+import { MODE_LABELS, OfferList } from "./OfferList";
 import { TarotCardView } from "./TarotCardView";
+
+export interface RoadChoice {
+  mode: TransportMode | null;
+  reason: string;
+  best: NormalizedOffer | null;
+}
 
 export interface RitualResultViewModel {
   prediction: PredictionText;
   destination: { name: string; region: string };
   spreadCards?: DrawnTarotCard[];
+  roadChoice: RoadChoice;
   sourceLinks: Array<{ label: string; url: string }>;
   transportOffers: NormalizedOffer[];
   hotelOffers: NormalizedOffer[];
   warnings: string[];
 }
 
+// Whole card is the link — same convention OfferList's .offer-card already
+// uses — rather than the mockup's separate CTA button, which would mean
+// nesting an <a class="btn"> inside a card-level <a>. `best.url` is
+// optional on NormalizedOffer, so fall back to plain content instead of a
+// dead href="#" (same rule Common Pitfalls holds OfferList to).
+function RoadHero({ best }: { best: NormalizedOffer }) {
+  const content = (
+    <>
+      <strong>{best.title}</strong>
+      {best.subtitle ? <span>{best.subtitle}</span> : null}
+      {best.price ? <b>{best.price}</b> : null}
+    </>
+  );
+
+  return best.url ? (
+    <a className="road__hero" href={best.url} target="_blank" rel="noreferrer">
+      {content}
+    </a>
+  ) : (
+    <div className="road__hero">{content}</div>
+  );
+}
+
 export function TravelResult({ result }: { result: RitualResultViewModel }) {
+  const { roadChoice } = result;
+  const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
+
   return (
     <section className="travel-result">
-      <div className="prediction-panel">
+      <div className="prediction-panel" data-block="prediction">
         <p className="result-kicker">Предсказанный маршрут</p>
         <h2>{result.prediction.headline}</h2>
         <p>{result.prediction.opening}</p>
         <p>{result.prediction.summary}</p>
       </div>
       {result.spreadCards?.length ? (
-        <section className="spread-panel" aria-label="Расклад карт">
+        <section className="spread-panel" data-block="spread" aria-label="Расклад карт">
           <div className="spread-panel__header">
             <p className="result-kicker">Расклад карт</p>
             <h3>Три знака дороги</h3>
@@ -39,15 +72,37 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           </div>
         </section>
       ) : null}
-      <div className="proof-links" aria-label="Подтверждения Туту">
+      <section className="road" data-block="road" aria-label="Дорога, которую выбрала карта">
+        <h3 className="sec"><span>Дорога, которую выбрала карта</span></h3>
+        {roadChoice.best ? (
+          <article className="road__card">
+            {modeLabel ? <p className="caps">{modeLabel}</p> : null}
+            <RoadHero best={roadChoice.best} />
+            <p className="road__reason">{roadChoice.reason}</p>
+          </article>
+        ) : (
+          <div className="road__fog">
+            <div className="rule" aria-hidden="true">
+              <span className="diamond" />
+            </div>
+            <p className="road__reason road__reason--fog">{roadChoice.reason}</p>
+          </div>
+        )}
+      </section>
+      <OfferList
+        title="Билеты по предсказанию"
+        offers={result.transportOffers}
+        excludeId={roadChoice.best?.id}
+        dataBlock="other-roads"
+      />
+      <OfferList title="Где остановиться" offers={result.hotelOffers} dataBlock="hotels" />
+      <div className="proof-links" data-block="sources" aria-label="Подтверждения Туту">
         {result.sourceLinks.map((link) => (
           <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
             {link.label}
           </a>
         ))}
       </div>
-      <OfferList title="Билеты по предсказанию" offers={result.transportOffers} />
-      <OfferList title="Где остановиться" offers={result.hotelOffers} />
     </section>
   );
 }
