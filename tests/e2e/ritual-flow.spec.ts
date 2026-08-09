@@ -20,8 +20,21 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
           summary: "Дорога подтверждается Туту.",
           cardReadings: [],
         },
-        transportOffers: [{ id: "transport-0", title: "Москва - Пермь", price: "4200 RUB" }],
-        hotelOffers: [{ id: "hotel-0", title: "Отель в Перми" }],
+        transportOffers: [
+          {
+            id: "transport-0",
+            title: "Москва - Пермь",
+            price: "4200 RUB",
+            url: "https://avia.tutu.ru/f/Moskva/Perm/",
+          },
+        ],
+        hotelOffers: [
+          {
+            id: "hotel-0",
+            title: "Отель в Перми",
+            url: "https://hotel.tutu.ru/offers/details/example",
+          },
+        ],
         sourceLinks: [{ label: "Путеводитель Туту", url: "https://www.tutu.ru/geo/" }],
         warnings: [],
       }),
@@ -45,5 +58,12 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
   await expect(spread.getByText("Башня", { exact: true })).toBeVisible();
   await expect(spread.getByText("Зов", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Путеводитель Туту" })).toBeVisible();
-  await expect(page.getByText("Москва - Пермь")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Москва - Пермь/ })).toHaveAttribute(
+    "href",
+    "https://avia.tutu.ru/f/Moskva/Perm/",
+  );
+  await expect(page.getByRole("link", { name: /Отель в Перми/ })).toHaveAttribute(
+    "href",
+    "https://hotel.tutu.ru/offers/details/example",
+  );
 });

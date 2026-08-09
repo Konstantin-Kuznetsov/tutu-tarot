@@ -15,6 +15,24 @@ export interface TutuSearchResult {
   warnings: string[];
 }
 
+function transportFallback(input: TutuSearchInput): NormalizedOffer {
+  return {
+    id: "transport-fallback",
+    title: "Открыть поиск билетов на Туту",
+    subtitle: `${input.intent.departureCity} - ${input.destination.nearestTransportHub}`,
+    url: "https://avia.tutu.ru/",
+  };
+}
+
+function hotelFallback(input: TutuSearchInput): NormalizedOffer {
+  return {
+    id: "hotel-fallback",
+    title: "Открыть поиск отелей на Туту",
+    subtitle: `${input.destination.hotelSearchCity}, ${input.intent.dateFrom} - ${input.intent.dateTo}`,
+    url: "https://hotel.tutu.ru/",
+  };
+}
+
 async function callTool(endpoint: string, name: string, args: Record<string, unknown>): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
@@ -122,12 +140,13 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
   let hotels: NormalizedOffer[] = [];
 
   try {
-    const rawTransport = await callTool(endpoint, "search_multitransport", {
-      from: input.intent.departureCity,
-      to: input.destination.nearestTransportHub,
-      date: input.intent.dateFrom,
-      passengers: input.intent.travelerCount,
+    const rawTransport = await callTool(endpoint, "search_avia", {
+      origin: input.intent.departureCity,
+      destination: input.destination.nearestTransportHub,
+      departure_date: input.intent.dateFrom,
+      adults: input.intent.travelerCount,
       page_size: 5,
+      view: "compact",
     });
     transport = normalizeTransportOffers(rawTransport);
   } catch (error) {
@@ -136,16 +155,20 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
 
   try {
     const rawHotels = await callTool(endpoint, "search_hotels", {
-      city: input.destination.hotelSearchCity,
-      date_from: input.intent.dateFrom,
-      date_to: input.intent.dateTo,
-      guests: input.intent.travelerCount,
+      city_name: input.destination.hotelSearchCity,
+      check_in: input.intent.dateFrom,
+      check_out: input.intent.dateTo,
+      adults: input.intent.travelerCount,
       page_size: 5,
+      view: "compact",
     });
     hotels = normalizeHotelOffers(rawHotels);
   } catch (error) {
     warnings.push(error instanceof Error ? error.message : "Tutu hotel search failed");
   }
+
+  if (transport.length === 0) transport = [transportFallback(input)];
+  if (hotels.length === 0) hotels = [hotelFallback(input)];
 
   return { transport, hotels, warnings };
 }

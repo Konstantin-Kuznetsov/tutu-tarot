@@ -86,6 +86,55 @@ describe("Tutu offer normalization", () => {
     });
   });
 
+  it("normalizes real Tutu avia offers with search result links", () => {
+    const offers = normalizeTransportOffers({
+      offers: [
+        {
+          transport: "avia",
+          price: { amount: 46624, currency: "RUB" },
+          carriers: ["Аэрофлот"],
+          duration_min: 590,
+          departure_at: "2026-09-10T06:00:00+03:00",
+          arrival_at: "2026-09-11T06:55:00+10:00",
+          search_results_url: "https://avia.tutu.ru/f/Sankt-peterburg/Vladivostok/?start=2026-09-10",
+        },
+      ],
+    });
+
+    expect(offers[0]).toEqual({
+      id: "transport-0",
+      title: "Авиабилеты: Аэрофлот",
+      price: "46624 RUB",
+      subtitle: "В пути 9 ч 50 мин",
+      url: "https://avia.tutu.ru/f/Sankt-peterburg/Vladivostok/?start=2026-09-10",
+    });
+  });
+
+  it("normalizes real Tutu hotel offers with checkout links", () => {
+    const offers = normalizeHotelOffers({
+      hotels: [
+        {
+          name: "Deep Hotel (Владивосток)",
+          address: "4.3 км от центра",
+          rating: 9.2,
+          checkout_url: "https://hotel.tutu.ru/offers/details/fallback",
+          best_offer: {
+            price: { amount: 27279.98, currency: "RUB" },
+            checkout_url: "https://hotel.tutu.ru/offers/details/best",
+          },
+        },
+      ],
+    });
+
+    expect(offers[0]).toEqual({
+      id: "hotel-0",
+      title: "Deep Hotel (Владивосток)",
+      price: "27279.98 RUB",
+      subtitle: "4.3 км от центра",
+      url: "https://hotel.tutu.ru/offers/details/best",
+    });
+  });
+
   it("returns an empty list for unknown hotel payloads", () => {
     expect(normalizeHotelOffers({ unexpected: true })).toEqual([]);
   });
@@ -108,6 +157,28 @@ describe("Tutu offer normalization", () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       headers: { Accept: "application/json, text/event-stream" },
     });
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).params).toEqual({
+      name: "search_avia",
+      arguments: {
+        origin: "Москва",
+        destination: "Пермь",
+        departure_date: "2026-09-10",
+        adults: 2,
+        page_size: 5,
+        view: "compact",
+      },
+    });
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string).params).toEqual({
+      name: "search_hotels",
+      arguments: {
+        city_name: "Пермь",
+        check_in: "2026-09-10",
+        check_out: "2026-09-14",
+        adults: 2,
+        page_size: 5,
+        view: "compact",
+      },
+    });
   });
 
   it("unwraps SSE JSON-RPC result content for transport and hotels", async () => {
@@ -117,7 +188,7 @@ describe("Tutu offer normalization", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(sseContentResponse({
         items: [{ title: "Москва - Пермь", price: { amount: 4200, currency: "RUB" } }],
-      }, `search_multitransport-${requestTime}`))
+      }, `search_avia-${requestTime}`))
       .mockResolvedValueOnce(sseContentResponse({
         items: [{ name: "Отель Пермь", price: { amount: 6000, currency: "RUB" } }],
       }, `search_hotels-${requestTime}`));
@@ -134,7 +205,7 @@ describe("Tutu offer normalization", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
     const requestTime = Date.now();
-    const transportId = `search_multitransport-${requestTime}`;
+    const transportId = `search_avia-${requestTime}`;
     const hotelId = `search_hotels-${requestTime}`;
     const progress = { jsonrpc: "2.0", method: "notifications/progress", params: { progress: 50 } };
     const unexpectedResult = {
@@ -176,7 +247,7 @@ describe("Tutu offer normalization", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(sseContentResponse(
         { items: [{ title: "Москва - Пермь" }] },
-        `search_multitransport-${requestTime}`,
+        `search_avia-${requestTime}`,
         "Text/Event-Stream; charset=utf-8",
       ))
       .mockResolvedValueOnce(sseContentResponse(
@@ -206,9 +277,16 @@ describe("Tutu offer normalization", () => {
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
 
-    expect(result.transport).toEqual([]);
+    expect(result.transport).toEqual([
+      {
+        id: "transport-fallback",
+        title: "Открыть поиск билетов на Туту",
+        subtitle: "Москва - Пермь",
+        url: "https://avia.tutu.ru/",
+      },
+    ]);
     expect(result.hotels[0].title).toBe("Отель Пермь");
-    expect(result.warnings).toEqual(["Tutu MCP search_multitransport failed: Transport unavailable"]);
+    expect(result.warnings).toEqual(["Tutu MCP search_avia failed: Transport unavailable"]);
   });
 
   it("keeps hotel offers when transport fetch fails", async () => {
@@ -221,7 +299,14 @@ describe("Tutu offer normalization", () => {
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
 
-    expect(result.transport).toEqual([]);
+    expect(result.transport).toEqual([
+      {
+        id: "transport-fallback",
+        title: "Открыть поиск билетов на Туту",
+        subtitle: "Москва - Пермь",
+        url: "https://avia.tutu.ru/",
+      },
+    ]);
     expect(result.hotels[0].title).toBe("Отель Пермь");
     expect(result.warnings).toEqual(["network unavailable"]);
   });
@@ -246,5 +331,31 @@ describe("Tutu offer normalization", () => {
 
     expect(transportSignal?.aborted).toBe(true);
     expect(result.hotels[0].title).toBe("Отель Пермь");
+  });
+
+  it("returns Tutu search entry points when both MCP tools produce no offers", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(contentResponse({ offers: [] }))
+      .mockResolvedValueOnce(contentResponse({ hotels: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+
+    expect(result.transport).toEqual([
+      {
+        id: "transport-fallback",
+        title: "Открыть поиск билетов на Туту",
+        subtitle: "Москва - Пермь",
+        url: "https://avia.tutu.ru/",
+      },
+    ]);
+    expect(result.hotels).toEqual([
+      {
+        id: "hotel-fallback",
+        title: "Открыть поиск отелей на Туту",
+        subtitle: "Пермь, 2026-09-10 - 2026-09-14",
+        url: "https://hotel.tutu.ru/",
+      },
+    ]);
   });
 });
