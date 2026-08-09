@@ -321,8 +321,18 @@ describe("Tutu offer normalization", () => {
       .mockImplementationOnce((_url: string, init?: RequestInit) => {
         transportSignal = init?.signal ?? undefined;
         if (!transportSignal) return Promise.reject(new Error("missing abort signal"));
+        // Create a Promise that rejects when the signal aborts
         return new Promise<Response>((_resolve, reject) => {
-          transportSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+          // Handle abort event - reject with the error message a real fetch produces
+          // In Node.js fetch, an aborted request rejects with a message "This operation was aborted"
+          const abortHandler = () => {
+            reject(new Error("This operation was aborted"));
+          };
+          transportSignal.addEventListener("abort", abortHandler, { once: true });
+          // Also check if already aborted (race condition)
+          if (transportSignal.aborted) {
+            reject(new Error("This operation was aborted"));
+          }
         });
       })
       .mockResolvedValueOnce(contentResponse({ items: [{ name: "Отель Пермь" }] }));
@@ -336,6 +346,8 @@ describe("Tutu offer normalization", () => {
 
     expect(transportSignal?.aborted).toBe(true);
     expect(result.hotels[0].title).toBe("Отель Пермь");
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.join(" ")).toMatch(/abort/i);
   });
 
   it("returns Tutu search entry points when both MCP tools produce no offers", async () => {
