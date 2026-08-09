@@ -1,4 +1,5 @@
 import type { DestinationSelection, TarotSpread, TripIntent } from "@/domain/types";
+import { travelAtlas } from "@/domain/travel/atlas";
 
 export interface OfferHighlights {
   transport: string[];
@@ -24,6 +25,24 @@ export interface PredictionText {
   summary: string;
 }
 
+function summaryFor(input: PredictionInput): string {
+  const { destination } = input.selection;
+  return `Предсказание ведет в ${destination.region}. Источник маршрута (${destination.source}): ${destination.sourceUrl}. Практическая часть маршрута: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`;
+}
+
+function containsDestination(text: string, destinationName: string): boolean {
+  return text.toLocaleLowerCase("ru-RU").includes(destinationName.toLocaleLowerCase("ru-RU"));
+}
+
+function isAcceptedNarration(text: string, input: PredictionInput): boolean {
+  const selectedDestination = input.selection.destination.name;
+  if (!containsDestination(text, selectedDestination)) return false;
+
+  return travelAtlas.every(
+    (destination) => destination.name === selectedDestination || !containsDestination(text, destination.name),
+  );
+}
+
 function templatePrediction(input: PredictionInput): PredictionText {
   const { destination } = input.selection;
   return {
@@ -34,7 +53,7 @@ function templatePrediction(input: PredictionInput): PredictionText {
       cardName: card.name,
       text: `${card.name} в позиции «${card.position}» говорит: ${card.meaning}. Поэтому ${destination.anchorPlace} становится главным знаком расклада.`,
     })),
-    summary: `Предсказание ведет в ${destination.region}. Практическая часть маршрута ищется через Туту: дорога до ${destination.nearestTransportHub}, отели в городе ${destination.hotelSearchCity}.`,
+    summary: summaryFor(input),
   };
 }
 
@@ -73,7 +92,7 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
     if (!response.ok) return templatePrediction(input);
     const data = (await response.json()) as { output_text?: string };
     const text = data.output_text?.trim();
-    if (!text) return templatePrediction(input);
+    if (!text || !isAcceptedNarration(text, input)) return templatePrediction(input);
 
     return {
       headline: `Карты указывают на ${input.selection.destination.name}`,
@@ -83,7 +102,7 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
         cardName: card.name,
         text: `${card.name}: ${card.meaning}`,
       })),
-      summary: `Маршрут подтверждается источниками Туту и поиском вариантов дороги.`,
+      summary: summaryFor(input),
     };
   } catch {
     return templatePrediction(input);
