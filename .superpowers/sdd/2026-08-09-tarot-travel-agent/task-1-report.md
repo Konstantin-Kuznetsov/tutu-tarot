@@ -75,3 +75,28 @@ The required build also passed with `npm run build`.
 
 - The brief requires the exact script `"lint": "next lint"`, but `next@latest` resolved to `16.3.0`, where `next lint` has been removed. As a result, `npm run lint` currently fails with `Invalid project directory provided`. Resolving this requires either changing the mandated script to an ESLint command or pinning a Next.js version that still provides `next lint`.
 - Vitest emits a Vite config-loader deprecation warning because the generated package does not declare `"type": "module"`; the focused test still passes.
+
+## Round 1 Fix Report
+
+### Fixes implemented
+
+- Changed the lint script from `next lint` to `eslint .` for Next.js 16 compatibility.
+- Added `eslint.config.mjs` using the installed `eslint-config-next/typescript` flat config and ignored generated/build directories.
+- Added `"type": "module"` to `package.json` so Vitest loads the existing ESM-style config without its Vite config-loader warning.
+- Synchronized `package-lock.json` with the manifest.
+
+### Covering commands and results
+
+- `npm run lint`: passed with no ESLint findings.
+- `npm run test -- tests/project-foundation.test.ts`: passed, 1 test file and 1 test; the prior Vite config-loader warning is absent.
+- `npm run build`: passed; Next.js compiled, type-checked, and prerendered `/` and `/_not-found`.
+
+### Round 1 self-review
+
+- The lint fix uses the Next-provided flat config rather than introducing custom rules.
+- The ESM change is project-wide but aligns package semantics with the existing ESM configuration files.
+- No application behavior or runtime architecture was changed.
+
+### Round 1 concerns
+
+- npm still prints the pre-existing environment warning about the unsupported `always-auth` user config; it is unrelated to project lint, test, or build behavior.
