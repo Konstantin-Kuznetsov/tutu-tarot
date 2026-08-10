@@ -1,8 +1,10 @@
 import type { PredictionText } from "@/server/oracle/narrator";
-import type { DrawnTarotCard, TransportMode } from "@/domain/types";
+import type { DrawnTarotCard, TransportMode, TripIntent } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { CSSProperties } from "react";
+import type { SharedReading } from "@/domain/share/code";
 import { MODE_LABELS, OfferList } from "./OfferList";
+import { ShareButton } from "./ShareButton";
 import { TarotCardView } from "./TarotCardView";
 
 export interface RoadChoice {
@@ -13,13 +15,44 @@ export interface RoadChoice {
 
 export interface RitualResultViewModel {
   prediction: PredictionText;
-  destination: { name: string; region: string };
+  // `id` is optional here, not because a real reading ever lacks one --
+  // runRitual always returns the full TravelAtlasItem -- but because
+  // several existing fixtures/tests build a viewModel by hand with just
+  // `{ name, region }`. It's what sharedReadingFrom below checks for before
+  // it will offer a share link.
+  destination: { id?: string; name: string; region: string };
   spreadCards?: DrawnTarotCard[];
   roadChoice: RoadChoice;
   sourceLinks: Array<{ label: string; url: string }>;
   transportOffers: NormalizedOffer[];
   hotelOffers: NormalizedOffer[];
   warnings: string[];
+  // Same story as `destination.id`: always present on a real reading
+  // (see RitualResult.intent), optional here only so hand-built test
+  // fixtures don't all need updating for a feature they don't exercise.
+  intent?: TripIntent;
+}
+
+// The whole reading has to fit in a link -- there is no database -- so
+// sharing needs the three drawn cards (with orientation), which destination
+// they pointed to, which road the third card named, and the trip itself.
+// Every one of those is optional on RitualResultViewModel (see its own
+// comments), so this only offers a share link once a real reading actually
+// supplied all of them; a hand-built test fixture missing one just doesn't
+// render the button, rather than throwing or sharing a broken link.
+function sharedReadingFrom(result: RitualResultViewModel): SharedReading | null {
+  const { spreadCards, destination, roadChoice, intent } = result;
+  if (!spreadCards || spreadCards.length !== 3 || !destination.id || !intent) return null;
+
+  return {
+    cards: spreadCards.map((card) => ({ id: card.id, reversed: card.reversed })),
+    destinationId: destination.id,
+    mode: roadChoice.mode,
+    departureCity: intent.departureCity,
+    dateFrom: intent.dateFrom,
+    dateTo: intent.dateTo,
+    travelerCount: intent.travelerCount,
+  };
 }
 
 // Whole card is the link — same convention OfferList's .offer-card already
@@ -65,6 +98,7 @@ function blockIndexStyle(index: number): CSSProperties {
 export function TravelResult({ result }: { result: RitualResultViewModel }) {
   const { roadChoice } = result;
   const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
+  const reading = sharedReadingFrom(result);
 
   return (
     <section className="travel-result">
@@ -143,6 +177,11 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           </a>
         ))}
       </div>
+      {/* No [data-block] here on purpose: the sources block above already
+          closes out the animated stagger sequence (BLOCK_INDEX.sources is
+          its last step), and this sits right after it, undelayed, rather
+          than adding a seventh staggered step. */}
+      {reading ? <ShareButton reading={reading} destinationName={result.destination.name} /> : null}
     </section>
   );
 }

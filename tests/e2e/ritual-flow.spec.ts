@@ -263,3 +263,121 @@ test("holds the third card until Tutu MCP answers, on one page throughout", asyn
   await expect(page.getByRole("navigation", { name: /экраны/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /результат/i })).toHaveCount(0);
 });
+
+// Task 13: proves the share code round-trips through a real click, a real
+// clipboard, and a real page load -- not just the codec's own unit tests.
+// The /api/ritual mock below is deliberately close to the shape runRitual
+// actually returns (real destination id, real card ids, an `intent` block)
+// because ShareButton reads straight off that response; anything short of
+// the real shape (e.g. the older fixtures elsewhere in this file, which
+// predate Task 13 and omit `destination.id`/`intent` on purpose) would just
+// hide the button instead of exercising it. The opened link's own search is
+// never mocked -- it hits the real (down, in this environment) Tutu MCP
+// endpoint and takes the documented fog fallback, proving the "prices
+// fresh" half of the feature along the way.
+test("a shared reading link reproduces the same cards, orientations and destination in a fresh tab", async ({ page, context }) => {
+  // Playwright's Chromium implements the async Clipboard API behind an
+  // explicit permission grant; without it, ShareButton's fallback path
+  // would hit the same "failed to copy" branch a real browser shows when
+  // permission is refused -- see tests/components/share-button.test.tsx for
+  // that branch's own coverage; this test wants the success path.
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+
+  await page.route("**/api/ritual", async (route) => {
+    const submitted = JSON.parse(route.request().postData() ?? "{}") as {
+      departureCity: string;
+      dateFrom: string;
+      dateTo: string;
+      travelerCount: number;
+    };
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ritualId: "demo",
+        seed: "seed",
+        intent: submitted,
+        spreadCards: [
+          {
+            id: "star", number: 17, name: "Звезда", image: "/tarot/17-star.webp", position: "Зов",
+            reversed: false, archetypes: ["north"], transport: ["avia"],
+            meaning: "северный свет и надежда", meaningReversed: "свет тусклый",
+          },
+          {
+            id: "moon", number: 18, name: "Луна", image: "/tarot/18-moon.webp", position: "Дар",
+            reversed: true, archetypes: ["north"], transport: ["railway"],
+            meaning: "ночная дорога и туман", meaningReversed: "туман рассеивается, страх был напрасным",
+          },
+          {
+            id: "hermit", number: 9, name: "Отшельник", image: "/tarot/09-hermit.webp", position: "Путь",
+            reversed: false, archetypes: ["solitude"], transport: ["railway"],
+            meaning: "дорога к тишине и высокому месту", meaningReversed: "одиночество тяготит, нужен попутчик",
+          },
+        ],
+        // A real atlas id -- resolveSharedReading (used by both the shared
+        // page and its opengraph-image sibling) rejects anything else.
+        destination: { id: "altai-chuysky", name: "Горный Алтай", region: "Республика Алтай" },
+        prediction: {
+          headline: "Карты указывают: Горный Алтай",
+          opening: "Карты раскрывают путь.",
+          summary: "Маршрут подтверждён.",
+          cardReadings: [],
+        },
+        roadChoice: {
+          mode: "railway",
+          reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.",
+          best: { id: "t-0", title: "Поезд: ФПК", price: "3481 RUB", mode: "railway", url: "https://www.tutu.ru/poezda/" },
+        },
+        transportOffers: [],
+        hotelOffers: [],
+        sourceLinks: [],
+        warnings: [],
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Город вылета").fill("Москва");
+  await pickFutureDateRange(page);
+  await page.getByLabel("Путешественники").fill("2");
+  await page.getByRole("button", { name: "Начать расклад" }).click();
+
+  await expect(page.getByText("Карты указывают: Горный Алтай")).toBeVisible();
+
+  await page.getByRole("button", { name: "Поделиться раскладом" }).click();
+  // ShareButton's clipboard.write() is asynchronous (its own promise, not
+  // awaited by the click handler -- see its comment on why the write call
+  // itself has to fire synchronously but the copy can't): reading the
+  // clipboard before that promise settles is a real race, not a hypothetical
+  // one -- it lost on this exact assertion under the "desktop" project
+  // while "mobile" happened to win. The visible confirmation text only
+  // renders once the write has actually resolved, so waiting for it first
+  // makes the read deterministic.
+  await expect(page.getByText("Ссылка скопирована")).toBeVisible();
+  const shareUrl = await page.evaluate(() => navigator.clipboard.readText());
+  expect(shareUrl).toMatch(/\/r\/[A-Za-z0-9_-]+$/);
+
+  // "Open it in a fresh page": a new page in the same browser context, not
+  // a client-side navigation on the page that already has the reading in
+  // memory -- this is the tab a friend who was sent the link would open.
+  const freshPage = await context.newPage();
+  await freshPage.goto(shareUrl);
+
+  await expect(freshPage.getByText("Карты указывают: Горный Алтай")).toBeVisible();
+  const spread = freshPage.getByTestId("spread-card");
+  await expect(spread).toHaveCount(3);
+  await expect(spread.nth(0)).toHaveAttribute("data-card-id", "star");
+  await expect(spread.nth(0)).toHaveAttribute("data-reversed", "false");
+  await expect(spread.nth(1)).toHaveAttribute("data-card-id", "moon");
+  await expect(spread.nth(1)).toHaveAttribute("data-reversed", "true");
+  await expect(spread.nth(2)).toHaveAttribute("data-card-id", "hermit");
+  await expect(spread.nth(2)).toHaveAttribute("data-reversed", "false");
+
+  await freshPage.setViewportSize({ width: 375, height: 812 });
+  const hasNoHorizontalOverflow = await freshPage.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  );
+  expect(hasNoHorizontalOverflow).toBe(true);
+
+  await freshPage.close();
+});

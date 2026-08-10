@@ -985,6 +985,53 @@ h1 {
   text-decoration: none;
 }
 
+/* Task 13 — sharing. Sits right after .proof-links, undelayed (see
+   TravelResult's own comment on why it carries no [data-block]). */
+.share-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.share-row__status {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.share-row__status--error {
+  color: var(--wine);
+}
+
+/* The raw fallback link shown when neither share nor clipboard worked —
+   same overflow-wrap-anywhere rule .road__hero/.proof-links already hold
+   for URLs, since an unbroken share link is exactly the kind of long
+   unbroken token that caused the 2026-08-09 mobile overflow (see
+   .prediction-panel's own comment). */
+.share-row__url {
+  overflow-wrap: anywhere;
+}
+
+/* The shared-reading page's one quiet line about prices being searched
+   fresh (see src/app/r/[code]/page.tsx) — same .caps kicker style as the
+   mockup's own hero tagline, just centred and line-length-capped since
+   this one runs a full sentence rather than a short label. */
+.share-note {
+  max-width: 52ch;
+  margin: 0 auto var(--sp-2);
+  text-align: center;
+}
+
+.share-fallback {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-4);
+  padding-block: var(--sp-8);
+  text-align: center;
+}
+
 .offer-section {
   display: grid;
   gap: 10px;

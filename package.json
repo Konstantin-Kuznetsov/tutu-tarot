@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "tarot:images": "node scripts/prepare-tarot-images.mjs",
+    "og:assets": "node scripts/prepare-og-assets.mjs",
     "smoke": "node scripts/smoke-ritual.mjs"
   },
   "dependencies": {

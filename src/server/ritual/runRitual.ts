@@ -16,6 +16,12 @@ export interface RoadChoice {
 export interface RitualResult {
   ritualId: string;
   seed: string;
+  // Carried alongside the draw (not derivable from `seed`, which is a
+  // one-way hash) so a completed reading can be turned into a share code
+  // client-side, with no server round-trip and no database: the whole
+  // reading -- prophecy and trip alike -- has to fit in the link itself.
+  // See src/domain/share/code.ts.
+  intent: TripIntent;
   spreadCards: DrawnTarotCard[];
   destination: TravelAtlasItem;
   prediction: PredictionText;
@@ -79,6 +85,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
   return {
     ritualId: Buffer.from(draw.seed).toString("base64url").slice(0, 12),
     seed: draw.seed,
+    intent: input,
     spreadCards,
     destination: selection.destination,
     prediction,
