@@ -93,6 +93,45 @@ function templatePrediction(input: PredictionInput): PredictionText {
   };
 }
 
+// The MCP search this route runs first already spends up to 18s (see
+// SEARCH_BUDGET_MS in mcpClient.ts) inside a 30s route ceiling (see
+// maxDuration on /api/ritual and /r/[code]/page.tsx). This fetch previously
+// had no timeout of its own, so a slow provider could eat all the remaining
+// headroom and take the whole request down with it. 8s leaves comfortable
+// room for narration/response overhead after a worst-case MCP search; any
+// failure here -- timeout included -- falls back to the template below, so
+// a slow or unreachable provider degrades the copy, never the request.
+const AI_TIMEOUT_MS = 8_000;
+
+// A raw `POST /v1/responses` body nests its text at
+// output[0].content[0].text -- `output_text` is a convenience field the
+// OpenAI SDK computes client-side after parsing the response, not a field
+// this hand-rolled fetch ever receives on the wire. Reading only
+// `output_text` meant every AI call silently produced `undefined` and fell
+// back to the template regardless of what the model returned. Read the real
+// wire shape; keep `output_text` as a defensive fallback in case some
+// provider or future SDK path does supply it directly.
+function extractOutputText(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const record = data as { output_text?: unknown; output?: unknown };
+  if (typeof record.output_text === "string") return record.output_text;
+
+  if (!Array.isArray(record.output)) return undefined;
+  for (const item of record.output) {
+    if (!item || typeof item !== "object") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+
+    for (const block of content) {
+      if (block && typeof block === "object" && typeof (block as { text?: unknown }).text === "string") {
+        return (block as { text: string }).text;
+      }
+    }
+  }
+  return undefined;
+}
+
 export async function createPrediction(input: PredictionInput): Promise<PredictionText> {
   if (!input.aiApiKey) {
     return templatePrediction(input);
@@ -101,6 +140,7 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${input.aiApiKey}`,
@@ -126,8 +166,11 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
     });
 
     if (!response.ok) return templatePrediction(input);
-    const data = (await response.json()) as { output_text?: string };
-    const flavor = flavorFor(data.output_text?.trim() ?? "");
+    const data = (await response.json()) as unknown;
+    // Only a validated flavor key from the app-owned allowlist (flavorCopy)
+    // ever leaves this function -- the model's own text, real-shaped or
+    // not, is never passed to a render path. See flavorFor.
+    const flavor = flavorFor(extractOutputText(data)?.trim() ?? "");
     if (!flavor) return templatePrediction(input);
 
     return {

@@ -89,6 +89,31 @@ function mockAiText(outputText: string) {
   }));
 }
 
+// The real `POST /v1/responses` wire shape -- `output_text` is an SDK
+// convenience field computed client-side after parsing, never present on
+// what this hand-rolled fetch actually receives. mockAiText above (and
+// every test built on it) mocks the shape the code *expected*, which is
+// exactly why the suite didn't catch the bug where every real AI call
+// silently produced `undefined` and fell back to the template.
+function mockAiRealEnvelope(text: string) {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      id: "resp_123",
+      object: "response",
+      output: [
+        {
+          type: "message",
+          id: "msg_123",
+          status: "completed",
+          role: "assistant",
+          content: [{ type: "output_text", text, annotations: [] }],
+        },
+      ],
+    }),
+  }));
+}
+
 describe("createPrediction", () => {
   it("returns template prediction when no AI key is configured", async () => {
     const result = await createPrediction(createInput());
@@ -105,6 +130,43 @@ describe("createPrediction", () => {
 
     expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
     expect(result.opening).toContain("Камень и тишина собирают маршрут в один ясный знак.");
+  });
+
+  // Regression: the code used to read only `data.output_text`, a field the
+  // real `POST /v1/responses` wire response never carries (it's an SDK
+  // convenience aggregation). Every real AI call therefore silently
+  // produced `undefined` and fell back to the template, while every test in
+  // this file kept passing because they all mocked the SDK's shape, not the
+  // wire's. This test uses the actual envelope shape and would fail against
+  // the old `data.output_text`-only read.
+  it("reads the flavor key from the real Responses API wire shape (output[0].content[0].text)", async () => {
+    mockAiRealEnvelope("stone_silence");
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
+    expect(result.opening).toContain("Камень и тишина собирают маршрут в один ясный знак.");
+  });
+
+  it("falls back to the template when the real envelope's flavor key is not on the allowlist", async () => {
+    mockAiRealEnvelope("сочи, конечно");
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.opening).not.toContain("сочи");
+  });
+
+  it("gives the AI request its own abort signal so a slow provider cannot exhaust the route's time budget", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: "stone_silence" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("ignores free text with a lowercase alternate destination", async () => {
