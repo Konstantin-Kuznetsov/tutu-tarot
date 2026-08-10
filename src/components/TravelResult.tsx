@@ -1,17 +1,12 @@
 import type { PredictionText } from "@/server/oracle/narrator";
-import type { DrawnTarotCard, TransportMode, TripIntent } from "@/domain/types";
+import type { DrawnTarotCard, TripIntent } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
+import type { RoadChoice } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
 import { MODE_LABELS, OfferList } from "./OfferList";
 import { ShareButton } from "./ShareButton";
 import { TarotCardView } from "./TarotCardView";
-
-export interface RoadChoice {
-  mode: TransportMode | null;
-  reason: string;
-  best: NormalizedOffer | null;
-}
 
 export interface RitualResultViewModel {
   prediction: PredictionText;

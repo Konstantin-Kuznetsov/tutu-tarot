@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { decodeReading } from "@/domain/share/code";
 import { resolveSharedReading } from "@/domain/share/reading";
 import { ritualSeed } from "@/domain/tarot/engine";
-import { FOG_REASON, roadReason } from "@/domain/tarot/roadReason";
 import type { TripIntent } from "@/domain/types";
 import { createPrediction } from "@/server/oracle/narrator";
+import { buildRoadChoiceAndSources } from "@/server/ritual/runRitual";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
 import { TravelResult, type RitualResultViewModel } from "@/components/TravelResult";
 
@@ -35,13 +35,13 @@ async function loadSharedResult(code: string): Promise<RitualResultViewModel | n
 
   const offers = await searchTutuOffers({ intent, destination });
   const pathCard = spreadCards[2];
-  const mode = reading.mode;
-  const best = mode ? offers.transport.find((offer) => offer.mode === mode) ?? null : null;
-  const roadChoice = {
-    mode,
-    reason: mode ? roadReason(pathCard, mode) : FOG_REASON,
-    best,
-  };
+  const { roadChoice, sourceLinks } = buildRoadChoiceAndSources({
+    mode: reading.mode,
+    pathCard,
+    transportOffers: offers.transport,
+    modesSummary: offers.modesSummary,
+    destination,
+  });
 
   const prediction = await createPrediction({
     intent,
@@ -54,14 +54,6 @@ async function loadSharedResult(code: string): Promise<RitualResultViewModel | n
     },
     aiApiKey: process.env.OPENAI_API_KEY,
   });
-
-  const sourceLinks = [
-    {
-      label: destination.source === "provereno.tutu" ? "Проверенный маршрут Туту" : "Источник маршрута",
-      url: destination.sourceUrl,
-    },
-    ...(destination.geoUrl ? [{ label: "Путеводитель Туту", url: destination.geoUrl }] : []),
-  ];
 
   return {
     prediction,

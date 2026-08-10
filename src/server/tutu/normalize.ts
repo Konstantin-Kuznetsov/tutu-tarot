@@ -67,7 +67,10 @@ function readPrice(value: unknown): string | undefined {
   return `${price.amount} ${typeof price.currency === "string" ? price.currency : "RUB"}`;
 }
 
-function formatDuration(minutes: unknown): string | undefined {
+// Exported so the road hero can format modes_summary's min_duration_min the
+// same way an actual offer's duration is formatted (see runRitual's
+// offerFromSummary) — one formatting rule, not two that could drift apart.
+export function formatDuration(minutes: unknown): string | undefined {
   if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) return undefined;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
