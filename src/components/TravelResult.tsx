@@ -144,6 +144,17 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
             <p className="road__reason road__reason--fog">{roadChoice.reason}</p>
           </div>
         )}
+        {/* One quiet, product-voiced line rather than the raw warning
+            strings themselves (those are diagnostic English carried in
+            RitualResultViewModel.warnings for the network payload, e.g.
+            "Tutu MCP search_multitransport failed: ..." -- never fit for a
+            reader). No [data-block] of its own: it belongs to the road
+            block's own stagger step, not a new one. */}
+        {result.warnings.length > 0 ? (
+          <p className="road__warning">
+            Дороги удалось проверить не полностью — Туту сейчас отвечает не на все запросы.
+          </p>
+        ) : null}
       </section>
       {/* OfferList renders its own [data-block] section; --block-index is set
           on this wrapper and inherited down to it (custom properties

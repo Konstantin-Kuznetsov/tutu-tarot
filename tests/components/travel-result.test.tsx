@@ -104,6 +104,53 @@ describe("TravelResult", () => {
     expect(within(road).queryByRole("link")).toBeNull();
   });
 
+  // Regression: a mode the third card actually names must always render the
+  // hero, never the fog treatment -- even when its `best` came from
+  // modes_summary rather than a matched offer (see runRitual's
+  // offerFromSummary). Before the fix, this exact shape (mode set, offer
+  // list only carrying an unrelated mode) produced `best: null` and the
+  // component fell through to the fog block while still showing a
+  // confident, mode-specific reason above it.
+  it("renders the hero, never the fog, whenever the card named a real mode", () => {
+    const summaryDerivedRoad: typeof resultWithRoad = {
+      ...resultWithRoad,
+      roadChoice: {
+        mode: "bus",
+        reason: "«Отшельник» ведёт по земле — дорога будет упрямой и близкой.",
+        best: {
+          id: "summary-bus",
+          title: "Автобус: билеты на Туту",
+          subtitle: "В пути от 2 ч 30 мин",
+          price: "от 3220 ₽",
+          url: "https://bus.tutu.ru/",
+          mode: "bus",
+        },
+      },
+    };
+
+    render(<TravelResult result={summaryDerivedRoad} />);
+
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+    expect(within(road).queryByText(/туман/i)).toBeNull();
+    expect(road).toHaveTextContent("от 3220 ₽");
+    expect(within(road).getByRole("link")).toHaveAttribute("href", "https://bus.tutu.ru/");
+  });
+
+  it("says nothing when the search had no warnings", () => {
+    render(<TravelResult result={resultWithRoad} />);
+    expect(screen.queryByText(/провер/i)).toBeNull();
+  });
+
+  it("tells the reader, in Russian and in the product's own voice, when roads could not be fully checked", () => {
+    render(<TravelResult result={{ ...resultWithRoad, warnings: ["Tutu MCP search_multitransport failed: 500"] }} />);
+
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+    // Never the raw diagnostic string itself — only the product-voiced line.
+    expect(road).not.toHaveTextContent("Tutu MCP");
+    expect(road).not.toHaveTextContent("500");
+    expect(road).toHaveTextContent("Туту сейчас отвечает не на все запросы");
+  });
+
   it("keeps the prediction above the roads", () => {
     const { container } = render(<TravelResult result={resultWithRoad} />);
     const order = Array.from(container.querySelectorAll("[data-block]")).map(

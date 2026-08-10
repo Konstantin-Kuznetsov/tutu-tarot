@@ -985,6 +985,19 @@ h1 {
   display: none;
 }
 
+/* One quiet line, same voice as .share-note, shown under the road block
+   (hero or fog, either way) when RitualResultViewModel.warnings is
+   non-empty -- e.g. Tutu MCP timed out or errored on one leg of the search.
+   Never renders the warning strings themselves; see TravelResult's own
+   comment on why. */
+.road__warning {
+  max-width: 52ch;
+  margin: 0 auto;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  text-align: center;
+}
+
 .proof-links {
   display: flex;
   flex-wrap: wrap;
