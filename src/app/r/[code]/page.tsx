@@ -12,6 +12,15 @@ interface PageProps {
   params: Promise<{ code: string }>;
 }
 
+// This route runs a live Tutu MCP search (searchTutuOffers, an 18s budget --
+// see SEARCH_BUDGET_MS in mcpClient.ts) and then narration, serially, at
+// request time -- same shape as /api/ritual, which already carries this
+// comment and this exact 30s ceiling. Without it, a cold shared link would
+// inherit whatever the platform default is, which can be lower than what
+// this page's own work needs: it would always pass locally (no cold start,
+// warm connections) while risking a mid-search kill in production.
+export const maxDuration = 30;
+
 // The prophecy -- which three cards, which orientation, which destination,
 // which road the third card named -- comes straight from the link and is
 // never recomputed: that is the whole point of a share code. Only the
