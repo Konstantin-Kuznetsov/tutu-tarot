@@ -2,16 +2,16 @@
 
 Next.js prototype for Tutu AI Hackathon 2026.
 
-The app performs a 3D tarot ritual, chooses a Russian destination from a curated Tutu-inspired atlas, narrates the result with optional AI, and searches real transport and hotel options through Tutu MCP.
+The app performs a tarot ritual, chooses a Russian destination from a curated Tutu-inspired atlas, narrates the result with optional AI, and searches real transport and hotel options through Tutu MCP.
 
 ## Local Development
 
 ```bash
 npm install
-npm run dev
+PORT=3100 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3100`.
 
 ## Environment
 
