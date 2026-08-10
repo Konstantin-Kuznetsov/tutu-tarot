@@ -1,11 +1,66 @@
+/* Design tokens, ported wholesale from docs/design/tokens.css (source of
+ * truth: Claude Design project "Дизайн карточек и навигации",
+ * id 33d8a5c9-0f76-4610-9f1c-45c9a1461ea7, screen "01 Вход.dc.html"). This
+ * replaces the partial hand-picked set Task 7 introduced for `.back` alone.
+ *
+ * `color-scheme: dark` is not part of the mockup's token file — it is kept
+ * from Task 7 because native form controls (the ticket's date/number
+ * inputs) need it to render their built-in chrome (calendar icon, spin
+ * buttons) in a dark-appropriate style instead of light-on-dark.
+ */
 :root {
   color-scheme: dark;
-  --ink: #f4edf7;
-  --muted: #c8bed1;
-  --bg: #151016;
-  --wine: #7a1f35;
-  --jade: #1a8f7a;
-  --brass: #c59b4d;
+
+  /* цвет: стол и ткань */
+  --bg: #0f0b15;
+  --cloth: #191024;
+  --cloth-2: #241735;
+  --line: #463357;
+  --line-soft: #2c1f3d;
+
+  /* золото и вино */
+  --gold: #d9a441;
+  --gold-bright: #f2c66d;
+  --gold-deep: #7d5c1e;
+  --wine: #8c3247;
+
+  /* текст */
+  --text: #f4edde;
+  --text-dim: #c9b89e;
+  --on-gold: #221503;
+
+  /* дуотон для сканов Райдера—Уэйта 1909: тени → света */
+  --duotone-shadows: #1d1426;
+  --duotone-lights: #e8c98a;
+
+  /* типографика */
+  --font-display: 'Prata', serif;
+  --font-ui: 'Manrope', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  --fs-xs: .8125rem;
+  --fs-s: .9375rem;
+  --fs-m: 1.0625rem;
+  --fs-l: 1.375rem;
+  --fs-xl: clamp(1.625rem, 3vw, 2.25rem);
+  --fs-hero: clamp(2.125rem, 5vw, 3.375rem);
+  --lh-tight: 1.15;
+  --lh-body: 1.55;
+  --track-caps: .14em;
+
+  /* отступы */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 72px;
+
+  /* радиусы */
+  --r-s: 6px; --r-m: 12px; --r-card: 12px; --r-pill: 999px;
+
+  /* тени */
+  --shadow-card: 0 14px 28px rgba(5, 2, 10, .55), 0 2px 6px rgba(5, 2, 10, .45);
+  --shadow-raise: 0 24px 48px rgba(5, 2, 10, .6);
+
+  /* движение */
+  --t-fast: 150ms; --t-med: 320ms; --t-slow: 700ms; --t-deal: 900ms;
+  --ease: cubic-bezier(.22, .61, .2, 1);
 }
 
 * {
@@ -16,8 +71,13 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--bg);
-  color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  font-family: var(--font-ui);
+  /* The mockup sets these through the `font:` shorthand. Without them the page
+     falls back to the browser's 16px/normal rhythm and --lh-body has no consumer. */
+  font-size: var(--fs-m);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -25,335 +85,632 @@ input {
   font: inherit;
 }
 
-.app-shell {
+/* Applies the display face to every heading in the app. Since Task 11 there
+   is only ever one <h1> in the document (TripIntentForm's), rendered for
+   every stage — the ritual and result screens no longer carry their own
+   duplicate heading. */
+h1 {
+  margin: 0;
+  font: 400 var(--fs-hero) / var(--lh-tight) var(--font-display);
+}
+
+/* ── Shared primitives — ported verbatim from docs/design/tokens.css ──
+   `.back` is NOT here: it already lives further down this file (see its own
+   comment), unmodified since Task 7's fix round. It is the same shared
+   card-back the entry screen's fan below reuses. */
+.table {
+  min-height: 100vh;
+  background: var(--bg) repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .012) 3px 4px);
+}
+
+.caps {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.rule { display: flex; align-items: center; gap: var(--sp-3); width: 220px; }
+.rule::before, .rule::after { content: ""; height: 1px; flex: 1; background: var(--line-soft); }
+.diamond { width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); flex: none; }
+
+/* Divider heading — flanking rules either side of the label. Shared by the
+   road section's own title and OfferList's h3 (both "Билеты по
+   предсказанию" and "Где остановиться"), so the three post-spread section
+   titles read as one family instead of the road looking like a one-off. */
+.sec {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  font: 400 var(--fs-l)/1.25 var(--font-display);
+  text-align: center;
+}
+
+.sec::before,
+.sec::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line-soft);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 15px 28px;
+  border-radius: var(--r-s);
+  border: 1px solid var(--gold-deep);
+  background: var(--gold);
+  color: var(--on-gold);
+  font: 700 var(--fs-s)/1 var(--font-ui);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.btn:hover { background: var(--gold-bright); color: var(--on-gold); }
+.btn:active { transform: translateY(1px); }
+
+.btn--secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line-soft);
+}
+
+.btn--secondary:hover {
+  background: transparent;
+  color: var(--gold-bright);
+  border-color: var(--gold-bright);
+}
+
+/* ── Entry screen — ported from Claude Design "01 Вход.dc.html" ──
+   The mockup's `.proto-nav` (prototype screen switcher) and its inter-screen
+   links are deliberately not ported: the product is one page. */
+.enter {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-5);
   min-height: 100vh;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  gap: var(--sp-5);
 }
 
-.ritual-surface {
-  width: min(100%, 1080px);
+.fan {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-2);
 }
 
-.ritual-layout {
-  width: min(100%, 1120px);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-  gap: 32px;
-  align-items: center;
+.fan .back {
+  width: 86px;
+  box-shadow: var(--shadow-card);
 }
 
-.ritual-copy h1 {
-  margin: 0 0 12px;
-  font-size: 48px;
-  letter-spacing: 0;
+.fan .back:nth-child(1) {
+  transform: rotate(-10deg) translate(20px, 12px);
 }
 
-.ritual-copy p,
-.ritual-status {
-  color: var(--muted);
+.fan .back:nth-child(2) {
+  z-index: 1;
+  transform: translateY(-2px);
 }
 
-.intent-form {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid rgba(197, 155, 77, 0.34);
-  border-radius: 8px;
-  background: rgba(21, 16, 22, 0.82);
+.fan .back:nth-child(3) {
+  transform: rotate(10deg) translate(-20px, 12px);
 }
 
-.intent-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
+.sub {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--text-dim);
 }
 
-.intent-form input {
+/* Four columns, matching the mockup ("01 Вход.dc.html") exactly again: Task
+   10 replaced the two separate dateFrom/dateTo .field cells with a single
+   .field wrapping DateRangeCalendar, so city/when/travelers/button is back
+   to the mockup's own column count and ratio (the mockup's "Когда поедете"
+   field links out to a separate calendar screen; ours opens a popover
+   in-place instead of navigating, but occupies the same one grid cell). */
+.ticket {
   width: 100%;
-  min-height: 42px;
-  border: 1px solid rgba(244, 237, 247, 0.22);
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #201826;
-  color: var(--ink);
+  display: grid;
+  grid-template-columns: 1.15fr 1.15fr .9fr auto;
+  text-align: left;
+  background: var(--cloth);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-card);
+  margin-top: var(--sp-3);
 }
 
-.intent-form button,
-.ritual-layout button {
-  min-height: 44px;
+.field {
+  display: grid;
+  gap: 5px;
+  padding: 18px 22px;
+  border-right: 1px solid var(--line-soft);
+  min-width: 0;
+  align-content: center;
+}
+
+.field .lab {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.field input {
+  background: none;
   border: 0;
-  border-radius: 6px;
-  padding: 10px 14px;
-  background: var(--brass);
-  color: #151016;
+  padding: 0;
+  color: var(--text);
+  font: 500 var(--fs-m)/1.3 var(--font-ui);
+  outline: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: #8d7fa0;
+}
+
+.field input:focus {
+  box-shadow: 0 1px 0 var(--gold);
+}
+
+.ticket .btn {
+  margin: 12px;
+  align-self: center;
+}
+
+.ticket .btn:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.ticket .btn:disabled:hover {
+  background: var(--gold);
+}
+
+/* ── Date range calendar — adapted from "04 Календарь.dc.html" ──
+   The mockup is a whole page you navigate to (its .day/.month/.grid
+   classes); DateRangeCalendar (Task 10) is a popover living inside the
+   ticket's own "Когда поедете" .field instead, so the class names and DOM
+   here are the component's own (calendar__*, a <table> per month), not a
+   port of the mockup's markup. What IS carried over verbatim: the token
+   values, the two-month layout, the weekday header with a dimmed weekend,
+   the hover ring on a plain day, marking the picked range as one
+   continuous band with gold-circle endpoints, and — via the
+   `data-position="start"|"end"` attribute alongside `data-edge` — the
+   mockup's own directional half-gradient per endpoint (`.day.start` /
+   `.day.end`), so the band visually flows into whichever side of the gold
+   circle continues the range. */
+.field .calendar {
+  position: relative;
+  width: 100%;
+}
+
+.calendar__trigger {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font: 500 var(--fs-m)/1.3 var(--font-ui);
+  text-align: left;
   cursor: pointer;
 }
 
-.result-shell {
-  padding: 18px;
-  border: 1px solid rgba(26, 143, 122, 0.38);
-  border-radius: 8px;
-  background: rgba(26, 143, 122, 0.12);
+.calendar__trigger:hover,
+.calendar__trigger:focus-visible {
+  color: var(--gold-bright);
 }
 
-.scene-shell {
-  grid-column: 1 / -1;
-  min-height: 300px;
-  position: relative;
+.calendar__trigger:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.calendar__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--sp-3));
+  left: 0;
+  width: max-content;
+  max-width: min(640px, calc(100vw - 2 * var(--sp-4)));
   display: grid;
-  gap: 14px;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  background: var(--cloth);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-raise);
 }
 
-.ritual-scene {
-  min-height: 300px;
-  isolation: isolate;
+.calendar__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.calendar__nav button {
+  background: none;
+  border: 0;
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--gold);
+  font: 700 var(--fs-s)/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.calendar__nav button:hover {
+  color: var(--gold-bright);
+}
+
+.calendar__months {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-7);
+}
+
+.calendar__month {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.calendar__month caption {
+  margin-bottom: var(--sp-3);
+  font: 400 var(--fs-l)/1.2 var(--font-display);
+  text-align: center;
+  caption-side: top;
+}
+
+.calendar__month th {
+  padding: var(--sp-2) 0;
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Monday-first header (WEEKDAYS in the component): columns 6 and 7 are
+   Saturday and Sunday. */
+.calendar__month th:nth-child(6),
+.calendar__month th:nth-child(7) {
+  color: var(--gold-deep);
+}
+
+.calendar__month td {
+  padding: 0;
+}
+
+.calendar__month button {
   position: relative;
+  z-index: 0;
+  width: 100%;
+  min-height: 44px;
   display: grid;
   place-items: center;
-  padding: clamp(24px, 5vw, 52px);
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(197, 155, 77, 0.32);
-  background:
-    linear-gradient(110deg, rgba(244, 237, 247, 0.08), transparent 32%),
-    linear-gradient(155deg, rgba(26, 143, 122, 0.18), transparent 38%),
-    linear-gradient(20deg, rgba(122, 31, 53, 0.2), transparent 48%),
-    #100b12;
-  box-shadow: inset 0 1px 0 rgba(244, 237, 247, 0.08), 0 28px 80px rgba(0, 0, 0, 0.24);
+  border: 0;
+  background: none;
+  font: 500 var(--fs-s)/1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  cursor: pointer;
 }
 
-.ritual-scene__veil {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  opacity: 0.72;
-  background:
-    repeating-linear-gradient(90deg, rgba(244, 237, 247, 0.05) 0 1px, transparent 1px 86px),
-    repeating-linear-gradient(0deg, rgba(197, 155, 77, 0.045) 0 1px, transparent 1px 72px);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
-}
-
-.ritual-scene__table {
-  position: absolute;
-  inset: 18px;
-  z-index: -1;
-  border-radius: 8px;
-  border: 1px solid rgba(197, 155, 77, 0.16);
-  background:
-    linear-gradient(90deg, transparent 0 14%, rgba(197, 155, 77, 0.2) 14% 14.2%, transparent 14.2% 85.8%, rgba(197, 155, 77, 0.2) 85.8% 86%, transparent 86%),
-    linear-gradient(0deg, transparent 0 18%, rgba(244, 237, 247, 0.08) 18% 18.2%, transparent 18.2% 81.8%, rgba(244, 237, 247, 0.08) 81.8% 82%, transparent 82%),
-    rgba(12, 8, 13, 0.44);
-}
-
-.ritual-scene__table span {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(62vw, 520px);
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(197, 155, 77, 0.42), transparent);
-  transform-origin: center;
-}
-
-.ritual-scene__table span:nth-child(1) {
-  transform: translate(-50%, -50%);
-}
-
-.ritual-scene__table span:nth-child(2) {
-  transform: translate(-50%, -50%) rotate(60deg);
-}
-
-.ritual-scene__table span:nth-child(3) {
-  transform: translate(-50%, -50%) rotate(-60deg);
-}
-
-.ritual-scene__deck {
-  position: absolute;
-  left: clamp(20px, 7vw, 78px);
-  bottom: clamp(18px, 5vw, 46px);
-  width: 82px;
-  aspect-ratio: 2 / 3;
-  opacity: 0.9;
-  transform: rotate(-10deg);
-}
-
-.ritual-scene__deck span {
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  border: 1px solid rgba(197, 155, 77, 0.52);
-  background:
-    linear-gradient(135deg, rgba(26, 143, 122, 0.82), rgba(122, 31, 53, 0.86)),
-    #1a1020;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
-}
-
-.ritual-scene__deck span:nth-child(2) {
-  transform: translate(5px, -5px);
-}
-
-.ritual-scene__deck span:nth-child(3) {
-  transform: translate(10px, -10px);
-}
-
-.ritual-scene__spread {
-  width: min(100%, 720px);
-  display: grid;
-  grid-template-columns: repeat(3, minmax(128px, 1fr));
-  gap: clamp(12px, 3vw, 28px);
-  align-items: center;
-}
-
-.ritual-scene__card {
-  min-width: 0;
-  aspect-ratio: 2 / 3;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  align-items: end;
-  gap: 10px;
-  position: relative;
-  overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid rgba(244, 237, 247, 0.24);
-  padding: clamp(14px, 2.2vw, 22px);
-  background:
-    linear-gradient(160deg, rgba(244, 237, 247, 0.92), rgba(232, 211, 160, 0.88) 48%, rgba(167, 216, 207, 0.9)),
-    #f3e8c9;
-  color: #151016;
-  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.32);
-  transform: translateY(42px) rotate(var(--ritual-tilt, 0deg));
-  opacity: 0;
-  animation: ritual-deal 960ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--ritual-order, 0) * 170ms);
-}
-
-.ritual-scene__card:nth-child(1) {
-  --ritual-tilt: -7deg;
-}
-
-.ritual-scene__card:nth-child(2) {
-  --ritual-tilt: 0deg;
-  transform: translateY(28px) rotate(var(--ritual-tilt));
-}
-
-.ritual-scene__card:nth-child(3) {
-  --ritual-tilt: 7deg;
-}
-
-.ritual-scene__card::before,
-.ritual-scene__card::after {
+.calendar__month button:hover:not(:disabled):not([data-edge="true"])::after {
   content: "";
   position: absolute;
-  inset: 10px;
-  border-radius: 7px;
+  inset: 0;
+  margin: auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 50%;
+}
+
+/* Continuous band: every day strictly between the endpoints, plus (see the
+   comment above the .field .calendar rule) the endpoints themselves. The
+   endpoints get a directional half-gradient instead of a flat fill (ported
+   verbatim from the mockup's .day.start/.day.end) so the band visually
+   flows into whichever side of the gold circle continues the range —
+   `data-position="start"` fills the trailing (right) half, `"end"` fills
+   the leading (left) half, matching the Monday-first, left-to-right grid. */
+.calendar__month button[data-in-range="true"] {
+  background: var(--cloth-2);
+}
+
+.calendar__month button[data-position="start"] {
+  background: linear-gradient(90deg, transparent 0 50%, var(--cloth-2) 50%);
+}
+
+.calendar__month button[data-position="end"] {
+  background: linear-gradient(90deg, var(--cloth-2) 0 50%, transparent 50%);
+}
+
+.calendar__month button[data-edge="true"] {
+  color: var(--on-gold);
+  font-weight: 700;
+}
+
+.calendar__month button[data-edge="true"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  margin: auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-deep), var(--shadow-card);
+}
+
+.calendar__month button:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .calendar__months {
+    grid-template-columns: 1fr;
+    gap: var(--sp-5);
+  }
+
+  .calendar__panel {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+.fine {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/* ── Ritual stage — one continuous surface ──
+   TripIntentForm stays mounted for the whole flow; RitualStage wraps it in
+   .intent-form (rather than editing that component) so it can be receded
+   without unmounting it. The scene and the result are later siblings in
+   document order, not a screen swap. */
+.ritual-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.intent-form {
+  transition: transform var(--t-med) var(--ease), opacity var(--t-med) var(--ease);
+}
+
+/* Recede, don't vanish: covers every post-submit stage, including "error"
+   (which has no dedicated case in the brief's 4-value stage machine but
+   should stay receded too — a transient network failure is no reason to
+   snap the ticket back to full size before the traveler even reads why). */
+.ritual-layout:not([data-stage="idle"]) .intent-form {
+  transform: scale(.92);
+  opacity: .55;
   pointer-events: none;
 }
 
-.ritual-scene__card::before {
-  border: 1px solid rgba(122, 31, 53, 0.22);
+/* TripIntentForm's own .table/.enter reserve a full viewport height — the
+   entry screen's centering trick, correct when it IS the whole page
+   (idle), wrong once receded, where it would push the dealing scene a
+   screen down for no reason. Overridden from here instead of edited on the
+   component so its own full-page layout stays intact for idle. */
+.ritual-layout:not([data-stage="idle"]) .intent-form .table {
+  min-height: 0;
 }
 
-.ritual-scene__card::after {
-  inset: 22px;
-  border: 1px solid rgba(197, 155, 77, 0.38);
-  background:
-    linear-gradient(90deg, transparent 49.6%, rgba(122, 31, 53, 0.28) 49.6% 50.4%, transparent 50.4%),
-    linear-gradient(0deg, transparent 49.6%, rgba(122, 31, 53, 0.28) 49.6% 50.4%, transparent 50.4%);
-  opacity: 0.75;
+.ritual-layout:not([data-stage="idle"]) .intent-form .enter {
+  min-height: 0;
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
 }
 
-.ritual-scene__card[data-tone="brass"] {
-  background:
-    linear-gradient(160deg, #f1d697, #f7edd0 52%, #b7ded1),
-    #f3e8c9;
+/* Shared status line — the scene's own "cards are landing"/"still
+   searching" copy (ported from the mockup's `.status`) and the error
+   message below both read as the same considered, in-flow voice rather
+   than two different UI languages. */
+.ritual-status {
+  margin: 0;
+  font: 400 var(--fs-l)/1.3 var(--font-display);
+  color: var(--text-dim);
+  text-align: center;
 }
 
-.ritual-scene__card[data-tone="jade"] {
-  background:
-    linear-gradient(160deg, #a7d8cf, #f4edd7 50%, #e8c77c),
-    #f3e8c9;
+.ritual-error {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-6) 0;
+  text-align: center;
 }
 
-.ritual-scene__card[data-tone="wine"] {
-  background:
-    linear-gradient(160deg, #d9b6c5, #f4ecd2 52%, #a7d8cf),
-    #f3e8c9;
+.result {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--sp-5) var(--sp-8);
 }
 
-.ritual-scene__card span,
-.ritual-scene__card strong {
+/* On "/" the result follows the receded ticket, so a top gap would just push
+   it down. On a shared link it is the first thing on the page, and without
+   this the title sits flush against the top edge of the phone that opened it
+   from a messenger — which is most of the traffic this page will ever see.
+
+   Doubled class on purpose: the narrow-width media query further down
+   re-declares `.result`'s padding with the shorthand, which resets
+   padding-top and would win on source order at equal specificity. */
+.result.result--shared {
+  padding-top: var(--sp-7);
+}
+
+/* Each top-level section of the reading assembles in on its own delay
+   (RitualStage/TravelResult set --block-index per block) instead of
+   popping in as one flat block, so the result reads as it being told to
+   you rather than dumped on screen. */
+.result [data-block] {
+  animation: block-in var(--t-med) var(--ease) both;
+  animation-delay: calc(var(--block-index, 0) * 150ms);
+}
+
+/* ── Ritual scene — ported from Claude Design "02 Ритуал.dc.html" ──
+   Cards deal as the shared `.back` primitive (same crosshatch/lozenge as
+   the entry screen's fan and a revealed card's own back — see the comment
+   above `.back` itself) and reveal through TarotCardView, not a second
+   back or a coloured placeholder panel with copy on it. No decorative box
+   around the scene, matching the mockup: the cards sit directly on the
+   page's own dark table. */
+.ritual-scene {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: var(--sp-6) 0;
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-6);
+}
+
+.ritual-scene__deck {
   position: relative;
-  z-index: 1;
+  width: 88px;
+  aspect-ratio: 100/172;
 }
 
-.ritual-scene__card span {
-  color: rgba(21, 16, 22, 0.62);
-  font-size: 13px;
+.ritual-scene__deck .back {
+  position: absolute;
+  inset: 0;
+  box-shadow: var(--shadow-card);
 }
 
-.ritual-scene__card strong {
-  max-width: 12ch;
-  font-size: clamp(18px, 2.5vw, 28px);
-  line-height: 1.04;
-  overflow-wrap: anywhere;
+.ritual-scene__deck .back:nth-child(1) {
+  transform: rotate(-6deg) translateX(-7px);
+}
+
+.ritual-scene__deck .back:nth-child(2) {
+  transform: rotate(3deg) translateX(5px);
+}
+
+.ritual-scene__deck .back:nth-child(3) {
+  transform: rotate(-1deg) translateY(-5px);
+}
+
+.ritual-scene__spread {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 3vw, 28px);
+  width: min(620px, 100%);
+}
+
+/* The slot deals in on a timer; whether it's showing a face-down back or a
+   revealed face is a React-driven swap (see RitualScene), not part of this
+   animation — the entrance plays identically either way. */
+.ritual-scene__slot {
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-3);
+  justify-items: center;
+  opacity: 0;
+  transform: translate3d(-16px, 30px, 0) rotate(-8deg) scale(.94);
+  animation: ritual-deal var(--t-deal) var(--ease) forwards;
+  animation-delay: calc(var(--ritual-order, 0) * 170ms);
+}
+
+.ritual-scene__slot .tarot-card {
+  width: 100%;
+}
+
+.ritual-scene__pos {
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ritual-scene__dot {
+  display: inline-block;
+  animation: ritual-blink 1.6s var(--ease) infinite;
+}
+
+.ritual-scene__dot:nth-child(2) {
+  animation-delay: .3s;
+}
+
+.ritual-scene__dot:nth-child(3) {
+  animation-delay: .6s;
 }
 
 .tarot-card {
-  aspect-ratio: 2 / 3;
+  /* The component root is a <figure> (for its figcaption); reset the UA
+     default figure margin (1em 40px) or the card shrinks and misaligns
+     inside .spread-grid. */
+  margin: 0;
+  aspect-ratio: 1 / 2.3;
   border: 1px solid rgba(197, 155, 77, 0.55);
   border-radius: 8px;
   min-width: 0;
   min-height: 0;
   display: grid;
   place-items: center;
-  padding: 8px;
+  /* No padding here — it lives on .tarot-card__face instead (see its
+     comment). Both .tarot-card__back and .tarot-card__face size themselves
+     to 100% of *this* box, so keeping the inset in one place is what makes
+     their boxes actually coincide (a fixed 2026-08-09 review found back
+     rendering 8px larger than face on every edge because back's inset:0
+     resolved against this element's un-padded padding box while face's
+     100%/100% resolved against its padded content box). */
+  padding: 0;
   position: relative;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 20%, rgba(197, 155, 77, 0.38), transparent 24%),
     linear-gradient(135deg, #1a8f7a, #7a1f35);
-  color: var(--ink);
+  color: var(--text);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
   transform-style: preserve-3d;
 }
 
-.tarot-card::before,
-.tarot-card::after {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 1px solid rgba(244, 237, 247, 0.24);
-  border-radius: 6px;
+/* Face-down state: .tarot-card's own ratio (1/2.3, tall enough for the
+   caption a revealed face needs) is shorter than .tarot-card__back's own
+   100/172, so `place-items: center` leaves a strip above and below the
+   centred back where THIS element's own background would otherwise show —
+   the teal/wine gradient above is only ever meant to peek through the
+   revealed face's own semi-transparent gradient, not stand alone. Matching
+   it to .back's own crosshatch here (not touching .back or
+   .tarot-card__back themselves — see their own comments on why) makes the
+   strip read as more of the same back instead of a colour clash. Found
+   live via RitualScene, the first place a face-down TarotCardView is
+   actually ever mounted (TravelResult's spread-panel is always revealed).
+   Revealed cards are untouched: this only applies before the flip. */
+.tarot-card[data-revealed="false"] {
+  background:
+    repeating-linear-gradient(45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
+    repeating-linear-gradient(-45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
+    var(--cloth-2);
 }
 
-.tarot-card::after {
-  inset: 18px;
-  border-color: rgba(197, 155, 77, 0.34);
-}
-
-.tarot-card__back,
 .tarot-card__face {
   width: 100%;
   height: 100%;
   display: grid;
   place-items: center;
   border-radius: 6px;
-}
-
-.tarot-card__back span {
-  width: 42%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1px solid rgba(244, 237, 247, 0.42);
-  box-shadow: inset 0 0 0 10px rgba(122, 31, 53, 0.34);
-}
-
-.tarot-card__face {
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto 1fr auto;
   gap: 6px;
-  padding: 12px 10px;
+  /* 20px/18px = the old 12px/10px face padding plus the 8px that used to
+     live on .tarot-card itself (see that rule's comment) — the visual
+     inset around the label/art/caption is unchanged, it just now comes
+     from one place instead of two. */
+  padding: 20px 18px;
   position: relative;
   z-index: 1;
   background:
@@ -371,6 +728,7 @@ input {
 .tarot-card__face strong {
   font-size: clamp(15px, 2vw, 20px);
   line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 .tarot-card__face p {
@@ -381,20 +739,104 @@ input {
   overflow-wrap: anywhere;
 }
 
-.tarot-card__symbol {
-  width: 58%;
-  max-width: 88px;
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid rgba(122, 31, 53, 0.34);
+.tarot-card__art {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 600 / 1032;
+  object-fit: cover;
+  border-radius: var(--r-card);
+}
+
+.tarot-card[data-reversed="true"] .tarot-card__art {
+  transform: rotate(180deg);
+}
+
+/* `.back` — ported verbatim from docs/design/tokens.css. This is the single
+   shared card-back look: same crosshatch and centred lozenge as the fan on
+   the entry screen and as a face-down card here. Do not fork a second copy;
+   extend it (as .tarot-card__back does below) instead. */
+.back {
+  aspect-ratio: 100/172;
+  border-radius: var(--r-card);
+  border: 1px solid var(--gold-deep);
+  position: relative;
   background:
-    radial-gradient(circle, rgba(122, 31, 53, 0.14), transparent 54%),
-    rgba(255, 255, 255, 0.28);
-  color: #7a1f35;
-  font-size: clamp(32px, 6vw, 54px);
-  line-height: 1;
+    repeating-linear-gradient(45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
+    repeating-linear-gradient(-45deg, transparent 0 7px, rgba(217, 164, 65, .13) 7px 8px),
+    var(--cloth-2);
+}
+
+.back::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 36%;
+  aspect-ratio: 1/1;
+  border: 1px solid var(--gold);
+  background: var(--cloth);
+  transform: rotate(45deg);
+}
+
+/* Adapts the shared `.back` look to sit layered under .tarot-card__face
+   inside .tarot-card (see TarotCardView, which mounts `class="back
+   tarot-card__back"`). Only `position` and `width` are added here —
+   `.back` already supplies `aspect-ratio: 100/172`, and deliberately
+   nothing here sets `height` or `inset`/`top`/`left`/etc.
+   `position: absolute` is required so the back doesn't take its own grid
+   row once .tarot-card__face is also mounted (both stay in the DOM at
+   once — .tarot-card__face is simply omitted before reveal). Leaving
+   inset/height unset is what makes `aspect-ratio` resolve at all: setting
+   `inset: 0` (as the old private copy did) fully determines both
+   dimensions from the containing block before aspect-ratio ever gets a
+   say, which is exactly why that copy rendered as a stretched rectangle
+   instead of a 100/172 card (see the 2026-08-09 review). With only width
+   fixed, height comes from aspect-ratio, and `place-items: center` on
+   .tarot-card (already there for exactly this) centers the resulting
+   shorter box — so back is always the correct card shape, and is always
+   fully contained inside .tarot-card__face's larger box (same width, same
+   x-position, centered on the y-axis) with no back pixels visible past
+   its edges. */
+.tarot-card__back {
+  position: absolute;
+  width: 100%;
+}
+
+/* display:block (and overflow-wrap below, plus .tarot-card__face strong's
+   overflow-wrap above) is not cosmetic: a 2026-08-09 review found that on a
+   reversed card, the name and this flag rendered with no space or break
+   opportunity between them (TarotCardView used to emit them as adjacent
+   JSX siblings sharing one inline run), and neither element could wrap.
+   That turned "ИмяКартыперевёрнутая" into one unbreakable run whose
+   max-content width forced .tarot-card__face's single implicit grid column
+   — shared with .tarot-card__art via the art's own `width: 100%` — to grow
+   past the card's fixed width. .tarot-card's `overflow: hidden` then
+   clipped the oversized content, which is what made the label and caption
+   disappear on reversed cards specifically (the rotate(180deg) transform
+   was coincidental, not causal: removing it left the oversized width
+   unchanged).
+   TarotCardView now also inserts a real space before the flag, but the fix
+   that actually matters is here: `display: block` puts the flag on its own
+   line unconditionally, so it can never again share an unbreakable inline
+   run with the name regardless of viewport width or name length, and
+   font-size/line-height are set explicitly (rather than inherited ambient
+   body text) both to read as a subordinate marker — matching
+   .tarot-card__face small's weight — and because mixing an inherited
+   line-height with an overridden font-size on wrapped inline content
+   produces inconsistent line spacing; block sidesteps that. overflow-wrap
+   remains as a belt-and-suspenders guarantee against the flag's own text
+   forcing a column blowout on an extremely narrow card. */
+.tarot-card__flag {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
 }
 
 .travel-result {
@@ -405,11 +847,13 @@ input {
 
 .prediction-panel {
   max-width: 780px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .result-kicker {
   margin: 0 0 8px;
-  color: var(--brass);
+  color: var(--gold);
 }
 
 .prediction-panel h2 {
@@ -447,6 +891,125 @@ input {
   width: 100%;
 }
 
+/* ── Road block — ported from "03 Результат.dc.html"'s `.route`/`.reason`,
+   adapted from its two-column card (text left, price+button right) into a
+   single clickable card (see RoadHero's comment in TravelResult.tsx for
+   why: nesting the mockup's `.btn` anchor inside a card-level anchor isn't
+   valid HTML, and this project already links whole cards elsewhere, e.g.
+   .offer-card). Colours, radius, shadow and the dashed-divider reason line
+   with its diamond marker are kept as-is from the mockup. */
+.road {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.road__card {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--cloth);
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-raise);
+}
+
+.road__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-6);
+  row-gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-2) 0;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.road__hero strong {
+  grid-column: 1;
+  min-width: 0;
+  font: 400 var(--fs-xl)/var(--lh-tight) var(--font-display);
+  overflow-wrap: anywhere;
+}
+
+.road__hero span {
+  grid-column: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.road__hero b {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font: 400 1.75rem/1 var(--font-display);
+  color: var(--gold-bright);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.road__reason {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin: var(--sp-2) 0 0;
+  padding-top: var(--sp-4);
+  border-top: 1px dashed var(--line);
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.road__reason::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--gold);
+  transform: rotate(45deg);
+  flex: none;
+}
+
+/* Fog state — reads as a considered "nothing here yet" moment (rule +
+   diamond flourish, the same one TripIntentForm's fine print sits under),
+   not an error: this is the ordinary result whenever Tutu MCP has nothing
+   usable to offer, not an edge case. */
+.road__fog {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-6) 0;
+  text-align: center;
+}
+
+.road__reason--fog {
+  max-width: 52ch;
+  margin: 0;
+  padding-top: 0;
+  border-top: 0;
+  justify-content: center;
+}
+
+.road__reason--fog::before {
+  display: none;
+}
+
+/* One quiet line, same voice as .share-note, shown under the road block
+   (hero or fog, either way) when RitualResultViewModel.warnings is
+   non-empty -- e.g. Tutu MCP timed out or errored on one leg of the search.
+   Never renders the warning strings themselves; see TravelResult's own
+   comment on why. */
+.road__warning {
+  max-width: 52ch;
+  margin: 0 auto;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  text-align: center;
+}
+
 .proof-links {
   display: flex;
   flex-wrap: wrap;
@@ -454,9 +1017,56 @@ input {
 }
 
 .proof-links a {
-  color: var(--ink);
+  color: var(--text);
   border-bottom: 1px solid rgba(197, 155, 77, 0.7);
   text-decoration: none;
+}
+
+/* Task 13 — sharing. Sits right after .proof-links, undelayed (see
+   TravelResult's own comment on why it carries no [data-block]). */
+.share-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.share-row__status {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.share-row__status--error {
+  color: var(--wine);
+}
+
+/* The raw fallback link shown when neither share nor clipboard worked —
+   same overflow-wrap-anywhere rule .road__hero/.proof-links already hold
+   for URLs, since an unbroken share link is exactly the kind of long
+   unbroken token that caused the 2026-08-09 mobile overflow (see
+   .prediction-panel's own comment). */
+.share-row__url {
+  overflow-wrap: anywhere;
+}
+
+/* The shared-reading page's one quiet line about prices being searched
+   fresh (see src/app/r/[code]/page.tsx) — same .caps kicker style as the
+   mockup's own hero tagline, just centred and line-length-capped since
+   this one runs a full sentence rather than a short label. */
+.share-note {
+  max-width: 52ch;
+  margin: 0 auto var(--sp-2);
+  text-align: center;
+}
+
+.share-fallback {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-4);
+  padding-block: var(--sp-8);
+  text-align: center;
 }
 
 .offer-section {
@@ -479,7 +1089,7 @@ input {
   padding: 14px;
   border: 1px solid rgba(244, 237, 247, 0.18);
   border-radius: 8px;
-  color: var(--ink);
+  color: var(--text);
   text-decoration: none;
   background: rgba(244, 237, 247, 0.06);
 }
@@ -492,52 +1102,108 @@ input {
 }
 
 .offer-card small {
-  color: var(--muted);
+  color: var(--text-dim);
+}
+
+/* Collapsed alternative-transport groups — ported from the mockup's
+   `.alt`/`details`/`summary`. Kept collapsed by default so the road hero
+   card above stays the visual payoff; these are the supporting cast. */
+.offer-groups {
+  display: grid;
+}
+
+.offer-group {
+  border-top: 1px solid var(--line-soft);
+}
+
+.offer-group:last-of-type {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.offer-group summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.offer-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.offer-group__chevron {
+  color: var(--gold);
+  transition: transform var(--t-med) var(--ease);
+  flex: none;
+}
+
+.offer-group[open] .offer-group__chevron {
+  transform: rotate(90deg);
+}
+
+.offer-group__label {
+  font: 600 var(--fs-m)/1.3 var(--font-ui);
+}
+
+.offer-group__count {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.offer-group .offer-grid {
+  padding-bottom: var(--sp-4);
 }
 
 @media (max-width: 760px) {
-  .app-shell {
-    place-items: start;
+  .enter {
+    padding: var(--sp-7) var(--sp-4);
   }
 
-  .ritual-layout {
+  .ticket {
     grid-template-columns: 1fr;
   }
 
-  .ritual-copy h1 {
-    font-size: 36px;
+  .field {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
   }
 
-  .scene-shell {
-    min-height: 240px;
+  .ticket .btn {
+    margin: 16px;
+  }
+
+  .fan .back {
+    width: 72px;
+  }
+
+  .ritual-layout:not([data-stage="idle"]) .intent-form .enter {
+    padding: var(--sp-5) var(--sp-4);
+  }
+
+  .result {
+    padding: 0 var(--sp-4) var(--sp-6);
   }
 
   .ritual-scene {
-    min-height: 240px;
-    padding: 22px 12px;
+    padding: var(--sp-5) 0;
+    gap: var(--sp-5);
   }
 
   .ritual-scene__deck {
-    width: 52px;
-    left: 16px;
-    bottom: 16px;
+    width: 60px;
   }
 
   .ritual-scene__spread {
-    grid-template-columns: repeat(3, minmax(76px, 1fr));
     gap: 8px;
   }
 
-  .ritual-scene__card {
-    padding: 10px 8px;
-  }
-
-  .ritual-scene__card span {
-    font-size: 11px;
-  }
-
-  .ritual-scene__card strong {
-    font-size: 14px;
+  .ritual-scene__pos {
+    font-size: 10px;
   }
 
   .spread-grid {
@@ -545,8 +1211,25 @@ input {
     gap: 8px;
   }
 
+  .road__card {
+    padding: var(--sp-5);
+  }
+
+  .road__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .road__hero b {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+
   .tarot-card__face {
-    padding: 9px 7px;
+    /* 17px/15px = the old 9px/7px mobile face padding plus the 8px that used
+       to live on .tarot-card (see the desktop rule's comment) — same
+       arithmetic, narrower base values. */
+    padding: 17px 15px;
   }
 
   .tarot-card__face p {
@@ -557,17 +1240,17 @@ input {
 @keyframes ritual-deal {
   0% {
     opacity: 0;
-    transform: translate3d(-78px, 58px, 0) rotate(calc(var(--ritual-tilt, 0deg) - 16deg)) scale(0.92);
+    transform: translate3d(-16px, 30px, 0) rotate(-8deg) scale(.94);
   }
 
-  68% {
+  70% {
     opacity: 1;
-    transform: translate3d(0, -8px, 0) rotate(calc(var(--ritual-tilt, 0deg) + 2deg)) scale(1.02);
+    transform: translate3d(0, -6px, 0) rotate(2deg) scale(1.02);
   }
 
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) rotate(var(--ritual-tilt, 0deg)) scale(1);
+    transform: none;
   }
 }
 
@@ -583,14 +1266,48 @@ input {
   }
 }
 
+@keyframes ritual-blink {
+  0%, 60%, 100% { opacity: .2; }
+  30% { opacity: 1; }
+}
+
+@keyframes block-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Explicit resets, not just the blanket duration kill-switch below: that
+   one shortens each animation to .01ms but leaves animation-delay
+   untouched, which would still stagger the dealing scene and the result's
+   blocks by up to a few hundred ms. "No stagger at all" (this task's own
+   requirement for reduced motion) needs animation:none outright. */
 @media (prefers-reduced-motion: reduce) {
-  .ritual-scene__card,
+  .ritual-scene__slot,
   .spread-card-shell {
     animation: none;
   }
 
-  .ritual-scene__card {
+  .ritual-scene__slot {
     opacity: 1;
-    transform: rotate(var(--ritual-tilt, 0deg));
+    transform: none;
+  }
+
+  .result [data-block] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Generic reduced-motion kill switch, ported verbatim from
+   docs/design/tokens.css. Coexists with the block above: that one sets
+   explicit resting values for the ritual-deal/card-reveal animations
+   specifically, this one is the blanket fallback for anything else
+   (currently .btn's hover/active transitions) that later tasks add. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
   }
 }

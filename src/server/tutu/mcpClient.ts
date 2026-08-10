@@ -1,5 +1,5 @@
-import type { TravelAtlasItem, TripIntent } from "@/domain/types";
-import { normalizeHotelOffers, normalizeTransportOffers, type NormalizedOffer } from "./normalize";
+import type { ModesSummary, TravelAtlasItem, TripIntent } from "@/domain/types";
+import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary, type NormalizedOffer } from "./normalize";
 
 const DEFAULT_MCP_URL = "https://mcp.tutu.ru/mcp";
 
@@ -7,12 +7,6 @@ export interface TutuSearchInput {
   intent: TripIntent;
   destination: TravelAtlasItem;
   endpoint?: string;
-}
-
-export interface TutuSearchResult {
-  transport: NormalizedOffer[];
-  hotels: NormalizedOffer[];
-  warnings: string[];
 }
 
 function transportFallback(input: TutuSearchInput): NormalizedOffer {
@@ -33,34 +27,35 @@ function hotelFallback(input: TutuSearchInput): NormalizedOffer {
   };
 }
 
-async function callTool(endpoint: string, name: string, args: Record<string, unknown>): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+async function callTool(
+  endpoint: string,
+  name: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<unknown> {
   const requestId = `${name}-${Date.now()}`;
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: requestId,
-        method: "tools/call",
-        params: { name, arguments: args },
-      }),
-    });
-    if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
-    const contentType = response.headers.get("content-type")?.toLowerCase();
-    const raw = contentType?.includes("text/event-stream")
-      ? parseSseResponse(await response.text(), name, requestId)
-      : await response.json();
-    return unwrapMcpResponse(raw, name);
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await fetch(endpoint, {
+    method: "POST",
+    signal,
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: requestId,
+      method: "tools/call",
+      params: { name, arguments: args },
+    }),
+  });
+  if (!response.ok) throw new Error(`Tutu MCP ${name} failed with ${response.status}`);
+
+  const contentType = response.headers.get("content-type")?.toLowerCase();
+  const raw = contentType?.includes("text/event-stream")
+    ? parseSseResponse(await response.text(), name, requestId)
+    : await response.json();
+
+  return unwrapMcpResponse(raw, name);
 }
 
 function parseSseResponse(body: string, name: string, requestId: string): unknown {
@@ -126,6 +121,10 @@ function unwrapMcpResponse(raw: unknown, name: string): unknown {
     throw new Error(`Tutu MCP ${name} result content has no text block`);
   }
 
+  if (/^Error executing tool/i.test(textBlock.text.trim())) {
+    throw new Error(textBlock.text.trim());
+  }
+
   try {
     return JSON.parse(textBlock.text);
   } catch {
@@ -133,42 +132,64 @@ function unwrapMcpResponse(raw: unknown, name: string): unknown {
   }
 }
 
+const SEARCH_BUDGET_MS = 18_000;
+
+export interface TutuSearchResult {
+  transport: NormalizedOffer[];
+  hotels: NormalizedOffer[];
+  modesSummary: ModesSummary;
+  warnings: string[];
+}
+
 export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSearchResult> {
   const endpoint = input.endpoint || process.env.TUTU_MCP_URL || DEFAULT_MCP_URL;
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), SEARCH_BUDGET_MS);
   const warnings: string[] = [];
-  let transport: NormalizedOffer[] = [];
-  let hotels: NormalizedOffer[] = [];
 
   try {
-    const rawTransport = await callTool(endpoint, "search_avia", {
-      origin: input.intent.departureCity,
-      destination: input.destination.nearestTransportHub,
-      departure_date: input.intent.dateFrom,
-      adults: input.intent.travelerCount,
-      page_size: 5,
-      view: "compact",
-    });
-    transport = normalizeTransportOffers(rawTransport);
-  } catch (error) {
-    warnings.push(error instanceof Error ? error.message : "Tutu transport search failed");
+    const [roads, stays] = await Promise.allSettled([
+      callTool(endpoint, "search_multitransport", {
+        origin: input.intent.departureCity,
+        destination: input.destination.nearestTransportHub,
+        departure_date: input.intent.dateFrom,
+        adults: input.intent.travelerCount,
+        modes: ["avia", "railway", "bus"],
+        optimize_for: "price",
+        page_size: 20,
+        view: "compact",
+      }, controller.signal),
+      callTool(endpoint, "search_hotels", {
+        city_name: input.destination.hotelSearchCity,
+        check_in: input.intent.dateFrom,
+        check_out: input.intent.dateTo,
+        adults: input.intent.travelerCount,
+        page_size: 5,
+        view: "compact",
+      }, controller.signal),
+    ]);
+
+    let transport: NormalizedOffer[] = [];
+    let modesSummary: ModesSummary = {};
+    if (roads.status === "fulfilled") {
+      transport = normalizeTransportOffers(roads.value);
+      modesSummary = readModesSummary(roads.value);
+    } else {
+      warnings.push(roads.reason instanceof Error ? roads.reason.message : "Tutu transport search failed");
+    }
+
+    let hotels: NormalizedOffer[] = [];
+    if (stays.status === "fulfilled") {
+      hotels = normalizeHotelOffers(stays.value);
+    } else {
+      warnings.push(stays.reason instanceof Error ? stays.reason.message : "Tutu hotel search failed");
+    }
+
+    if (transport.length === 0) transport = [transportFallback(input)];
+    if (hotels.length === 0) hotels = [hotelFallback(input)];
+
+    return { transport, hotels, modesSummary, warnings };
+  } finally {
+    clearTimeout(deadline);
   }
-
-  try {
-    const rawHotels = await callTool(endpoint, "search_hotels", {
-      city_name: input.destination.hotelSearchCity,
-      check_in: input.intent.dateFrom,
-      check_out: input.intent.dateTo,
-      adults: input.intent.travelerCount,
-      page_size: 5,
-      view: "compact",
-    });
-    hotels = normalizeHotelOffers(rawHotels);
-  } catch (error) {
-    warnings.push(error instanceof Error ? error.message : "Tutu hotel search failed");
-  }
-
-  if (transport.length === 0) transport = [transportFallback(input)];
-  if (hotels.length === 0) hotels = [hotelFallback(input)];
-
-  return { transport, hotels, warnings };
 }

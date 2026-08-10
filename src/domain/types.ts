@@ -1,4 +1,6 @@
-export type TarotPosition = "Зов" | "Путь" | "Дар маршрута";
+export type TarotPosition = "Зов" | "Дар" | "Путь";
+
+export type TransportMode = "avia" | "railway" | "bus";
 
 export type TarotArchetype =
   | "solitude"
@@ -22,20 +24,18 @@ export interface TripIntent {
 
 export interface TarotCardDefinition {
   id: string;
+  number: number;
   name: string;
-  image?: string;
+  image: string;
   archetypes: TarotArchetype[];
+  transport: TransportMode[];
   meaning: string;
+  meaningReversed: string;
 }
 
 export interface DrawnTarotCard extends TarotCardDefinition {
   position: TarotPosition;
-}
-
-export interface TarotSpread {
-  seed: string;
-  cards: DrawnTarotCard[];
-  archetypes: TarotArchetype[];
+  reversed: boolean;
 }
 
 export interface TravelAtlasItem {
@@ -64,3 +64,11 @@ export interface DestinationSelection {
   score: number;
   reasons: string[];
 }
+
+export interface ModeSummary {
+  count: number;
+  minPrice: number | null;
+  minDurationMin: number | null;
+}
+
+export type ModesSummary = Partial<Record<TransportMode, ModeSummary>>;

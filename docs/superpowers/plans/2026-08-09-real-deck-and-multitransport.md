@@ -26,7 +26,7 @@ Spec: `docs/superpowers/specs/2026-08-09-real-deck-and-multitransport-design.md`
   - Mode literals are `avia | railway | bus | etrain`. `rail` fails validation.
   - Tool-level errors arrive as plain text inside `result.content[].text`, not as a JSON-RPC `error`.
   - `search_multitransport` returns `{ variants, meta }`; `meta.modes_summary` carries per-mode `count`, `min_price`, `min_duration_min`.
-- Run `npm run lint` and `npx tsc --noEmit` before every commit. Both must be clean.
+- Run `npm run lint` and `npx tsc --noEmit` before every commit. Both must be clean — **except in Tasks 1 and 3**, which deliberately leave the tree mid-refactor: the card type changes there, and its consumers (narrator, orchestration, components) are only repaired in Task 6. Those two tasks verify with their own focused test run instead, and each says so. From Task 6 onward the whole suite, lint and `tsc` must be clean at every commit. Do not "fix" a red tree in Tasks 1–3 by weakening the deck or the engine.
 - **Visual design is settled — do not invent one.** Tokens and shared primitives are in `docs/design/tokens.css`; port them into `src/app/globals.css` rather than inventing colours, spacing or timings. The full mockups for all four screens live in the Claude Design project `33d8a5c9-0f76-4610-9f1c-45c9a1461ea7` (files `01 Вход.dc.html`, `02 Ритуал.dc.html`, `03 Результат.dc.html`, `04 Календарь.dc.html`); read the relevant screen with the `DesignSync` tool's `get_file` method before writing any markup or CSS.
 - The mockups link to each other by hand and carry a `.proto-nav` block in the corner. That is prototype scaffolding. The product is one page with no navigation between screens — do not port `.proto-nav` or any cross-screen link.
 - Fonts are **Prata** (display) and **Manrope** (UI). Both ship a Cyrillic subset, verified 2026-08-09. Load them with `next/font/google` so they are self-hosted; do not port the mockup's `<link>` tags to Google Fonts.
@@ -1618,7 +1618,100 @@ git commit -m "feat: render real tarot artwork with orientation"
 
 ---
 
-### Task 8: The road block in the result
+### Task 8: Visual shell and entry screen
+
+**Files:**
+- Modify: `src/app/globals.css`
+- Modify: `src/app/layout.tsx`
+- Modify: `src/app/page.tsx`
+- Modify: `src/components/TripIntentForm.tsx`
+- Test: `tests/components/entry-screen.test.tsx` (create)
+- Modify: `tests/e2e/ritual-flow.spec.ts`
+
+**Interfaces:**
+- Consumes: `docs/design/tokens.css` and the Claude Design mockups.
+- Produces: the shared visual language every later screen sits on. No new exported types.
+
+This task exists because a browser check after Task 7 found the approved design was never ported: the page rendered in a default sans-serif with a plain two-column layout and no card fan, while colours and the gold button had arrived piecemeal. Tasks 9, 10 and 11 restyle parts of a shell that did not exist. This builds it.
+
+Read `01 Вход.dc.html` from the Claude Design project `33d8a5c9-0f76-4610-9f1c-45c9a1461ea7` with the `DesignSync` tool's `get_file` method before writing anything. It is the source of truth for this screen.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/components/entry-screen.test.tsx`:
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import Page from "@/app/page";
+
+describe("entry screen", () => {
+  it("presents the service line, the title and the promise", () => {
+    render(<Page />);
+    expect(screen.getByText(/Туту · сервис путешествий/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Таро-турагент" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the deck fan above the title", () => {
+    render(<Page />);
+    expect(screen.getByTestId("deck-fan").querySelectorAll(".back")).toHaveLength(3);
+  });
+
+  it("keeps the honest fine print", () => {
+    render(<Page />);
+    expect(screen.getByText(/Билеты, поезда и отели — настоящие/i)).toBeInTheDocument();
+  });
+
+  it("carries no prototype navigation", () => {
+    render(<Page />);
+    expect(document.querySelector(".proto-nav")).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npm run test -- tests/components/entry-screen.test.tsx`
+Expected: FAIL — none of the service line, the fan or the fine print exists yet.
+
+- [ ] **Step 3: Port the tokens wholesale**
+
+Copy the `:root` block and the shared primitives (`.table`, `.caps`, `.rule`, `.diamond`, `.back`, `.btn`, and the `prefers-reduced-motion` block) from `docs/design/tokens.css` into `src/app/globals.css`, replacing any values Task 7 introduced by hand. `.back` must be the single shared card-back implementation — the fan on this screen and the face-down tarot card are the same object, and Task 7's fix round already established that rule.
+
+- [ ] **Step 4: Load the fonts through next/font**
+
+In `src/app/layout.tsx`, load **Prata** (display) and **Manrope** (UI) with `next/font/google` so they are self-hosted, requesting the `cyrillic` and `latin` subsets. Both ship a Cyrillic subset — verified 2026-08-09 against the Google Fonts CSS API. Expose them as the CSS variables the tokens expect (`--font-display`, `--font-ui`) rather than as class names, so the ported CSS keeps working unchanged. Do not port the mockup's `<link rel="stylesheet">` tags to `fonts.googleapis.com`: an external request at runtime is exactly what this project avoids.
+
+- [ ] **Step 5: Rebuild the entry screen**
+
+Rebuild `src/app/page.tsx` and `src/components/TripIntentForm.tsx` to the mockup: the three-card fan (`data-testid="deck-fan"`, three `.back` elements at the mockup's rotations), the `.caps` service line, the `h1` in the display font, the promise line, the horizontal `.ticket` form with `.field` cells divided by `--line-soft`, the gold submit button inside the ticket, the `.rule` with its diamond, and the fine print. Below 760px the ticket becomes a single column, exactly as the mockup's media query does.
+
+**Do not port `.proto-nav` or any link between screens.** The mockup's four screens link to each other by hand; the product is one page.
+
+Keep the form's existing behaviour and its submitted payload unchanged — the date inputs stay as they are here and are replaced by the calendar in Task 10.
+
+- [ ] **Step 6: Extend the e2e check**
+
+In `tests/e2e/ritual-flow.spec.ts`, assert on both the desktop and mobile projects that the entry screen shows the title and the fan, and that the page has no horizontal overflow: `document.documentElement.scrollWidth <= window.innerWidth + 1`. The ticket layout is the most likely thing to push the page sideways at 375px.
+
+- [ ] **Step 7: Run everything**
+
+Run: `npm run test -- tests/components/entry-screen.test.tsx`, then `npm run test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm run test:e2e`.
+Expected: all PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/app/globals.css src/app/layout.tsx src/app/page.tsx src/components/TripIntentForm.tsx tests/components/entry-screen.test.tsx tests/e2e/ritual-flow.spec.ts
+git commit -m "feat: port the approved visual language and entry screen"
+```
+
+---
+
+### Task 9: The road block in the result
 
 **Files:**
 - Modify: `src/components/TravelResult.tsx`
@@ -1711,7 +1804,7 @@ git commit -m "feat: lead the result with the road the card chose"
 
 ---
 
-### Task 9: Date range calendar
+### Task 10: Date range calendar
 
 **Files:**
 - Create: `src/components/DateRangeCalendar.tsx`
@@ -1973,7 +2066,7 @@ git commit -m "feat: pick the trip as one range on a calendar"
 
 ---
 
-### Task 10: One continuous flow
+### Task 11: One continuous flow
 
 **Files:**
 - Modify: `src/components/RitualStage.tsx`
@@ -1989,6 +2082,16 @@ git commit -m "feat: pick the trip as one range on a calendar"
 
 The whole ritual happens on one surface. There is no navigation, no "show me the result" button, and the form never disappears — it recedes to a thin ticket strip so the user can still see what they asked for.
 
+**This task also ports the ritual screen's visuals, which no earlier task covered.**
+A browser check after Task 9 found the dealing scene still rendering the pre-design
+placeholder: three pastel yellow/mint/pink panels with heavy black sans-serif text,
+on a screen whose entry and result are already dark plum and gold. Read
+`02 Ритуал.dc.html` from the Claude Design project
+`33d8a5c9-0f76-4610-9f1c-45c9a1461ea7` with the `DesignSync` tool before touching
+`RitualScene.tsx`, and rebuild the scene to it. The cards being dealt are face-down
+`.back` cards — the same shared primitive as the entry-screen fan and the tarot
+card's back — not coloured panels with copy on them.
+
 The load-bearing idea: **the wait for MCP is the third card.** The first two cards flip on a timer because they only need the seed. The third cannot flip until the search reports which roads exist. Do not add a decorative delay and do not flip the third card early — the pause is the mechanism.
 
 - [ ] **Step 1: Write the failing test**
@@ -2000,9 +2103,14 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RitualStage } from "@/components/RitualStage";
 
+// Task 10 disables the submit button until both endpoints are chosen, so the
+// dates must be picked through the calendar before submitting.
 function fillAndSubmit() {
   fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
-  // The calendar and traveller count keep whatever defaults the form holds.
+  fireEvent.click(screen.getByRole("button", { name: /Когда поедете/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Следующий месяц" }));
+  fireEvent.click(screen.getByRole("button", { name: "10" }));
+  fireEvent.click(screen.getByRole("button", { name: "17" }));
   fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
 }
 
@@ -2155,7 +2263,7 @@ git commit -m "feat: run the ritual as one continuous flow"
 
 ---
 
-### Task 11: Live verification against real Tutu MCP
+### Task 12: Live verification against real Tutu MCP
 
 **Files:**
 - Create: `scripts/smoke-ritual.mjs`
@@ -2259,10 +2367,148 @@ git commit -m "test: smoke the ritual against live tutu mcp"
 
 ## Plan Self-Review
 
-**Spec coverage.** Every spec section maps to a task: two-phase ritual → 3 and 6; deck and orientation → 1 and 3; images → 2; multitransport and error-as-text → 4; availability and sanity filter → 5; result presentation → 8; calendar → 9; continuous flow → 10; determinism and degenerate cases → tests in 3, 5 and 6; testing section → distributed, plus 11 for the live contract check.
+**Spec coverage.** Every spec section maps to a task: two-phase ritual → 3 and 6; deck and orientation → 1 and 3; images → 2; multitransport and error-as-text → 4; availability and sanity filter → 5; visual shell and entry screen → 8; result presentation → 9; calendar → 10; continuous flow → 11; determinism and degenerate cases → tests in 3, 5 and 6; testing section → distributed, plus 12 for the live contract check.
 
-**Added after the spec was approved.** Task 10 is not in the spec — the continuous flow was agreed separately once the design arrived, on the argument that the wait for MCP is the third card rather than dead time to disguise. It replaces the fixed minimum ritual duration introduced before this plan.
+**Added after the spec was approved.** Task 11 is not in the spec — the continuous flow was agreed separately once the design arrived, on the argument that the wait for MCP is the third card rather than dead time to disguise. It replaces the fixed minimum ritual duration introduced before this plan.
 
 **Type consistency.** `TransportMode` values are `avia | railway | bus` everywhere, including the MCP `modes` argument. `ModesSummary` is defined in Task 4 and consumed unchanged in 5 and 6. `drawPathCard(seed, usableModes, excludeIds)` has the same signature in Tasks 3 and 6. `RoadChoice` is defined in Task 6 and consumed in 8. `spreadCards` replaces `cards` in Task 6 and every later reference uses `spreadCards`.
 
 **Known transient state.** Tasks 1 and 3 knowingly leave `npm run test` red between them, because the type change ripples through the narrator and components before Task 6 repairs them. This is stated in both tasks so an implementer does not "fix" it by weakening the deck.
+
+**Added mid-execution.** Task 8 was inserted after a browser check following Task 7
+showed the approved design had never been ported: the page rendered in a default
+sans-serif with no card fan and no ticket form, while colours and the gold button
+had arrived piecemeal. Tasks 9-11 restyle parts of a shell that did not exist, so
+the shell is built first. Later tasks were renumbered accordingly.
+
+---
+
+### Task 13: Share a reading
+
+**Files:**
+- Create: `src/domain/share/code.ts`
+- Create: `src/app/r/[code]/page.tsx`
+- Create: `src/app/r/[code]/opengraph-image.tsx`
+- Create: `src/components/ShareButton.tsx`
+- Modify: `src/components/TravelResult.tsx`
+- Modify: `src/app/globals.css`
+- Test: `tests/domain/share-code.test.ts` (create)
+- Test: `tests/components/share-button.test.tsx` (create)
+- Modify: `tests/e2e/ritual-flow.spec.ts`
+
+**Interfaces:**
+- Consumes: `RitualResult` and the atlas.
+- Produces: `encodeReading(reading): string` and `decodeReading(code): SharedReading | null` from `src/domain/share/code.ts`.
+
+The goal is spread, not archival. People forward pictures, not URLs, so the generated preview image is the part that actually travels; the link is what makes the image mean something when tapped.
+
+**The whole reading lives in the link — there is no database.** Nothing to provision, nothing to clean up, no row to expire, and it deploys to Vercel unchanged.
+
+**Prophecy frozen, prices fresh.** The cards, their orientations and the destination come from the link, so a shared reading is always the same reading and needs no MCP call to render. The roads are searched again on view, so prices and availability are current. Say so on the page in one quiet line — it is a genuinely good property, not a caveat to hide.
+
+- [ ] **Step 1: Write the failing test for the codec**
+
+Create `tests/domain/share-code.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { decodeReading, encodeReading, type SharedReading } from "@/domain/share/code";
+
+const reading: SharedReading = {
+  cards: [
+    { id: "tower", reversed: false },
+    { id: "hermit", reversed: true },
+    { id: "chariot", reversed: false },
+  ],
+  destinationId: "altai-chuysky",
+  mode: "railway",
+  departureCity: "Москва",
+  dateFrom: "2026-09-10",
+  dateTo: "2026-09-17",
+  travelerCount: 2,
+};
+
+describe("share code", () => {
+  it("round-trips a reading", () => {
+    expect(decodeReading(encodeReading(reading))).toEqual(reading);
+  });
+
+  it("produces a URL-safe code with no padding", () => {
+    expect(encodeReading(reading)).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("survives a Cyrillic departure city", () => {
+    const decoded = decodeReading(encodeReading({ ...reading, departureCity: "Нижний Новгород" }));
+    expect(decoded?.departureCity).toBe("Нижний Новгород");
+  });
+
+  it("returns null for anything it cannot trust", () => {
+    for (const bad of ["", "!!!!", "YWJj", btoa("{}"), encodeReading(reading).slice(0, 8)]) {
+      expect(decodeReading(bad)).toBeNull();
+    }
+  });
+
+  it("rejects a card id that is not in the deck and a destination that is not in the atlas", () => {
+    const wrongCard = encodeReading({ ...reading, cards: [{ id: "nope", reversed: false }, ...reading.cards.slice(1)] });
+    expect(decodeReading(wrongCard)).toBeNull();
+    const wrongPlace = encodeReading({ ...reading, destinationId: "atlantis" });
+    expect(decodeReading(wrongPlace)).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npm run test -- tests/domain/share-code.test.ts`
+Expected: FAIL — cannot resolve `@/domain/share/code`.
+
+- [ ] **Step 3: Write the codec**
+
+Create `src/domain/share/code.ts`. Encode a compact tuple as JSON, then base64url with the padding stripped. Decode with a zod schema, then check every id against the real deck and the real atlas, and return `null` on any failure — a code is untrusted input that arrives from strangers. Never throw out of `decodeReading`; a malformed link must render a page, not a stack trace.
+
+Keep the payload small: a tuple, not an object with long keys. The departure city is the only variable-length part, and the code must survive Cyrillic, so encode through `TextEncoder`/`TextDecoder` rather than `btoa` on a raw string.
+
+- [ ] **Step 4: Write the failing test for the share button**
+
+Create `tests/components/share-button.test.tsx`. Cover three things: it uses `navigator.share` when available; it falls back to writing the URL to the clipboard when `share` is absent; and it reports failure visibly rather than silently when both are unavailable.
+
+- [ ] **Step 5: Run it, then build the button**
+
+Create `src/components/ShareButton.tsx` as a client component.
+
+**Build the `ClipboardItem` synchronously inside the click handler.** Safari revokes the user-activation the moment you `await` before touching the clipboard, so any `await` first makes copying fail on iPhone — which is most of the audience for a share button. Construct the item from a promise, do not await and then construct.
+
+Render it in `TravelResult` after the result, next to the source links. Label it in Russian and give it a short confirmation state after a successful copy.
+
+- [ ] **Step 6: Build the shared reading page**
+
+Create `src/app/r/[code]/page.tsx`. Decode the code; on `null`, render a calm page in the product's voice offering to lay a fresh spread, never an error trace. On success, render the same cards, orientation, destination and prediction the original reading had, then search the roads again through the existing server-side path so prices are current.
+
+Read the Next 16 routing and metadata guides in `node_modules/next/dist/docs/` before writing this — `AGENTS.md` requires it, and param handling in this version differs from older ones.
+
+- [ ] **Step 7: Generate the preview image**
+
+Create `src/app/r/[code]/opengraph-image.tsx` using the framework's image-response API. Compose the three card images, the destination name and one line of the prophecy over the product's dark palette.
+
+Two traps to handle deliberately:
+
+- The image runtime does not inherit `next/font`. A display face has to be supplied as a font file the route can read. Resolve this from the Next 16 docs in `node_modules/next/dist/docs/`, and **make no outbound request at runtime** — the whole project holds that line, and an image route that fetches a font from Google would break it.
+- The card artwork lives under `public/tarot/`. Load it in whatever way the docs prescribe for local assets; do not hotlink it through a public URL.
+
+If a genuinely self-contained image cannot be produced, fall back to a static branded image plus correct Open Graph tags and say so in the report — a wrong-looking preview is worse than a plain one.
+
+- [ ] **Step 8: Prove a shared link works end-to-end**
+
+Extend `tests/e2e/ritual-flow.spec.ts`: complete a reading, read the share URL the button would copy, open it in a fresh page, and assert the same three cards with the same orientations and the same destination appear. Assert the page has no horizontal overflow at 375px.
+
+- [ ] **Step 9: Run everything**
+
+Run: `npm run test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm run test:e2e`.
+Expected: all PASS.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add src/domain/share src/app/r src/components/ShareButton.tsx src/components/TravelResult.tsx src/app/globals.css tests
+git commit -m "feat: share a reading as a link that carries the whole spread"
+```

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
-import { normalizeHotelOffers, normalizeTransportOffers } from "@/server/tutu/normalize";
+import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary } from "@/server/tutu/normalize";
 import type { TravelAtlasItem, TripIntent } from "@/domain/types";
 
 const intent: TripIntent = {
@@ -107,6 +107,7 @@ describe("Tutu offer normalization", () => {
       price: "46624 RUB",
       subtitle: "В пути 9 ч 50 мин",
       url: "https://avia.tutu.ru/f/Sankt-peterburg/Vladivostok/?start=2026-09-10",
+      mode: "avia",
     });
   });
 
@@ -158,13 +159,15 @@ describe("Tutu offer normalization", () => {
       headers: { Accept: "application/json, text/event-stream" },
     });
     expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).params).toEqual({
-      name: "search_avia",
+      name: "search_multitransport",
       arguments: {
         origin: "Москва",
         destination: "Пермь",
         departure_date: "2026-09-10",
         adults: 2,
-        page_size: 5,
+        modes: ["avia", "railway", "bus"],
+        optimize_for: "price",
+        page_size: 20,
         view: "compact",
       },
     });
@@ -188,7 +191,7 @@ describe("Tutu offer normalization", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(sseContentResponse({
         items: [{ title: "Москва - Пермь", price: { amount: 4200, currency: "RUB" } }],
-      }, `search_avia-${requestTime}`))
+      }, `search_multitransport-${requestTime}`))
       .mockResolvedValueOnce(sseContentResponse({
         items: [{ name: "Отель Пермь", price: { amount: 6000, currency: "RUB" } }],
       }, `search_hotels-${requestTime}`));
@@ -205,7 +208,7 @@ describe("Tutu offer normalization", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
     const requestTime = Date.now();
-    const transportId = `search_avia-${requestTime}`;
+    const transportId = `search_multitransport-${requestTime}`;
     const hotelId = `search_hotels-${requestTime}`;
     const progress = { jsonrpc: "2.0", method: "notifications/progress", params: { progress: 50 } };
     const unexpectedResult = {
@@ -247,7 +250,7 @@ describe("Tutu offer normalization", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(sseContentResponse(
         { items: [{ title: "Москва - Пермь" }] },
-        `search_avia-${requestTime}`,
+        `search_multitransport-${requestTime}`,
         "Text/Event-Stream; charset=utf-8",
       ))
       .mockResolvedValueOnce(sseContentResponse(
@@ -286,7 +289,7 @@ describe("Tutu offer normalization", () => {
       },
     ]);
     expect(result.hotels[0].title).toBe("Отель Пермь");
-    expect(result.warnings).toEqual(["Tutu MCP search_avia failed: Transport unavailable"]);
+    expect(result.warnings).toEqual(["Tutu MCP search_multitransport failed: Transport unavailable"]);
   });
 
   it("keeps hotel offers when transport fetch fails", async () => {
@@ -311,28 +314,41 @@ describe("Tutu offer normalization", () => {
     expect(result.warnings).toEqual(["network unavailable"]);
   });
 
-  it("aborts a stalled Tutu transport request after 20 seconds", async () => {
+  it("aborts a stalled Tutu transport request after the shared 18 second deadline", async () => {
     vi.useFakeTimers();
     let transportSignal: AbortSignal | undefined;
     const fetchMock = vi.fn()
       .mockImplementationOnce((_url: string, init?: RequestInit) => {
         transportSignal = init?.signal ?? undefined;
-        if (!transportSignal) return Promise.reject(new Error("missing abort signal"));
+        const signal = transportSignal;
+        if (!signal) return Promise.reject(new Error("missing abort signal"));
+        // Create a Promise that rejects when the signal aborts
         return new Promise<Response>((_resolve, reject) => {
-          transportSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+          // Handle abort event - reject with the error message a real fetch produces
+          // In Node.js fetch, an aborted request rejects with a message "This operation was aborted"
+          const abortHandler = () => {
+            reject(new Error("This operation was aborted"));
+          };
+          signal.addEventListener("abort", abortHandler, { once: true });
+          // Also check if already aborted (race condition)
+          if (signal.aborted) {
+            reject(new Error("This operation was aborted"));
+          }
         });
       })
       .mockResolvedValueOnce(contentResponse({ items: [{ name: "Отель Пермь" }] }));
     vi.stubGlobal("fetch", fetchMock);
 
     const resultPromise = searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
-    await vi.advanceTimersByTimeAsync(19_999);
+    await vi.advanceTimersByTimeAsync(17_999);
     expect(transportSignal?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     const result = await resultPromise;
 
     expect(transportSignal?.aborted).toBe(true);
     expect(result.hotels[0].title).toBe("Отель Пермь");
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.join(" ")).toMatch(/abort/i);
   });
 
   it("returns Tutu search entry points when both MCP tools produce no offers", async () => {
@@ -359,5 +375,68 @@ describe("Tutu offer normalization", () => {
         url: "https://hotel.tutu.ru/",
       },
     ]);
+  });
+});
+
+const vladimirResponse = {
+  variants: [
+    {
+      offer_id: "4abc27df",
+      transport: "railway",
+      price: { amount: 691.77, currency: "RUB" },
+      duration_min: 105,
+      carriers: ["ФПК"],
+      search_results_url: "https://www.tutu.ru/poezda/rasp_d.php?date=10.09.2026",
+      checkout_url: "https://www.tutu.ru/poezda/order/?tn=705",
+    },
+  ],
+  meta: {
+    modes_summary: {
+      railway: { count: 19, min_price: 691.77, min_duration_min: 104 },
+      bus: { count: 6, min_price: 3220, min_duration_min: 150 },
+    },
+    unavailable: [{ mode: "avia", reason: "no_route" }],
+  },
+};
+
+describe("multitransport normalization", () => {
+  it("reads variants and carries the mode from the response", () => {
+    const offers = normalizeTransportOffers(vladimirResponse);
+    expect(offers).toHaveLength(1);
+    expect(offers[0].mode).toBe("railway");
+    expect(offers[0].price).toBe("691.77 RUB");
+    expect(offers[0].url).toContain("tutu.ru");
+  });
+
+  it("reads per-mode availability from meta, not from the variant list", () => {
+    const summary = readModesSummary(vladimirResponse);
+    expect(summary.railway).toEqual({ count: 19, minPrice: 691.77, minDurationMin: 104 });
+    // Only one railway variant was returned on this page, yet six buses exist.
+    expect(summary.bus?.count).toBe(6);
+    expect(summary.avia).toBeUndefined();
+  });
+});
+
+describe("tool errors delivered as text", () => {
+  it("surfaces the tool message instead of a JSON parse complaint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: "x",
+          result: {
+            content: [{ type: "text", text: "Error executing tool search_multitransport: 1 validation error" }],
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination });
+
+    expect(result.warnings.join(" ")).toContain("Error executing tool");
+    expect(result.warnings.join(" ")).not.toContain("not valid JSON");
+    vi.unstubAllGlobals();
   });
 });

@@ -1,11 +1,15 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RitualStage } from "@/components/RitualStage";
+import { pickFutureDateRange } from "../support/pickFutureDateRange";
 
+// `ritualResponse` below is a fully mocked API response, not something
+// asserted against the dates actually picked, so which dates
+// pickFutureDateRange() lands on doesn't matter here — only that it picks
+// a valid, submittable range.
 const ritualResponse = {
   ritualId: "demo",
   seed: "москва|2026-09-10|2026-09-17|2",
-  cards: [],
   spreadCards: [],
   destination: { name: "Усьвинские Столбы", region: "Пермский край" },
   prediction: {
@@ -14,6 +18,7 @@ const ritualResponse = {
     summary: "Дорога подтверждается Туту.",
     cardReadings: [],
   },
+  roadChoice: { mode: null, reason: "Дорога скрыта туманом.", best: null },
   transportOffers: [],
   hotelOffers: [],
   sourceLinks: [],
@@ -40,8 +45,7 @@ describe("RitualStage", () => {
 
     render(<RitualStage />);
     fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
-    fireEvent.change(screen.getByLabelText("Дата начала"), { target: { value: "2026-09-10" } });
-    fireEvent.change(screen.getByLabelText("Дата конца"), { target: { value: "2026-09-17" } });
+    pickFutureDateRange();
     fireEvent.change(screen.getByLabelText("Путешественники"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
 
@@ -103,8 +107,7 @@ describe("RitualStage", () => {
 
     render(<RitualStage />);
     fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
-    fireEvent.change(screen.getByLabelText("Дата начала"), { target: { value: "2026-09-10" } });
-    fireEvent.change(screen.getByLabelText("Дата конца"), { target: { value: "2026-09-17" } });
+    pickFutureDateRange();
     fireEvent.change(screen.getByLabelText("Путешественники"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
 

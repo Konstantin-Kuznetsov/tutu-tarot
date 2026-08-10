@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "tarot:images": "node scripts/prepare-tarot-images.mjs",
+    "og:assets": "node scripts/prepare-og-assets.mjs",
+    "smoke": "node scripts/smoke-ritual.mjs"
   },
   "dependencies": {
     "next": "^16.3.0",
@@ -27,6 +30,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0",
     "jsdom": "^29.1.1",
+    "sharp": "^0.35.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

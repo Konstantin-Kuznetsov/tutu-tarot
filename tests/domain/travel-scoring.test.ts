@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TarotArchetype } from "@/domain/types";
+import type { ArchetypeWeights } from "@/domain/tarot/engine";
 import { travelAtlas } from "@/domain/travel/atlas";
 import { selectDestination } from "@/domain/travel/scoring";
 
@@ -22,7 +22,7 @@ describe("selectDestination", () => {
 
   it("selects Usvinskie Stolby for cliffs and road archetypes", () => {
     const result = selectDestination({
-      archetypes: ["cliffs", "road", "solitude"],
+      archetypeWeights: { cliffs: 1, road: 1, solitude: 1 },
       dateFrom: "2026-09-10",
       dateTo: "2026-09-17",
       departureCity: "Москва",
@@ -35,7 +35,7 @@ describe("selectDestination", () => {
 
   it("returns a Russian destination with Tutu source metadata", () => {
     const result = selectDestination({
-      archetypes: ["north", "water", "mystery"],
+      archetypeWeights: { north: 1, water: 1, mystery: 1 },
       dateFrom: "2026-02-10",
       dateTo: "2026-02-14",
       departureCity: "Санкт-Петербург",
@@ -48,7 +48,7 @@ describe("selectDestination", () => {
 
   it("is deterministic for the same archetypes and dates", () => {
     const input = {
-      archetypes: ["north", "water", "mystery"] satisfies TarotArchetype[],
+      archetypeWeights: { north: 1, water: 1, mystery: 1 } satisfies ArchetypeWeights,
       dateFrom: "2026-02-10",
       dateTo: "2026-02-14",
       departureCity: "Санкт-Петербург",
