@@ -2380,3 +2380,135 @@ showed the approved design had never been ported: the page rendered in a default
 sans-serif with no card fan and no ticket form, while colours and the gold button
 had arrived piecemeal. Tasks 9-11 restyle parts of a shell that did not exist, so
 the shell is built first. Later tasks were renumbered accordingly.
+
+---
+
+### Task 13: Share a reading
+
+**Files:**
+- Create: `src/domain/share/code.ts`
+- Create: `src/app/r/[code]/page.tsx`
+- Create: `src/app/r/[code]/opengraph-image.tsx`
+- Create: `src/components/ShareButton.tsx`
+- Modify: `src/components/TravelResult.tsx`
+- Modify: `src/app/globals.css`
+- Test: `tests/domain/share-code.test.ts` (create)
+- Test: `tests/components/share-button.test.tsx` (create)
+- Modify: `tests/e2e/ritual-flow.spec.ts`
+
+**Interfaces:**
+- Consumes: `RitualResult` and the atlas.
+- Produces: `encodeReading(reading): string` and `decodeReading(code): SharedReading | null` from `src/domain/share/code.ts`.
+
+The goal is spread, not archival. People forward pictures, not URLs, so the generated preview image is the part that actually travels; the link is what makes the image mean something when tapped.
+
+**The whole reading lives in the link — there is no database.** Nothing to provision, nothing to clean up, no row to expire, and it deploys to Vercel unchanged.
+
+**Prophecy frozen, prices fresh.** The cards, their orientations and the destination come from the link, so a shared reading is always the same reading and needs no MCP call to render. The roads are searched again on view, so prices and availability are current. Say so on the page in one quiet line — it is a genuinely good property, not a caveat to hide.
+
+- [ ] **Step 1: Write the failing test for the codec**
+
+Create `tests/domain/share-code.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { decodeReading, encodeReading, type SharedReading } from "@/domain/share/code";
+
+const reading: SharedReading = {
+  cards: [
+    { id: "tower", reversed: false },
+    { id: "hermit", reversed: true },
+    { id: "chariot", reversed: false },
+  ],
+  destinationId: "altai-chuysky",
+  mode: "railway",
+  departureCity: "Москва",
+  dateFrom: "2026-09-10",
+  dateTo: "2026-09-17",
+  travelerCount: 2,
+};
+
+describe("share code", () => {
+  it("round-trips a reading", () => {
+    expect(decodeReading(encodeReading(reading))).toEqual(reading);
+  });
+
+  it("produces a URL-safe code with no padding", () => {
+    expect(encodeReading(reading)).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("survives a Cyrillic departure city", () => {
+    const decoded = decodeReading(encodeReading({ ...reading, departureCity: "Нижний Новгород" }));
+    expect(decoded?.departureCity).toBe("Нижний Новгород");
+  });
+
+  it("returns null for anything it cannot trust", () => {
+    for (const bad of ["", "!!!!", "YWJj", btoa("{}"), encodeReading(reading).slice(0, 8)]) {
+      expect(decodeReading(bad)).toBeNull();
+    }
+  });
+
+  it("rejects a card id that is not in the deck and a destination that is not in the atlas", () => {
+    const wrongCard = encodeReading({ ...reading, cards: [{ id: "nope", reversed: false }, ...reading.cards.slice(1)] });
+    expect(decodeReading(wrongCard)).toBeNull();
+    const wrongPlace = encodeReading({ ...reading, destinationId: "atlantis" });
+    expect(decodeReading(wrongPlace)).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npm run test -- tests/domain/share-code.test.ts`
+Expected: FAIL — cannot resolve `@/domain/share/code`.
+
+- [ ] **Step 3: Write the codec**
+
+Create `src/domain/share/code.ts`. Encode a compact tuple as JSON, then base64url with the padding stripped. Decode with a zod schema, then check every id against the real deck and the real atlas, and return `null` on any failure — a code is untrusted input that arrives from strangers. Never throw out of `decodeReading`; a malformed link must render a page, not a stack trace.
+
+Keep the payload small: a tuple, not an object with long keys. The departure city is the only variable-length part, and the code must survive Cyrillic, so encode through `TextEncoder`/`TextDecoder` rather than `btoa` on a raw string.
+
+- [ ] **Step 4: Write the failing test for the share button**
+
+Create `tests/components/share-button.test.tsx`. Cover three things: it uses `navigator.share` when available; it falls back to writing the URL to the clipboard when `share` is absent; and it reports failure visibly rather than silently when both are unavailable.
+
+- [ ] **Step 5: Run it, then build the button**
+
+Create `src/components/ShareButton.tsx` as a client component.
+
+**Build the `ClipboardItem` synchronously inside the click handler.** Safari revokes the user-activation the moment you `await` before touching the clipboard, so any `await` first makes copying fail on iPhone — which is most of the audience for a share button. Construct the item from a promise, do not await and then construct.
+
+Render it in `TravelResult` after the result, next to the source links. Label it in Russian and give it a short confirmation state after a successful copy.
+
+- [ ] **Step 6: Build the shared reading page**
+
+Create `src/app/r/[code]/page.tsx`. Decode the code; on `null`, render a calm page in the product's voice offering to lay a fresh spread, never an error trace. On success, render the same cards, orientation, destination and prediction the original reading had, then search the roads again through the existing server-side path so prices are current.
+
+Read the Next 16 routing and metadata guides in `node_modules/next/dist/docs/` before writing this — `AGENTS.md` requires it, and param handling in this version differs from older ones.
+
+- [ ] **Step 7: Generate the preview image**
+
+Create `src/app/r/[code]/opengraph-image.tsx` using the framework's image-response API. Compose the three card images, the destination name and one line of the prophecy over the product's dark palette.
+
+Two traps to handle deliberately:
+
+- The image runtime does not inherit `next/font`. A display face has to be supplied as a font file the route can read. Resolve this from the Next 16 docs in `node_modules/next/dist/docs/`, and **make no outbound request at runtime** — the whole project holds that line, and an image route that fetches a font from Google would break it.
+- The card artwork lives under `public/tarot/`. Load it in whatever way the docs prescribe for local assets; do not hotlink it through a public URL.
+
+If a genuinely self-contained image cannot be produced, fall back to a static branded image plus correct Open Graph tags and say so in the report — a wrong-looking preview is worse than a plain one.
+
+- [ ] **Step 8: Prove a shared link works end-to-end**
+
+Extend `tests/e2e/ritual-flow.spec.ts`: complete a reading, read the share URL the button would copy, open it in a fresh page, and assert the same three cards with the same orientations and the same destination appear. Assert the page has no horizontal overflow at 375px.
+
+- [ ] **Step 9: Run everything**
+
+Run: `npm run test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm run test:e2e`.
+Expected: all PASS.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add src/domain/share src/app/r src/components/ShareButton.tsx src/components/TravelResult.tsx src/app/globals.css tests
+git commit -m "feat: share a reading as a link that carries the whole spread"
+```
