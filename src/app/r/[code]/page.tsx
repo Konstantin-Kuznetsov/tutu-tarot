@@ -116,7 +116,7 @@ export default async function SharedReadingPage({ params }: PageProps) {
 
   return (
     <div className="table">
-      <main className="result">
+      <main className="result result--shared">
         <h1>Таро-турагент</h1>
         <p className="caps share-note">
           Карты и направление — те же, что выпали изначально. Билеты и отели ищутся заново, для свежих цен.

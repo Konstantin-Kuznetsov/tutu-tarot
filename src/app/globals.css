@@ -543,6 +543,18 @@ h1 {
   padding: 0 var(--sp-5) var(--sp-8);
 }
 
+/* On "/" the result follows the receded ticket, so a top gap would just push
+   it down. On a shared link it is the first thing on the page, and without
+   this the title sits flush against the top edge of the phone that opened it
+   from a messenger — which is most of the traffic this page will ever see.
+
+   Doubled class on purpose: the narrow-width media query further down
+   re-declares `.result`'s padding with the shorthand, which resets
+   padding-top and would win on source order at equal specificity. */
+.result.result--shared {
+  padding-top: var(--sp-7);
+}
+
 /* Each top-level section of the reading assembles in on its own delay
    (RitualStage/TravelResult set --block-index per block) instead of
    popping in as one flat block, so the result reads as it being told to
