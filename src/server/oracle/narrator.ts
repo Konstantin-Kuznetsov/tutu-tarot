@@ -25,6 +25,11 @@ export interface PredictionText {
   headline: string;
   opening: string;
   cardReadings: Array<{
+    // The drawn card's own id (DrawnTarotCard.id) -- carried through so the
+    // reading can be matched back to its card by identity in
+    // TravelResult/TarotCardView, never by array position (see
+    // createPrediction's own comment on why id, not index, is the key).
+    id: string;
     position: string;
     cardName: string;
     text: string;
@@ -93,6 +98,7 @@ function templatePrediction(input: PredictionInput): PredictionText {
     headline: `Карты указывают: ${destination.name}`,
     opening: appOpening(input),
     cardReadings: input.spread.cards.map((card) => ({
+      id: card.id,
       position: card.position,
       cardName: card.name,
       text: `${card.name} в позиции «${card.position}» говорит: ${card.meaning}. Поэтому ${destination.anchorPlace} становится главным знаком расклада.`,
@@ -161,6 +167,7 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
     headline: `Карты указывают: ${input.selection.destination.name}`,
     opening: appOpening(input),
     cardReadings: input.spread.cards.map((card) => ({
+      id: card.id,
       position: card.position,
       cardName: card.name,
       text: textById.get(card.id) ?? card.meaning,

@@ -883,12 +883,56 @@ h1 {
 
 .spread-card-shell {
   min-width: 0;
+}
+
+/* card-reveal now targets the card figure itself, not the shell around it
+   (moved here from `.spread-card-shell` when the reading paragraph below
+   was added). The keyframe rotates the animated box around its own centre
+   (see @keyframes card-reveal's rotateX/rotateZ), and that rotation swings
+   the box's corners sideways by roughly half its height times sin(angle) --
+   harmless for a card alone, but `.tarot-card-reading` can add a couple
+   hundred pixels of height below the card, and animating a box that tall
+   pushed a card mid-rotation past a 375px viewport (measured 377px) before
+   its own entrance animation had settled. Scoping the animation back to
+   just `.tarot-card` keeps the rotating box exactly the card's own pinned
+   height, independent of how long its reading is, and the reading itself
+   simply appears without competing for the same transform. */
+.spread-card-shell .tarot-card {
+  width: 100%;
   animation: card-reveal 620ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   animation-delay: calc(var(--card-order, 0) * 120ms);
 }
 
-.spread-card-shell .tarot-card {
-  width: 100%;
+/* The written reading for this card (template or AI) -- rendered as a
+   sibling of `.tarot-card`, not inside its figcaption (see TarotCardView's
+   own comment on why): it needs to wrap and grow freely in normal document
+   flow, never inside the card's pinned-aspect-ratio, overflow:hidden box,
+   which was sized for the deck's own short meaning phrases, not a written
+   reading up to 400 characters long. overflow-wrap matches every other
+   AI/user-facing prose block in this file (e.g. .prediction-panel,
+   .road__hero) for the same reason: an unbroken run must never be the thing
+   that forces horizontal overflow. */
+.tarot-card-reading {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* One quiet line after the spread -- a coda, not a heading (see
+   TravelResult's own comment). Styled like .road__warning's product-voiced
+   aside: centred, muted, capped line length, never louder than the cards
+   above it. */
+.spread-panel__closing {
+  max-width: 52ch;
+  margin: var(--sp-2) auto 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  font-style: italic;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 /* ── Road block — ported from "03 Результат.dc.html"'s `.route`/`.reason`,
@@ -1283,7 +1327,7 @@ h1 {
    requirement for reduced motion) needs animation:none outright. */
 @media (prefers-reduced-motion: reduce) {
   .ritual-scene__slot,
-  .spread-card-shell {
+  .spread-card-shell .tarot-card {
     animation: none;
   }
 

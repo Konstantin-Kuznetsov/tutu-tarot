@@ -90,6 +90,17 @@ function blockIndexStyle(index: number): CSSProperties {
   return { "--block-index": index } as CSSProperties;
 }
 
+// Matches a card to its written reading by the card's own id, never by
+// array position: the model (or the template) can list its readings in any
+// order, and cardReadings is keyed by id specifically so a reordered reply
+// still lands on the right card (see PredictionText.cardReadings' own
+// comment). Returns undefined -- not the deck's meaning -- when no reading
+// exists for this card; TarotCardView itself falls back to card.meaning in
+// that case, so this only ever supplies a replacement, never a default.
+function readingTextFor(cardId: string, cardReadings: PredictionText["cardReadings"]): string | undefined {
+  return cardReadings.find((reading) => reading.id === cardId)?.text;
+}
+
 export function TravelResult({ result }: { result: RitualResultViewModel }) {
   const { roadChoice } = result;
   const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
@@ -117,10 +128,21 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           <div className="spread-grid">
             {result.spreadCards.map((card, index) => (
               <div className="spread-card-shell" key={`${card.position}-${card.id}`} style={{ "--card-order": index } as CSSProperties}>
-                <TarotCardView card={card} revealed testId="spread-card" />
+                <TarotCardView
+                  card={card}
+                  revealed
+                  testId="spread-card"
+                  readingText={readingTextFor(card.id, result.prediction.cardReadings)}
+                />
               </div>
             ))}
           </div>
+          {/* A coda, not a heading -- one quiet line after the spread, only
+              ever set when the AI wrote one and it passed validation (see
+              PredictionText.closingLine's own comment). */}
+          {result.prediction.closingLine ? (
+            <p className="spread-panel__closing">{result.prediction.closingLine}</p>
+          ) : null}
         </section>
       ) : null}
       <section

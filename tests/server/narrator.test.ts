@@ -150,16 +150,19 @@ describe("createPrediction", () => {
         "Карты раскрывают путь из города Москва: Усьвинские Столбы, где каменная дорога. Каменные столбы обещают путь к тишине.",
       cardReadings: [
         {
+          id: "tower",
           position: "Зов",
           cardName: "Башня",
           text: "Башня в позиции «Зов» говорит: камень и высота. Поэтому Усьвинские Столбы становится главным знаком расклада.",
         },
         {
+          id: "chariot",
           position: "Дар",
           cardName: "Колесница",
           text: "Колесница в позиции «Дар» говорит: дорога. Поэтому Усьвинские Столбы становится главным знаком расклада.",
         },
         {
+          id: "hermit",
           position: "Путь",
           cardName: "Отшельник",
           text: "Отшельник в позиции «Путь» говорит: тишина. Поэтому Усьвинские Столбы становится главным знаком расклада.",
@@ -185,9 +188,9 @@ describe("createPrediction", () => {
     expect(result.summary).toContain("Пермский край");
     expect(result.closingLine).toBe(VALID_NARRATION.closingLine);
     expect(result.cardReadings).toEqual([
-      { position: "Зов", cardName: "Башня", text: VALID_NARRATION.cardReadings[0].text },
-      { position: "Дар", cardName: "Колесница", text: VALID_NARRATION.cardReadings[1].text },
-      { position: "Путь", cardName: "Отшельник", text: VALID_NARRATION.cardReadings[2].text },
+      { id: "tower", position: "Зов", cardName: "Башня", text: VALID_NARRATION.cardReadings[0].text },
+      { id: "chariot", position: "Дар", cardName: "Колесница", text: VALID_NARRATION.cardReadings[1].text },
+      { id: "hermit", position: "Путь", cardName: "Отшельник", text: VALID_NARRATION.cardReadings[2].text },
     ]);
   });
 

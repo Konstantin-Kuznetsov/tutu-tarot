@@ -31,4 +31,22 @@ describe("TarotCardView", () => {
     render(<TarotCardView card={tower} revealed={false} />);
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
+
+  // The actual defect this task fixes: a written reading, once supplied,
+  // must replace the deck's own stock meaning -- not sit alongside it.
+  it("shows its matching reading instead of the deck's stock meaning when one is supplied", () => {
+    const reading = "Башня рушит старые стены, чтобы освободить дорогу к каменным столбам и тишине.";
+    render(<TarotCardView card={tower} revealed readingText={reading} />);
+
+    expect(screen.getByText(reading)).toBeInTheDocument();
+    expect(screen.queryByText(tower.meaning)).not.toBeInTheDocument();
+  });
+
+  // The safety net: no reading (AI unconfigured, or its output failed
+  // validation) must fall back to exactly today's behaviour.
+  it("falls back to the deck's own meaning when no reading is supplied", () => {
+    render(<TarotCardView card={tower} revealed />);
+
+    expect(screen.getByText(tower.meaning)).toBeInTheDocument();
+  });
 });

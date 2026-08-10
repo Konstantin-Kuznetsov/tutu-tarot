@@ -158,4 +158,62 @@ describe("TravelResult", () => {
     );
     expect(order).toEqual(["prediction", "spread", "road", "other-roads", "hotels", "sources"]);
   });
+
+  // The actual defect this task fixes: cardReadings travelled in the
+  // response and in the shared-reading page's data, but nothing ever
+  // rendered it -- the page kept showing the deck's own stock meaning.
+  it("shows each card's own written reading, matched by id rather than array order", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          prediction: {
+            ...resultWithRoad.prediction,
+            cardReadings: [
+              // Deliberately out of spreadCards order (moon, then hermit,
+              // then star) -- proves the match is by id, not by position in
+              // this array or in spreadCards.
+              { id: "moon", position: "Дар", cardName: "Луна", text: "Луна освещает ночную дорогу к тишине." },
+              { id: "hermit", position: "Путь", cardName: "Отшельник", text: "Отшельник ведёт к высокому месту в одиночестве." },
+              { id: "star", position: "Зов", cardName: "Звезда", text: "Звезда зовёт на север, к воде и надежде." },
+            ],
+          },
+        }}
+      />,
+    );
+
+    // Each reading appears under its own card, not the deck's stock meaning.
+    expect(screen.getByText("Звезда зовёт на север, к воде и надежде.")).toBeInTheDocument();
+    expect(screen.getByText("Луна освещает ночную дорогу к тишине.")).toBeInTheDocument();
+    expect(screen.getByText("Отшельник ведёт к высокому месту в одиночестве.")).toBeInTheDocument();
+    expect(screen.queryByText("северный свет, вода и надежда")).not.toBeInTheDocument();
+    expect(screen.queryByText("ночная дорога, туман и то, что видно только впотьмах")).not.toBeInTheDocument();
+    expect(screen.queryByText("дорога к тишине и высокому месту")).not.toBeInTheDocument();
+  });
+
+  it("falls back to each card's own deck meaning when no reading exists for it, exactly as before", () => {
+    render(<TravelResult result={resultWithRoad} />);
+
+    expect(screen.getByText("северный свет, вода и надежда")).toBeInTheDocument();
+    expect(screen.getByText("ночная дорога, туман и то, что видно только впотьмах")).toBeInTheDocument();
+    expect(screen.getByText("дорога к тишине и высокому месту")).toBeInTheDocument();
+  });
+
+  it("renders the closing line as a quiet coda after the spread when one is present", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          prediction: { ...resultWithRoad.prediction, closingLine: "Дорога уже начертана картами." },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Дорога уже начертана картами.")).toBeInTheDocument();
+  });
+
+  it("renders no closing line when the prediction doesn't carry one", () => {
+    render(<TravelResult result={resultWithRoad} />);
+    expect(document.querySelector(".spread-panel__closing")).not.toBeInTheDocument();
+  });
 });
