@@ -150,11 +150,23 @@ h1 {
   text-transform: uppercase;
   cursor: pointer;
   text-decoration: none;
-  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
 .btn:hover { background: var(--gold-bright); color: var(--on-gold); }
 .btn:active { transform: translateY(1px); }
+
+.btn--secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line-soft);
+}
+
+.btn--secondary:hover {
+  background: transparent;
+  color: var(--gold-bright);
+  border-color: var(--gold-bright);
+}
 
 /* ── Entry screen — ported from Claude Design "01 Вход.dc.html" ──
    The mockup's `.proto-nav` (prototype screen switcher) and its inter-screen

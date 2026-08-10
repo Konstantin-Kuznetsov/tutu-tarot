@@ -16,6 +16,16 @@ function shareUrlFor(reading: SharedReading): string {
   return `${window.location.origin}/r/${encodeReading(reading)}`;
 }
 
+function buildShareMessage(destinationName: string): string {
+  return `Карты выбрали для меня «${destinationName}». Загляните в расклад:`;
+}
+
+function buildTelegramUrl(shareUrl: string, message: string): string {
+  const encodedUrl = encodeURIComponent(shareUrl);
+  const encodedText = encodeURIComponent(message);
+  return `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
+}
+
 export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
   // Held alongside `status`, not derived from it: this button also renders
@@ -25,16 +35,18 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   // than point at "the page address", which would be actively wrong there.
   const [url, setUrl] = useState<string | null>(null);
 
+  const shareUrl = shareUrlFor(reading);
+  const shareMessage = buildShareMessage(destinationName);
+  const telegramUrl = buildTelegramUrl(shareUrl, shareMessage);
+
   function handleClick() {
-    const shareUrl = shareUrlFor(reading);
     setUrl(shareUrl);
-    const text = `Карты выбрали для меня «${destinationName}». Загляните в расклад:`;
 
     if (typeof navigator.share === "function") {
       // Fire-and-forget: the OS share sheet owns its own UI from here, and
       // a user who cancels it makes navigator.share() reject -- that is not
       // a failure this button needs to report.
-      navigator.share({ title: SHARE_TITLE, text, url: shareUrl }).catch(() => {});
+      navigator.share({ title: SHARE_TITLE, text: shareMessage, url: shareUrl }).catch(() => {});
       return;
     }
 
@@ -81,6 +93,9 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
       <button type="button" className="btn" onClick={handleClick}>
         Поделиться раскладом
       </button>
+      <a href={telegramUrl} target="_blank" rel="noreferrer noopener" className="btn btn--secondary">
+        Telegram
+      </a>
       {status === "copied" ? (
         <p className="share-row__status" role="status">
           Ссылка скопирована

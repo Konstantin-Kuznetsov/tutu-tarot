@@ -87,4 +87,29 @@ describe("ShareButton", () => {
 
     await screen.findByText(/не удалось/i);
   });
+
+  it("renders the Telegram share control", () => {
+    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
+    const telegramLink = screen.getByRole("link", { name: /Telegram/ });
+    expect(telegramLink).toBeInTheDocument();
+  });
+
+  it("encodes both URL and message in the Telegram share href", () => {
+    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
+    const telegramLink = screen.getByRole("link", { name: /Telegram/ });
+    const href = telegramLink.getAttribute("href");
+
+    expect(href).toContain("https://t.me/share/url?");
+    expect(href).toContain("url=");
+    expect(href).toContain("text=");
+    expect(href).toContain(encodeURIComponent("Карты выбрали для меня «Горный Алтай». Загляните в расклад:"));
+  });
+
+  it("opens the Telegram link in a new tab with security attributes", () => {
+    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
+    const telegramLink = screen.getByRole("link", { name: /Telegram/ });
+
+    expect(telegramLink.getAttribute("target")).toBe("_blank");
+    expect(telegramLink.getAttribute("rel")).toBe("noreferrer noopener");
+  });
 });
