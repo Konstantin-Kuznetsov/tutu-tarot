@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "tarot:images": "node scripts/prepare-tarot-images.mjs"
+    "tarot:images": "node scripts/prepare-tarot-images.mjs",
+    "smoke": "node scripts/smoke-ritual.mjs"
   },
   "dependencies": {
     "next": "^16.3.0",
