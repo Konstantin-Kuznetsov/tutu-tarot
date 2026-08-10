@@ -76,26 +76,40 @@ function createInput(overrides: Partial<PredictionInput> = {}): PredictionInput 
       reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной.",
       best: null,
     },
-    offers: { transport: [], hotels: [] },
     aiApiKey: undefined,
     ...overrides,
   };
 }
 
-function mockAiText(outputText: string) {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+const VALID_NARRATION = {
+  cardReadings: [
+    { id: "tower", text: "Башня рушит старые стены, чтобы освободить дорогу к каменным столбам и тишине." },
+    { id: "chariot", text: "Колесница подгоняет решимость, и путь на Урал начинает складываться сам собой." },
+    { id: "hermit", text: "Отшельник зовёт к тишине, где скалы Усьвы становятся единственным собеседником." },
+  ],
+  closingLine: "Дорога уже начертана картами — остаётся только выйти из дома.",
+};
+
+// The real chat-completions wire shape (`choices[0].message.content`) --
+// the default envelope aiClient.ts speaks, since most corporate gateways
+// expose an OpenAI-compatible chat-completions endpoint.
+function mockChatCompletion(content: string) {
+  const fetchMock = vi.fn().mockResolvedValue({
     ok: true,
-    json: async () => ({ output_text: outputText }),
-  }));
+    json: async () => ({
+      id: "chatcmpl_123",
+      object: "chat.completion",
+      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+    }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
-// The real `POST /v1/responses` wire shape -- `output_text` is an SDK
-// convenience field computed client-side after parsing, never present on
-// what this hand-rolled fetch actually receives. mockAiText above (and
-// every test built on it) mocks the shape the code *expected*, which is
-// exactly why the suite didn't catch the bug where every real AI call
-// silently produced `undefined` and fell back to the template.
-function mockAiRealEnvelope(text: string) {
+// The `/v1/responses`-style envelope (`output[0].content[0].text`) some
+// gateways speak instead -- aiClient.ts's extractMessageText must handle
+// both shapes without knowing in advance which one AI_BASE_URL points at.
+function mockResponsesEnvelope(text: string) {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
@@ -123,45 +137,189 @@ describe("createPrediction", () => {
     expect(result.summary).toContain("Пермский край");
   });
 
-  it("accepts a valid flavor key while app data supplies the route", async () => {
-    mockAiText("stone_silence");
+  // The product's safety net: whatever createPrediction returns with no AI
+  // configured today must never change shape or content out from under a
+  // demo. Full deep equality (not just a few field checks) so any
+  // accidental new field, renamed key, or altered copy fails loudly here.
+  it("is byte-identical to the template prediction with no AI configured", async () => {
+    const result = await createPrediction(createInput());
+
+    expect(result).toEqual({
+      headline: "Карты указывают: Усьвинские Столбы",
+      opening:
+        "Карты раскрывают путь из города Москва: Усьвинские Столбы, где каменная дорога. Каменные столбы обещают путь к тишине.",
+      cardReadings: [
+        {
+          id: "tower",
+          position: "Зов",
+          cardName: "Башня",
+          text: "Башня в позиции «Зов» говорит: камень и высота. Зов задаёт вопрос, с которого начинается расклад.",
+        },
+        {
+          id: "chariot",
+          position: "Дар",
+          cardName: "Колесница",
+          text: "Колесница в позиции «Дар» говорит: дорога. Дар отвечает на зов и добавляет к нему свой смысл.",
+        },
+        {
+          id: "hermit",
+          position: "Путь",
+          cardName: "Отшельник",
+          text: "Отшельник в позиции «Путь» говорит: тишина. Путь ведёт дальше и приводит расклад к цели — Усьвинские Столбы.",
+        },
+      ],
+      summary:
+        "Маршрут указывает путь: Пермский край. Маршрут собран из открытых источников. Практическая часть маршрута: центр — Пермь. «Отшельник» сажает к окну — дорога будет долгой и созерцательной.",
+    });
+    // No closingLine key at all on the template path -- not even undefined
+    // -- which is what keeps this object identical to the pre-AI shape.
+    expect(Object.hasOwn(result, "closingLine")).toBe(false);
+  });
+
+  // TarotCardView rotates a reversed card's art and swaps its own caption
+  // to meaningReversed, but omits that caption whenever a reading is
+  // supplied -- so the template reading is the only meaning a reversed
+  // card shows on screen. Reading card.meaning there (the upright text)
+  // made the page contradict itself against the "перевёрнутая" flag right
+  // next to it.
+  it("uses the reversed meaning, not the upright one, when a card falls reversed, and reads as resistance", async () => {
+    const baseInput = createInput();
+    const result = await createPrediction({
+      ...baseInput,
+      spread: {
+        ...baseInput.spread,
+        cards: baseInput.spread.cards.map((card) =>
+          card.id === "hermit" ? { ...card, reversed: true } : card,
+        ),
+      },
+    });
+
+    const hermitReading = result.cardReadings.find((reading) => reading.id === "hermit");
+    expect(hermitReading?.text).toContain("одиночество тяготит, нужен попутчик");
+    expect(hermitReading?.text).not.toContain("дорога к тишине и высокому месту");
+    // A reversed card is resistance, not a neutral variant -- the sentence
+    // must say so, not just silently swap which string it quotes.
+    expect(hermitReading?.text).toMatch(/сопротивля/);
+  });
+
+  // Regression: the old template appended the exact same trailing sentence
+  // ("Поэтому X становится главным знаком расклада") under all three
+  // cards, so the three readings read as one template stuttering three
+  // times instead of three distinct readings.
+  it("does not end all three readings on the same trailing sentence", async () => {
+    const result = await createPrediction(createInput());
+
+    // Each reading is "<card meaning sentence>. <trailing clause>" and
+    // neither card.meaning nor card.meaningReversed contains a period in
+    // this fixture, so the first ". " boundary reliably separates the two.
+    const trailingClauses = result.cardReadings.map((reading) => {
+      const boundary = reading.text.indexOf(". ");
+      return reading.text.slice(boundary + 2);
+    });
+
+    expect(new Set(trailingClauses).size).toBe(3);
+  });
+
+  // Regression: destination.anchorPlace used to be repeated under all
+  // three cards. The headline and opening already name the destination,
+  // so the readings should mention anchorPlace at most once between them
+  // -- and this destination's anchorPlace is a list ("Магас, Эгикал и
+  // Вовнушки", the exact shape that broke "становится"/"становятся"
+  // agreement, see atlas.ts's ingushetia-towers entry).
+  it("names the destination's anchorPlace at most once across the three readings", async () => {
+    const baseInput = createInput();
+    const anchorPlace = "Магас, Эгикал и Вовнушки";
+    const result = await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: { ...baseInput.selection.destination, anchorPlace },
+      },
+    });
+
+    const mentions = result.cardReadings.filter((reading) => reading.text.includes(anchorPlace)).length;
+    expect(mentions).toBeLessThanOrEqual(1);
+    // Regression guard for the exact broken construction: a verb agreeing
+    // (wrongly, for a list) with anchorPlace as its subject.
+    expect(result.cardReadings.every((reading) => !/становится|становятся/.test(reading.text))).toBe(true);
+  });
+
+  it("renders the AI's card readings and closing line while keeping the app-authored headline, opening and summary", async () => {
+    mockChatCompletion(JSON.stringify(VALID_NARRATION));
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
     expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
-    expect(result.opening).toContain("Камень и тишина собирают маршрут в один ясный знак.");
+    expect(result.opening).toBe(
+      "Карты раскрывают путь из города Москва: Усьвинские Столбы, где каменная дорога. Каменные столбы обещают путь к тишине.",
+    );
+    expect(result.summary).toContain("Пермский край");
+    expect(result.closingLine).toBe(VALID_NARRATION.closingLine);
+    expect(result.cardReadings).toEqual([
+      { id: "tower", position: "Зов", cardName: "Башня", text: VALID_NARRATION.cardReadings[0].text },
+      { id: "chariot", position: "Дар", cardName: "Колесница", text: VALID_NARRATION.cardReadings[1].text },
+      { id: "hermit", position: "Путь", cardName: "Отшельник", text: VALID_NARRATION.cardReadings[2].text },
+    ]);
   });
 
-  // Regression: the code used to read only `data.output_text`, a field the
-  // real `POST /v1/responses` wire response never carries (it's an SDK
-  // convenience aggregation). Every real AI call therefore silently
-  // produced `undefined` and fell back to the template, while every test in
-  // this file kept passing because they all mocked the SDK's shape, not the
-  // wire's. This test uses the actual envelope shape and would fail against
-  // the old `data.output_text`-only read.
-  it("reads the flavor key from the real Responses API wire shape (output[0].content[0].text)", async () => {
-    mockAiRealEnvelope("stone_silence");
+  it("reads the narration from the /v1/responses-style wire shape (output[0].content[0].text) too", async () => {
+    mockResponsesEnvelope(JSON.stringify(VALID_NARRATION));
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.closingLine).toBe(VALID_NARRATION.closingLine);
+    expect(result.cardReadings[0].text).toBe(VALID_NARRATION.cardReadings[0].text);
+  });
+
+  it("falls back to the template when the gateway response is not ok", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
     expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
-    expect(result.opening).toContain("Камень и тишина собирают маршрут в один ясный знак.");
+    expect(result.closingLine).toBeUndefined();
+    expect(result.cardReadings[0].text).toContain("камень и высота");
   });
 
-  it("falls back to the template when the real envelope's flavor key is not on the allowlist", async () => {
-    mockAiRealEnvelope("сочи, конечно");
+  it("falls back to the template when the network call throws", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
-    expect(result.opening).not.toContain("сочи");
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
+    expect(result.closingLine).toBeUndefined();
+  });
+
+  it("falls back to the template when the model's JSON fails validateNarration (e.g. naming another destination)", async () => {
+    mockChatCompletion(
+      JSON.stringify({
+        cardReadings: [
+          { id: "tower", text: "Карты почти указали на Суздаль, но что-то пошло другим путём совсем." },
+          ...VALID_NARRATION.cardReadings.slice(1),
+        ],
+        closingLine: VALID_NARRATION.closingLine,
+      }),
+    );
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
+    expect(result.opening).not.toContain("Суздаль");
+    expect(result.summary).not.toContain("Суздаль");
+    expect(result.closingLine).toBeUndefined();
+  });
+
+  it("falls back to the template when the model returns free text instead of JSON", async () => {
+    mockChatCompletion("Башня говорит о переменах. Колесница ведёт вперёд. Отшельник хранит тишину.");
+
+    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+
+    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
+    expect(result.closingLine).toBeUndefined();
   });
 
   it("gives the AI request its own abort signal so a slow provider cannot exhaust the route's time budget", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ output_text: "stone_silence" }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = mockChatCompletion(JSON.stringify(VALID_NARRATION));
 
     await createPrediction(createInput({ aiApiKey: "test-key" }));
 
@@ -169,39 +327,26 @@ describe("createPrediction", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("ignores free text with a lowercase alternate destination", async () => {
-    mockAiText("сочи зовет сильнее, чем выбранный маршрут");
+  it("sends the model only the three cards with orientations and the destination name and region -- nothing else", async () => {
+    const fetchMock = mockChatCompletion(JSON.stringify(VALID_NARRATION));
 
-    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
+    await createPrediction(createInput({ aiApiKey: "test-key" }));
 
-    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
-    expect(result.opening).not.toContain("сочи");
-  });
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    const userMessage = JSON.parse(requestBody.messages[1].content);
 
-  it("ignores free text with a Latin alternate destination", async () => {
-    mockAiText("Sochi is the better destination");
-
-    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
-
-    expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
-    expect(result.opening).not.toContain("Sochi");
-  });
-
-  it("falls back when AI narration names a different known destination", async () => {
-    mockAiText("Териберка станет вашим следующим местом силы.");
-
-    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
-
-    expect(result.opening).toContain("каменная дорога");
-    expect(result.opening).not.toContain("Териберка");
-  });
-
-  it("falls back when AI narration does not name the selected destination", async () => {
-    mockAiText("Вас ждет впечатляющая каменная дорога.");
-
-    const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
-
-    expect(result.opening).toContain("каменная дорога");
+    expect(userMessage).toEqual({
+      cards: [
+        { id: "tower", name: "Башня", position: "Зов", reversed: false },
+        { id: "chariot", name: "Колесница", position: "Дар", reversed: false },
+        { id: "hermit", name: "Отшельник", position: "Путь", reversed: false },
+      ],
+      destination: { name: "Усьвинские Столбы", region: "Пермский край" },
+    });
+    // No offers, no traveler count, no other atlas entries, no road choice.
+    expect(userMessage).not.toHaveProperty("offers");
+    expect(userMessage).not.toHaveProperty("roadChoice");
+    expect(userMessage).not.toHaveProperty("travelerCount");
   });
 
   it("never puts a raw URL in the summary", async () => {
@@ -298,17 +443,13 @@ describe("createPrediction", () => {
   });
 
   it("appends the road choice's reason to the summary without exposing it to the AI prompt", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ output_text: "stone_silence" }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = mockChatCompletion(JSON.stringify(VALID_NARRATION));
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
     expect(result.summary).toContain("«Отшельник» сажает к окну — дорога будет долгой и созерцательной.");
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
-    const userMessage = JSON.parse(requestBody.input[1].content);
+    const userMessage = JSON.parse(requestBody.messages[1].content);
     expect(userMessage).not.toHaveProperty("roadChoice");
   });
 

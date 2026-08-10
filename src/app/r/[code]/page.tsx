@@ -57,11 +57,7 @@ async function loadSharedResult(code: string): Promise<RitualResultViewModel | n
     spread: { seed: ritualSeed(intent), cards: spreadCards },
     selection: { destination, score: 0, reasons: [] },
     roadChoice,
-    offers: {
-      transport: offers.transport.map((offer) => offer.title),
-      hotels: offers.hotels.map((offer) => offer.title),
-    },
-    aiApiKey: process.env.OPENAI_API_KEY,
+    aiApiKey: process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY,
   });
 
   return {

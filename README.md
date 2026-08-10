@@ -17,9 +17,46 @@ Open `http://localhost:3100`.
 
 Copy `.env.example` to `.env.local` when AI narration is needed.
 
-`OPENAI_API_KEY` is optional. Without it, the app uses template narration.
-
 `TUTU_MCP_URL` defaults to `https://mcp.tutu.ru/mcp`.
+
+## AI narration
+
+AI narration is optional. With no `AI_API_KEY` (or legacy `OPENAI_API_KEY`)
+configured, the app degrades to written-in template copy — the same
+headline, opening and card text every time, deterministic and free.
+
+When a key is configured, the model writes the three card readings (one per
+drawn card, aware of the card's name, its position in the spread and whether
+it fell reversed) and one closing line, in Russian. That is the entire
+surface it controls.
+
+It cannot touch the destination, its region, the road choice (transport
+mode, price, links) or the Tutu source attribution. Those are rendered
+straight from `RitualResult` — deterministic tarot-atlas scoring plus a real
+Tutu MCP search — regardless of what the model returns; there is no code
+path from the model's output to any of those fields.
+
+Free-text output from a model can't be proven safe by pattern-matching
+alone: a lexical check catches known place names, not ones we've never
+curated. `validateNarration` (`src/server/oracle/validate.ts`) rejects known
+`travelAtlas` names other than the chosen one, URLs, non-Cyrillic text and
+out-of-range length — it reduces bad copy, it does not eliminate it. The
+real guarantee is structural: the route itself is never asked of the model
+and is never read from its reply, so nothing a validation gap lets through
+can redirect the trip. Any failure at any stage — no key, network error,
+timeout (8s, so a slow gateway can't eat the route's 30s budget), invalid
+JSON, or a validation rejection — falls back to the template unchanged.
+
+Point this at a different provider or a corporate gateway purely through
+environment variables — no code change required:
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `AI_BASE_URL` | Chat-completions endpoint | `https://api.openai.com/v1/chat/completions` |
+| `AI_API_KEY` | Credential (falls back to `OPENAI_API_KEY`) | — |
+| `AI_MODEL` | Model identifier | `gpt-4.1-mini` |
+| `AI_AUTH_HEADER` | Header carrying the credential | `Authorization` |
+| `AI_AUTH_PREFIX` | Value prefix before the credential | `Bearer ` |
 
 ## Verification
 
@@ -59,4 +96,6 @@ single duotone treatment, and writes the committed WebP files under
 
 ## Deployment
 
-Deploy as a standard Next.js app on Vercel. Configure `OPENAI_API_KEY` only if live AI narration is required for the demo.
+Deploy as a standard Next.js app on Vercel. Configure `AI_API_KEY` (and, if
+pointing at a non-default gateway, `AI_BASE_URL`/`AI_MODEL`/`AI_AUTH_HEADER`/
+`AI_AUTH_PREFIX`) only if live AI narration is required for the demo.

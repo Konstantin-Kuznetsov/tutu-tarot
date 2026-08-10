@@ -2512,3 +2512,78 @@ Expected: all PASS.
 git add src/domain/share src/app/r src/components/ShareButton.tsx src/components/TravelResult.tsx src/app/globals.css tests
 git commit -m "feat: share a reading as a link that carries the whole spread"
 ```
+
+---
+
+### Task 14: Let the oracle actually speak
+
+**Files:**
+- Modify: `src/server/oracle/narrator.ts`
+- Create: `src/server/oracle/aiClient.ts`
+- Create: `src/server/oracle/validate.ts`
+- Modify: `.env.example`, `README.md`
+- Test: `tests/server/ai-narration.test.ts` (create)
+- Modify: `tests/server/narrator.test.ts`
+
+**Interfaces:**
+- Produces: `requestNarration(input, config): Promise<AiNarration | null>` and `validateNarration(raw, context): AiNarration | null`.
+
+Today the model may return exactly one of four keys, each selecting a pre-written sentence. Everything else is app-authored. That boundary was correct while the AI was a candidate source of the route. It no longer is: the destination comes from deterministic scoring over the atlas, and the road comes from what Tutu MCP says exists. So the model can be given real work — writing the three card readings — without becoming able to redirect the trip.
+
+**What the model writes:** the three card readings, in Russian, one per drawn card, each aware of the card's name, its position in the spread and whether it fell reversed. Plus one closing line.
+
+**What stays app data and is never model-controlled:** the headline, the destination and its region, the road choice with its mode, price and links, and the Tutu source attribution. These are rendered from `RitualResult`, not from model output, and no validation failure can change them.
+
+**The honest limit, stated rather than papered over:** it is not possible to prove a free-text model will never name some place we have never heard of. Lexical checks catch known names and miss unknown ones — an earlier attempt to validate arbitrary prose failed review three times for exactly this reason. What is provable is that the *route* cannot move: the model is never asked to choose anything, and every routing fact on screen comes from app data. The validation below reduces bad copy; it does not pretend to eliminate it.
+
+- [ ] **Step 1: Write the failing validation tests**
+
+Create `tests/server/ai-narration.test.ts`. `validateNarration(raw, context)` must return `null` — so the caller falls back to the template — for every one of these, and must accept a well-formed narration:
+
+- output that is not JSON, or is JSON but not an object;
+- a `cardReadings` array whose length is not exactly 3;
+- a reading whose `id` is not one of the three ids that were sent, including a valid deck id that was not drawn;
+- ids that are correct but duplicated;
+- a `text` that is empty, shorter than 20 characters, or longer than 400;
+- a `text` naming any destination from `travelAtlas` other than the chosen one, matched case-insensitively;
+- a `text` containing a URL or an `http` scheme;
+- a `text` that is not predominantly Cyrillic, which catches a model answering in English or emitting markup.
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npm run test -- tests/server/ai-narration.test.ts`
+Expected: FAIL — the module does not exist.
+
+- [ ] **Step 3: Write the validator**
+
+Create `src/server/oracle/validate.ts` implementing exactly the rules above. It must never throw: it takes untrusted text and returns either a narration or `null`.
+
+- [ ] **Step 4: Write the gateway client**
+
+Create `src/server/oracle/aiClient.ts`. It speaks the OpenAI-compatible chat-completions shape by default, because that is what most corporate gateways expose, and takes every varying part from configuration so pointing it at a different provider is an environment change rather than a code change:
+
+```
+AI_BASE_URL     full endpoint URL
+AI_API_KEY      credential
+AI_MODEL        model identifier
+AI_AUTH_HEADER  header name, default "Authorization"
+AI_AUTH_PREFIX  value prefix, default "Bearer "
+```
+
+Keep `OPENAI_API_KEY` working as a fallback for `AI_API_KEY` so nothing already deployed breaks. Keep the existing 8-second `AbortSignal` timeout and the rule that any failure returns `null` and the caller renders the template.
+
+Ask the model for JSON and parse it defensively — a gateway may return the text inside a chat `choices[0].message.content`, or inside a `/v1/responses`-style `output[0].content[0].text`. Handle both; the existing `extractOutputText` already covers the second.
+
+**Do not send the model anything it does not need.** It gets the three cards with orientations, the destination name and region, and nothing else — no other atlas entries, no offer titles, no traveller details. Fewer place names in the prompt means fewer place names in the output.
+
+- [ ] **Step 5: Wire it into the narrator**
+
+`createPrediction` calls the client, runs `validateNarration`, and on success renders the model's `cardReadings` and closing line while keeping the app-authored headline, opening and source-aware summary. On any failure it returns `templatePrediction` exactly as today, so the worst case is never worse than the current output.
+
+- [ ] **Step 6: Document it**
+
+Add the new variables to `.env.example` with a one-line comment each, and a short README section saying the AI is optional, what it writes, what it cannot touch, and that the app degrades to written-in templates without it.
+
+- [ ] **Step 7: Verify**
+
+Run `npm run test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm run test:e2e`. All must pass. With no AI configured the output must be byte-identical to today's template prediction — prove that with a test.
