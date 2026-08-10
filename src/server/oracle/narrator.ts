@@ -1,22 +1,23 @@
 import type { DestinationSelection, DrawnTarotCard, TravelAtlasItem, TripIntent } from "@/domain/types";
 import type { RoadChoice } from "@/server/ritual/runRitual";
-
-export interface OfferHighlights {
-  transport: string[];
-  hotels: string[];
-}
+import { DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL, requestNarration, type AiClientConfig } from "@/server/oracle/aiClient";
 
 export interface CardSpread {
   seed: string;
   cards: DrawnTarotCard[];
 }
 
+// Offer titles/prices used to be sent to the AI prompt in the old flavor-key
+// design; they no longer are (see requestNarration's NarrationRequestInput
+// in aiClient.ts -- cards and destination name/region only), so
+// PredictionInput carries nothing offer-shaped anymore. Nothing constructs
+// or reads it, which is exactly the point: fewer things in scope here are
+// fewer things that could leak into a prompt later by accident.
 export interface PredictionInput {
   intent: TripIntent;
   spread: CardSpread;
   selection: DestinationSelection;
   roadChoice: RoadChoice;
-  offers: OfferHighlights;
   aiApiKey?: string;
 }
 
@@ -29,6 +30,11 @@ export interface PredictionText {
     text: string;
   }>;
   summary: string;
+  // Only ever present when the AI actually wrote one and it passed
+  // validateNarration -- the template path never sets it, which is exactly
+  // what keeps the no-AI output identical to before this field existed
+  // (see createPrediction's "byte-identical" test in narrator.test.ts).
+  closingLine?: string;
 }
 
 // Source-sensitive, but deliberately carries no URL: raw links belong to the
@@ -76,19 +82,6 @@ function summaryFor(input: PredictionInput): string {
   return [baseSummary, input.roadChoice.reason].filter(Boolean).join(" ");
 }
 
-type FlavorKey = "stone_silence" | "north_light" | "warm_road" | "old_city";
-
-const flavorCopy: Record<FlavorKey, string> = {
-  stone_silence: "Камень и тишина собирают маршрут в один ясный знак.",
-  north_light: "Северный свет оставляет в дороге ощущение простора.",
-  warm_road: "Теплая дорога раскрывается постепенно, шаг за шагом.",
-  old_city: "Старый ритм города помогает услышать историю места.",
-};
-
-function flavorFor(text: string): string | undefined {
-  return Object.prototype.hasOwnProperty.call(flavorCopy, text) ? flavorCopy[text as FlavorKey] : undefined;
-}
-
 function appOpening(input: PredictionInput): string {
   const { destination } = input.selection;
   return `Карты раскрывают путь из города ${input.intent.departureCity}: ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
@@ -108,97 +101,71 @@ function templatePrediction(input: PredictionInput): PredictionText {
   };
 }
 
-// The MCP search this route runs first already spends up to 18s (see
-// SEARCH_BUDGET_MS in mcpClient.ts) inside a 30s route ceiling (see
-// maxDuration on /api/ritual and /r/[code]/page.tsx). This fetch previously
-// had no timeout of its own, so a slow provider could eat all the remaining
-// headroom and take the whole request down with it. 8s leaves comfortable
-// room for narration/response overhead after a worst-case MCP search; any
-// failure here -- timeout included -- falls back to the template below, so
-// a slow or unreachable provider degrades the copy, never the request.
-const AI_TIMEOUT_MS = 8_000;
-
-// A raw `POST /v1/responses` body nests its text at
-// output[0].content[0].text -- `output_text` is a convenience field the
-// OpenAI SDK computes client-side after parsing the response, not a field
-// this hand-rolled fetch ever receives on the wire. Reading only
-// `output_text` meant every AI call silently produced `undefined` and fell
-// back to the template regardless of what the model returned. Read the real
-// wire shape; keep `output_text` as a defensive fallback in case some
-// provider or future SDK path does supply it directly.
-function extractOutputText(data: unknown): string | undefined {
-  if (!data || typeof data !== "object") return undefined;
-
-  const record = data as { output_text?: unknown; output?: unknown };
-  if (typeof record.output_text === "string") return record.output_text;
-
-  if (!Array.isArray(record.output)) return undefined;
-  for (const item of record.output) {
-    if (!item || typeof item !== "object") continue;
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-
-    for (const block of content) {
-      if (block && typeof block === "object" && typeof (block as { text?: unknown }).text === "string") {
-        return (block as { text: string }).text;
-      }
-    }
-  }
-  return undefined;
+// The credential itself is resolved by the caller (runRitual.ts and the
+// shared-reading page both try AI_API_KEY before falling back to
+// OPENAI_API_KEY, so nothing already deployed on the old variable name
+// breaks) and arrives here as input.aiApiKey -- see createPrediction below.
+// This only resolves the rest of the gateway shape from the environment,
+// fresh on every call (not module-load, so tests can stub process.env per
+// case): host, model, auth header name and value prefix. Every one of those
+// defaults to the OpenAI-compatible chat-completions shape most corporate
+// gateways expose, and every one is overridden purely through environment
+// variables, so pointing this at a different gateway is a config change,
+// never a code change.
+function resolveAiClientConfig(apiKey: string): AiClientConfig {
+  return {
+    baseUrl: process.env.AI_BASE_URL || DEFAULT_AI_BASE_URL,
+    apiKey,
+    model: process.env.AI_MODEL || DEFAULT_AI_MODEL,
+    authHeader: process.env.AI_AUTH_HEADER || "Authorization",
+    authPrefix: process.env.AI_AUTH_PREFIX ?? "Bearer ",
+  };
 }
 
+// The model writes free text for exactly two things: one reading per drawn
+// card and a closing line (see AiNarration in validate.ts). Everything else
+// on screen -- headline, opening, destination, region, road, price, links,
+// source attribution -- is app data from RitualResult and is built the same
+// way whether or not the AI call succeeds; nothing the model returns can
+// reach those fields.
 export async function createPrediction(input: PredictionInput): Promise<PredictionText> {
   if (!input.aiApiKey) {
     return templatePrediction(input);
   }
 
-  try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${input.aiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-        input: [
-          {
-            role: "system",
-            content: "Return exactly one flavor key from this allowlist and nothing else: stone_silence, north_light, warm_road, old_city. Do not return prose, destinations, URLs, or claims of supernatural certainty.",
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              intent: input.intent,
-              cards: input.spread.cards,
-              destination: input.selection.destination,
-              offers: input.offers,
-            }),
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) return templatePrediction(input);
-    const data = (await response.json()) as unknown;
-    // Only a validated flavor key from the app-owned allowlist (flavorCopy)
-    // ever leaves this function -- the model's own text, real-shaped or
-    // not, is never passed to a render path. See flavorFor.
-    const flavor = flavorFor(extractOutputText(data)?.trim() ?? "");
-    if (!flavor) return templatePrediction(input);
-
-    return {
-      headline: `Карты указывают: ${input.selection.destination.name}`,
-      opening: `${appOpening(input)} ${flavor}`,
-      cardReadings: input.spread.cards.map((card) => ({
+  const config = resolveAiClientConfig(input.aiApiKey);
+  const narration = await requestNarration(
+    {
+      cards: input.spread.cards.map((card) => ({
+        id: card.id,
+        name: card.name,
         position: card.position,
-        cardName: card.name,
-        text: `${card.name}: ${card.meaning}`,
+        reversed: card.reversed,
       })),
-      summary: summaryFor(input),
-    };
-  } catch {
-    return templatePrediction(input);
-  }
+      destinationName: input.selection.destination.name,
+      destinationRegion: input.selection.destination.region,
+    },
+    config,
+  );
+
+  if (!narration) return templatePrediction(input);
+
+  // Re-key the model's readings by the card id it referenced them with --
+  // validateNarration already guarantees exactly the three sent ids appear
+  // once each, so this lookup cannot miss. Position and card name still
+  // come from input.spread.cards (app data), never from the model, exactly
+  // like templatePrediction above.
+  const textById = new Map(narration.cardReadings.map((reading) => [reading.id, reading.text]));
+
+  return {
+    headline: `Карты указывают: ${input.selection.destination.name}`,
+    opening: appOpening(input),
+    cardReadings: input.spread.cards.map((card) => ({
+      position: card.position,
+      cardName: card.name,
+      text: textById.get(card.id) ?? card.meaning,
+    })),
+    summary: summaryFor(input),
+    closingLine: narration.closingLine,
+  };
 }

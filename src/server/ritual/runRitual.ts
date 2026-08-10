@@ -159,11 +159,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     spread: { seed: draw.seed, cards: spreadCards },
     selection,
     roadChoice,
-    offers: {
-      transport: offers.transport.map((offer) => offer.title),
-      hotels: offers.hotels.map((offer) => offer.title),
-    },
-    aiApiKey: deps.aiApiKey ?? process.env.OPENAI_API_KEY,
+    aiApiKey: deps.aiApiKey ?? process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY,
   });
 
   return {
