@@ -1,4 +1,10 @@
-import type { DestinationSelection, DrawnTarotCard, TravelAtlasItem, TripIntent } from "@/domain/types";
+import type {
+  DestinationSelection,
+  DrawnTarotCard,
+  TarotPosition,
+  TravelAtlasItem,
+  TripIntent,
+} from "@/domain/types";
 import type { RoadChoice } from "@/server/ritual/runRitual";
 import { DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL, requestNarration, type AiClientConfig } from "@/server/oracle/aiClient";
 
@@ -92,6 +98,53 @@ function appOpening(input: PredictionInput): string {
   return `Карты раскрывают путь из города ${input.intent.departureCity}: ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
 }
 
+// TarotCardView rotates a reversed card's artwork 180° and swaps its own
+// caption to meaningReversed (see TarotCardView.tsx's `card.reversed ?
+// card.meaningReversed : card.meaning`) -- but that caption line is omitted
+// whenever a reading is supplied (readingText replaces it, never both at
+// once), so the reading text below is the *only* meaning a reversed card
+// shows on screen. Reading card.meaning there made the page contradict
+// itself: the flag says "перевёрнутая" while the prose reads the upright
+// fortune. A reversed card is resistance, not a neutral variant -- the
+// sentence says so ("сопротивляется") instead of silently swapping strings.
+//
+// "в перевёрнутом положении" (an established Russian tarot phrase for
+// "in a reversed position") is a fixed prepositional phrase that doesn't
+// agree with card.name's gender or number, so it stays correct across
+// every card without a declension table.
+function cardMeaningSentence(card: DrawnTarotCard): string {
+  if (card.reversed) {
+    return `${card.name} в позиции «${card.position}» выпадает в перевёрнутом положении и сопротивляется: ${card.meaningReversed}.`;
+  }
+  return `${card.name} в позиции «${card.position}» говорит: ${card.meaning}.`;
+}
+
+// One clause per position instead of one clause reused three times: the old
+// "Поэтому ${anchorPlace} становится главным знаком расклада" repeated
+// verbatim under all three cards, which read as a template stutter rather
+// than three readings. Only the "Путь" clause names anchorPlace -- the
+// destination is already in the headline and appOpening, so restating it
+// under every card added nothing but repetition.
+//
+// anchorPlace is named after an em dash with no verb governing it, on
+// purpose. atlas.ts stores it as either a single place ("Суздаль",
+// "Тюмень") or a list ("Магас, Эгикал и Вовнушки", "Иркутск и Ольхон"), so
+// any verb here ("становится"/"становятся") would have to agree in number
+// with a shape that varies per destination -- exactly the trap that
+// produced "Магас, Эгикал и Вовнушки становится". A verbless appositive
+// after "—" is grammatically correct for both a single place and a list,
+// for every entry in atlas.ts, without inspecting the string's shape.
+function connectiveFor(position: TarotPosition, destination: TravelAtlasItem): string {
+  switch (position) {
+    case "Зов":
+      return "Зов задаёт вопрос, с которого начинается расклад.";
+    case "Дар":
+      return "Дар отвечает на зов и добавляет к нему свой смысл.";
+    case "Путь":
+      return `Путь ведёт дальше и приводит расклад к цели — ${destination.anchorPlace}.`;
+  }
+}
+
 function templatePrediction(input: PredictionInput): PredictionText {
   const { destination } = input.selection;
   return {
@@ -101,7 +154,7 @@ function templatePrediction(input: PredictionInput): PredictionText {
       id: card.id,
       position: card.position,
       cardName: card.name,
-      text: `${card.name} в позиции «${card.position}» говорит: ${card.meaning}. Поэтому ${destination.anchorPlace} становится главным знаком расклада.`,
+      text: `${cardMeaningSentence(card)} ${connectiveFor(card.position, destination)}`,
     })),
     summary: summaryFor(input),
   };

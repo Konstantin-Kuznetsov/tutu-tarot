@@ -153,19 +153,19 @@ describe("createPrediction", () => {
           id: "tower",
           position: "Зов",
           cardName: "Башня",
-          text: "Башня в позиции «Зов» говорит: камень и высота. Поэтому Усьвинские Столбы становится главным знаком расклада.",
+          text: "Башня в позиции «Зов» говорит: камень и высота. Зов задаёт вопрос, с которого начинается расклад.",
         },
         {
           id: "chariot",
           position: "Дар",
           cardName: "Колесница",
-          text: "Колесница в позиции «Дар» говорит: дорога. Поэтому Усьвинские Столбы становится главным знаком расклада.",
+          text: "Колесница в позиции «Дар» говорит: дорога. Дар отвечает на зов и добавляет к нему свой смысл.",
         },
         {
           id: "hermit",
           position: "Путь",
           cardName: "Отшельник",
-          text: "Отшельник в позиции «Путь» говорит: тишина. Поэтому Усьвинские Столбы становится главным знаком расклада.",
+          text: "Отшельник в позиции «Путь» говорит: тишина. Путь ведёт дальше и приводит расклад к цели — Усьвинские Столбы.",
         },
       ],
       summary:
@@ -174,6 +174,74 @@ describe("createPrediction", () => {
     // No closingLine key at all on the template path -- not even undefined
     // -- which is what keeps this object identical to the pre-AI shape.
     expect(Object.hasOwn(result, "closingLine")).toBe(false);
+  });
+
+  // TarotCardView rotates a reversed card's art and swaps its own caption
+  // to meaningReversed, but omits that caption whenever a reading is
+  // supplied -- so the template reading is the only meaning a reversed
+  // card shows on screen. Reading card.meaning there (the upright text)
+  // made the page contradict itself against the "перевёрнутая" flag right
+  // next to it.
+  it("uses the reversed meaning, not the upright one, when a card falls reversed, and reads as resistance", async () => {
+    const baseInput = createInput();
+    const result = await createPrediction({
+      ...baseInput,
+      spread: {
+        ...baseInput.spread,
+        cards: baseInput.spread.cards.map((card) =>
+          card.id === "hermit" ? { ...card, reversed: true } : card,
+        ),
+      },
+    });
+
+    const hermitReading = result.cardReadings.find((reading) => reading.id === "hermit");
+    expect(hermitReading?.text).toContain("одиночество тяготит, нужен попутчик");
+    expect(hermitReading?.text).not.toContain("дорога к тишине и высокому месту");
+    // A reversed card is resistance, not a neutral variant -- the sentence
+    // must say so, not just silently swap which string it quotes.
+    expect(hermitReading?.text).toMatch(/сопротивля/);
+  });
+
+  // Regression: the old template appended the exact same trailing sentence
+  // ("Поэтому X становится главным знаком расклада") under all three
+  // cards, so the three readings read as one template stuttering three
+  // times instead of three distinct readings.
+  it("does not end all three readings on the same trailing sentence", async () => {
+    const result = await createPrediction(createInput());
+
+    // Each reading is "<card meaning sentence>. <trailing clause>" and
+    // neither card.meaning nor card.meaningReversed contains a period in
+    // this fixture, so the first ". " boundary reliably separates the two.
+    const trailingClauses = result.cardReadings.map((reading) => {
+      const boundary = reading.text.indexOf(". ");
+      return reading.text.slice(boundary + 2);
+    });
+
+    expect(new Set(trailingClauses).size).toBe(3);
+  });
+
+  // Regression: destination.anchorPlace used to be repeated under all
+  // three cards. The headline and opening already name the destination,
+  // so the readings should mention anchorPlace at most once between them
+  // -- and this destination's anchorPlace is a list ("Магас, Эгикал и
+  // Вовнушки", the exact shape that broke "становится"/"становятся"
+  // agreement, see atlas.ts's ingushetia-towers entry).
+  it("names the destination's anchorPlace at most once across the three readings", async () => {
+    const baseInput = createInput();
+    const anchorPlace = "Магас, Эгикал и Вовнушки";
+    const result = await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: { ...baseInput.selection.destination, anchorPlace },
+      },
+    });
+
+    const mentions = result.cardReadings.filter((reading) => reading.text.includes(anchorPlace)).length;
+    expect(mentions).toBeLessThanOrEqual(1);
+    // Regression guard for the exact broken construction: a verb agreeing
+    // (wrongly, for a list) with anchorPlace as its subject.
+    expect(result.cardReadings.every((reading) => !/становится|становятся/.test(reading.text))).toBe(true);
   });
 
   it("renders the AI's card readings and closing line while keeping the app-authored headline, opening and summary", async () => {
