@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCalendarDate } from "@/domain/validation/dates";
 import { tarotCards } from "@/domain/tarot/cards";
 import { travelAtlas } from "@/domain/travel/atlas";
 import type { TransportMode } from "@/domain/types";
@@ -130,9 +131,21 @@ export function decodeReading(code: string): SharedReading | null {
 
     const reading = fromPayload(result.data);
 
+    // Validate calendar dates
+    if (!isCalendarDate(reading.dateFrom) || !isCalendarDate(reading.dateTo)) return null;
+
+    // Validate date range: dateTo must not be before dateFrom
+    if (reading.dateTo < reading.dateFrom) return null;
+
+    // Validate card ids are in the deck
     const deckIds = new Set(tarotCards.map((card) => card.id));
     if (!reading.cards.every((card) => deckIds.has(card.id))) return null;
 
+    // Validate card ids are distinct (no duplicates)
+    const cardIds = new Set(reading.cards.map((card) => card.id));
+    if (cardIds.size !== 3) return null;
+
+    // Validate destination is in the atlas
     const atlasIds = new Set(travelAtlas.map((place) => place.id));
     if (!atlasIds.has(reading.destinationId)) return null;
 

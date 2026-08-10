@@ -41,4 +41,55 @@ describe("share code", () => {
     const wrongPlace = encodeReading({ ...reading, destinationId: "atlantis" });
     expect(decodeReading(wrongPlace)).toBeNull();
   });
+
+  it("rejects invalid calendar dates", () => {
+    // February 30 does not exist
+    const invalidDay = encodeReading({ ...reading, dateFrom: "2026-02-30" });
+    expect(decodeReading(invalidDay)).toBeNull();
+    // Month 13 does not exist
+    const invalidMonth = encodeReading({ ...reading, dateFrom: "2026-13-01" });
+    expect(decodeReading(invalidMonth)).toBeNull();
+  });
+
+  it("rejects a reversed date range", () => {
+    const reversed = encodeReading({ ...reading, dateFrom: "2026-09-17", dateTo: "2026-09-10" });
+    expect(decodeReading(reversed)).toBeNull();
+  });
+
+  it("accepts an equal date range", () => {
+    const equal = encodeReading({ ...reading, dateFrom: "2026-09-10", dateTo: "2026-09-10" });
+    expect(decodeReading(equal)).toEqual({ ...reading, dateFrom: "2026-09-10", dateTo: "2026-09-10" });
+  });
+
+  it("rejects duplicate card ids", () => {
+    const duplicateFirst = encodeReading({
+      ...reading,
+      cards: [
+        { id: "tower", reversed: false },
+        { id: "tower", reversed: true },
+        { id: "chariot", reversed: false },
+      ],
+    });
+    expect(decodeReading(duplicateFirst)).toBeNull();
+
+    const duplicateSecond = encodeReading({
+      ...reading,
+      cards: [
+        { id: "tower", reversed: false },
+        { id: "hermit", reversed: true },
+        { id: "hermit", reversed: false },
+      ],
+    });
+    expect(decodeReading(duplicateSecond)).toBeNull();
+
+    const allSame = encodeReading({
+      ...reading,
+      cards: [
+        { id: "tower", reversed: false },
+        { id: "tower", reversed: true },
+        { id: "tower", reversed: false },
+      ],
+    });
+    expect(decodeReading(allSame)).toBeNull();
+  });
 });
