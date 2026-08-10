@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import type {
   DestinationSelection,
   DrawnTarotCard,
@@ -6,7 +7,13 @@ import type {
   TripIntent,
 } from "@/domain/types";
 import type { RoadChoice } from "@/server/ritual/runRitual";
-import { DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL, requestNarration, type AiClientConfig } from "@/server/oracle/aiClient";
+import {
+  DEFAULT_AI_BASE_URL,
+  DEFAULT_AI_MODEL,
+  requestNarration,
+  type AiClientConfig,
+  type NarrationRequestInput,
+} from "@/server/oracle/aiClient";
 
 export interface CardSpread {
   seed: string;
@@ -181,31 +188,94 @@ function resolveAiClientConfig(apiKey: string): AiClientConfig {
   };
 }
 
+// A reading is immutable: the same three cards, in the same Зов/Дар/Путь
+// order, with the same orientations, pointing at the same destination will
+// always get the same narration request (see buildUserPayload in
+// aiClient.ts -- cards + destination name/region is the model's entire
+// input, nothing trip-specific ever reaches it). A shared link
+// (src/app/r/[code]/page.tsx) decodes exactly this identity back out of the
+// code on every open and re-requests narration for it, which is what turns
+// a viral link into one paid model call per view. Keying purely on this
+// identity -- never on trip dates, traveler count, road choice or the API
+// key itself -- is what lets every open of the same link, and every fresh
+// draw that happens to land on the same three cards and destination, share
+// one cached narration.
+interface NarrationIdentity {
+  cards: Array<{ id: string; reversed: boolean }>;
+  destinationId: string;
+}
+
+function narrationCacheKeyParts(identity: NarrationIdentity): string[] {
+  return [
+    "oracle-narration",
+    ...identity.cards.flatMap((card) => [card.id, String(card.reversed)]),
+    identity.destinationId,
+  ];
+}
+
 // The model writes free text for exactly two things: one reading per drawn
 // card and a closing line (see AiNarration in validate.ts). Everything else
 // on screen -- headline, opening, destination, region, road, price, links,
 // source attribution -- is app data from RitualResult and is built the same
 // way whether or not the AI call succeeds; nothing the model returns can
-// reach those fields.
+// reach those fields. Only the AI call itself (requestNarration) is cached
+// below -- headline/opening/summary are still computed fresh on every call
+// from live input (departure city, road choice from the just-run price
+// search), exactly as before caching existed.
 export async function createPrediction(input: PredictionInput): Promise<PredictionText> {
   if (!input.aiApiKey) {
     return templatePrediction(input);
   }
 
   const config = resolveAiClientConfig(input.aiApiKey);
-  const narration = await requestNarration(
-    {
-      cards: input.spread.cards.map((card) => ({
-        id: card.id,
-        name: card.name,
-        position: card.position,
-        reversed: card.reversed,
-      })),
-      destinationName: input.selection.destination.name,
-      destinationRegion: input.selection.destination.region,
+  const narrationRequest: NarrationRequestInput = {
+    cards: input.spread.cards.map((card) => ({
+      id: card.id,
+      name: card.name,
+      position: card.position,
+      reversed: card.reversed,
+    })),
+    destinationName: input.selection.destination.name,
+    destinationRegion: input.selection.destination.region,
+  };
+
+  // unstable_cache is called fresh on every createPrediction invocation
+  // (not hoisted to module scope) so the closure below always captures this
+  // call's narrationRequest/config -- cheap to construct, and it keeps the
+  // credential and gateway config out of the cache key entirely (they are
+  // only ever read from the closure on a cache miss, never passed as an
+  // argument to the cached function, so they cannot become part of the
+  // key). The cache key comes solely from narrationCacheKeyParts, and
+  // revalidate: false caches indefinitely -- there is no staleness to
+  // recover from, since the same identity can never legitimately produce a
+  // different reading.
+  //
+  // requestNarration itself never throws -- it resolves to null on every
+  // failure (no key, network error, timeout, bad JSON, failed validation),
+  // by design, so callers can fall back to the template unconditionally.
+  // Caching that null verbatim would defeat the fallback's own purpose: a
+  // single transient failure (a network blip on the first person to open a
+  // link) would freeze that reading's cache entry on "no narration"
+  // indefinitely, stranding every later viewer on the template even after
+  // the gateway recovers. Throwing on null instead means unstable_cache
+  // never persists a failed attempt (a rejected callback skips its
+  // cacheNewResult write), so only an actual narration is ever cached --
+  // failures simply retry the API on the next call, same as before caching
+  // existed.
+  const fetchNarration = unstable_cache(
+    async () => {
+      const narration = await requestNarration(narrationRequest, config);
+      if (!narration) throw new Error("no narration to cache");
+      return narration;
     },
-    config,
+    narrationCacheKeyParts({
+      cards: input.spread.cards.map((card) => ({ id: card.id, reversed: card.reversed })),
+      destinationId: input.selection.destination.id,
+    }),
+    { revalidate: false },
   );
+
+  const narration = await fetchNarration().catch(() => null);
 
   if (!narration) return templatePrediction(input);
 

@@ -37,17 +37,42 @@ export interface AiClientConfig {
 // unreachable gateway degrades the copy -- never the request.
 const AI_TIMEOUT_MS = 8_000;
 
+// Caps completion length so a misbehaving model can't bill for thousands of
+// tokens on a single reading. The validator (validate.ts) already bounds
+// every text field -- three card readings plus a closing line -- at 400
+// characters each, so the JSON reply never legitimately needs more than
+// ~1,600 characters of prose plus its own object/array/key punctuation (ids,
+// braces, quotes): call it ~1,800 characters worst case. Cyrillic tokenizes
+// less efficiently than English (roughly 1.5-2 characters per token instead
+// of ~4), so that reply can cost up to ~1,200 tokens even when every field
+// is fully used. 1,500 leaves headroom for that worst case without leaving
+// the ceiling anywhere near "thousands of tokens" for a runaway response.
+const MAX_COMPLETION_TOKENS = 1_500;
+
 // Most corporate AI gateways expose an OpenAI-compatible chat-completions
 // endpoint, so that shape is the default. api.openai.com itself is only
 // ever reached if no AI_BASE_URL is configured.
 export const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1/chat/completions";
 export const DEFAULT_AI_MODEL = "gpt-4.1-mini";
 
+// The rest of the page (share-note, buttons, dates) is written in formal
+// "вы" -- the standard register for a Russian product addressing a stranger
+// -- so the model's own prose is told to match it explicitly, word by word,
+// rather than trusting a vague "be formal" to survive translation into
+// generation. Plain "be formal" left the model defaulting to "ты" in
+// production regardless (see the fix commit this line belongs to for real
+// examples), which is why the instruction below spells out both pronoun
+// sets. An impersonal, address-free voice was the other option considered
+// -- it would also stop the clash -- but an oracle addressing the person
+// whose reading this is reads warmer and more direct than a voice that
+// never says "you" at all, so "вы" was kept as the app's one address form
+// and simply requested from the model too.
 const SYSTEM_PROMPT = [
   "Ты — таролог-рассказчик мистического приложения, которое подбирает путешествие по России с помощью карт Таро.",
   "Тебе присылают три уже вытянутые карты (с позицией в раскладе и тем, выпала ли карта перевёрнутой) и уже выбранное направление (название и регион).",
   "Направление уже выбрано приложением по другим правилам — ты не выбираешь и не меняешь его, только пишешь о картах и о том, как они ведут к этому направлению.",
   "Не называй никакое другое направление, город или место, кроме единственного, что дано в запросе.",
+  "Если в тексте карты обращаются к человеку, для которого сделан расклад, обращайся только на «вы» — вежливая форма (вы, вам, вас, ваш, откройтесь), а не на «ты» (тебе, тебя, твой, откройся): это единственное обращение, которое использует остальной текст приложения.",
   "Верни строго один JSON-объект без markdown, без пояснений и без кодовых блоков, ровно такой формы:",
   '{"cardReadings":[{"id":"<id карты>","text":"..."},{"id":"<id карты>","text":"..."},{"id":"<id карты>","text":"..."}],"closingLine":"..."}',
   "В cardReadings должно быть ровно три записи — по одной на каждую присланную карту, id каждой записи должен в точности совпадать с id карты из запроса.",
@@ -109,6 +134,39 @@ function extractMessageText(data: unknown): string | undefined {
   return undefined;
 }
 
+// OpenAI-compatible gateways report token counts on `data.usage`
+// (`prompt_tokens`/`completion_tokens`/`total_tokens`). Read defensively,
+// like extractMessageText above -- a gateway that omits or reshapes usage
+// should degrade to an incomplete log line, never throw.
+function extractUsage(data: unknown): { prompt?: number; completion?: number; total?: number } | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const usage = (data as { usage?: unknown }).usage;
+  if (!usage || typeof usage !== "object") return undefined;
+
+  const record = usage as { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
+  return {
+    prompt: typeof record.prompt_tokens === "number" ? record.prompt_tokens : undefined,
+    completion: typeof record.completion_tokens === "number" ? record.completion_tokens : undefined,
+    total: typeof record.total_tokens === "number" ? record.total_tokens : undefined,
+  };
+}
+
+// The only server-side record of what a reading actually cost: token counts
+// and the model that produced them, one concise line per successful gateway
+// call (a call that returned an HTTP-ok response with a body -- billed
+// regardless of whether validateNarration later accepts or rejects the
+// content, since the gateway is paid for tokens generated, not for text
+// that passes validation). Deliberately carries nothing else -- no prompt,
+// no model output, no card or destination data -- so this line is safe to
+// leave in production logs.
+function logUsage(data: unknown, model: string): void {
+  const usage = extractUsage(data);
+  if (!usage) return;
+  console.log(
+    `[oracle] narration usage model=${model} prompt_tokens=${usage.prompt ?? "?"} completion_tokens=${usage.completion ?? "?"} total_tokens=${usage.total ?? "?"}`,
+  );
+}
+
 // Some models wrap otherwise-valid JSON in a ```json ... ``` fence despite
 // being told not to. Stripping a leading/trailing fence is extraction, not
 // a validation rule -- validateNarration below still applies every content
@@ -139,12 +197,15 @@ export async function requestNarration(input: NarrationRequestInput, config: AiC
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: JSON.stringify(buildUserPayload(input)) },
         ],
+        max_tokens: MAX_COMPLETION_TOKENS,
       }),
     });
 
     if (!response.ok) return null;
 
     const data = (await response.json()) as unknown;
+    logUsage(data, config.model);
+
     const text = extractMessageText(data);
     if (!text) return null;
 
