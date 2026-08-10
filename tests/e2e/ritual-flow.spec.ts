@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { pickFutureDateRange } from "./helpers";
+import { encodeReading, type SharedReading } from "@/domain/share/code";
 
 // Runs under both the "desktop" and "mobile" Playwright projects configured
 // in playwright.config.ts, so this single test covers both viewport sizes.
@@ -380,4 +381,73 @@ test("a shared reading link reproduces the same cards, orientations and destinat
   expect(hasNoHorizontalOverflow).toBe(true);
 
   await freshPage.close();
+});
+
+// Task 13, fix round 2: closes the hole that let the /r/[code] SSR crash
+// ship. Every existing check of that route (including the test right above
+// this one) reaches it through `page.goto()`/a real browser and then reads
+// the DOM with `getByText`/locators -- which is exactly what let the bug
+// through. React hydrates on the client from the RSC payload regardless of
+// whether the *server* render failed, so even while ShareButton's `window is
+// not defined` crash was making the server return HTTP 500 for every shared
+// reading, a browser-driven test that only checked for visible text still
+// passed: the client-side render papered right over the broken response.
+// (Confirmed directly against this repo's dev server while writing this
+// test -- `curl` on a real share code returned status 500 with that exact
+// ReferenceError, while a Playwright browser test against the same URL and
+// code still went green.)
+//
+// So this test checks the one thing a hydration-masked assertion cannot
+// fake: the actual HTTP status of the top-level navigation response,
+// captured from `page.goto()` itself, before any client-side JS has run.
+// `page.goto()` does not throw on a non-2xx response -- it resolves
+// normally with the real status -- so this fails with a clear "500 !== 200"
+// rather than a locator timeout if the SSR crash ever comes back. The card
+// assertions after it are the same shape as the test above, kept here so a
+// regression that leaves the status code fine but breaks what actually
+// renders still has coverage.
+//
+// The code below is minted directly with the real codec (not clicked
+// through the UI), because this test's whole point is the server's
+// handling of a fresh, cold request to /r/[code] -- nothing about how the
+// link was produced matters here. `mode` is null on purpose, not "railway"
+// like the test above's: roadChoice.mode on the shared page is read
+// straight off the decoded reading (see loadSharedResult in
+// src/app/r/[code]/page.tsx), so this is the documented fog reading
+// (mcp.tutu.ru is unreachable in this environment -- see the Task 13
+// brief) -- proof that a fog reading stays shareable and server-renders
+// cleanly, not just a mode-carrying one.
+test("a fresh server-side navigation to /r/[code] responds 200 and renders the shared cards", async ({ page }) => {
+  const reading: SharedReading = {
+    cards: [
+      { id: "star", reversed: false },
+      { id: "moon", reversed: true },
+      { id: "hermit", reversed: false },
+    ],
+    // A real atlas id -- resolveSharedReading rejects anything else, same
+    // as the test above.
+    destinationId: "altai-chuysky",
+    mode: null,
+    departureCity: "Москва",
+    dateFrom: "2026-09-10",
+    dateTo: "2026-09-17",
+    travelerCount: 2,
+  };
+  const code = encodeReading(reading);
+
+  // A brand-new page navigating straight to the URL: always a real top-level
+  // HTTP request for the document, never a Next.js client-side transition
+  // (there is nothing loaded yet to transition from) -- exactly the request
+  // a stranger's freshly tapped share link makes.
+  const response = await page.goto(`/r/${code}`);
+  expect(response?.status()).toBe(200);
+
+  const spread = page.getByTestId("spread-card");
+  await expect(spread).toHaveCount(3);
+  await expect(spread.nth(0)).toHaveAttribute("data-card-id", "star");
+  await expect(spread.nth(0)).toHaveAttribute("data-reversed", "false");
+  await expect(spread.nth(1)).toHaveAttribute("data-card-id", "moon");
+  await expect(spread.nth(1)).toHaveAttribute("data-reversed", "true");
+  await expect(spread.nth(2)).toHaveAttribute("data-card-id", "hermit");
+  await expect(spread.nth(2)).toHaveAttribute("data-reversed", "false");
 });

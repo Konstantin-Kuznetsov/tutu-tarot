@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { encodeReading, type SharedReading } from "@/domain/share/code";
 
 type Status = "idle" | "copied" | "error";
@@ -12,8 +12,16 @@ interface ShareButtonProps {
   destinationName: string;
 }
 
-function shareUrlFor(reading: SharedReading): string {
-  return `${window.location.origin}/r/${encodeReading(reading)}`;
+// Takes `origin` as a parameter rather than reading `window.location.origin`
+// itself: this function is called both from the click handler (always
+// browser-only, `window` is safe there) and from the Telegram anchor's href,
+// which needs a value at render time -- including the server render of
+// /r/[code] (see the Task 13 fix-round-2 report), where `window` does not
+// exist at all. Keeping this function itself window-free means neither
+// caller has to guard it; each caller supplies an origin it already knows is
+// safe to read.
+function shareUrlFor(origin: string, reading: SharedReading): string {
+  return `${origin}/r/${encodeReading(reading)}`;
 }
 
 function buildShareMessage(destinationName: string): string {
@@ -35,11 +43,31 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   // than point at "the page address", which would be actively wrong there.
   const [url, setUrl] = useState<string | null>(null);
 
-  const shareUrl = shareUrlFor(reading);
+  // This component is rendered inside /r/[code], a server-rendered route,
+  // where `window` does not exist -- so the origin can't be read in the
+  // component body (that crashed the server render before this fix; see the
+  // Task 13 fix-round-2 report). It's resolved after mount instead, in an
+  // effect, and starts null so the server render and the client's first
+  // render agree (no Telegram anchor yet) -- no hydration mismatch, and no
+  // placeholder link built from the wrong origin.
+  const [origin, setOrigin] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
   const shareMessage = buildShareMessage(destinationName);
-  const telegramUrl = buildTelegramUrl(shareUrl, shareMessage);
+  const telegramUrl = origin ? buildTelegramUrl(shareUrlFor(origin, reading), shareMessage) : null;
 
   function handleClick() {
+    // Reads window.location.origin directly here rather than reusing the
+    // `origin` state above: a click can only ever happen in the browser, so
+    // `window` is always safe inside this handler -- exactly as it was
+    // before the Telegram control moved shareUrlFor into the component body
+    // (commit 05f7617). Not depending on the mount effect's state means
+    // "Поделиться раскладом" keeps working on the very first click, even if
+    // that click somehow lands before the effect has run.
+    const shareUrl = shareUrlFor(window.location.origin, reading);
     setUrl(shareUrl);
 
     if (typeof navigator.share === "function") {
@@ -93,9 +121,11 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
       <button type="button" className="btn" onClick={handleClick}>
         Поделиться раскладом
       </button>
-      <a href={telegramUrl} target="_blank" rel="noreferrer noopener" className="btn btn--secondary">
-        Telegram
-      </a>
+      {telegramUrl ? (
+        <a href={telegramUrl} target="_blank" rel="noreferrer noopener" className="btn btn--secondary">
+          Telegram
+        </a>
+      ) : null}
       {status === "copied" ? (
         <p className="share-row__status" role="status">
           Ссылка скопирована
