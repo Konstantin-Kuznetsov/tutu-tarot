@@ -87,6 +87,26 @@ export function RitualStage() {
   useEffect(() => clearTimers, []);
 
   async function startRitual(intent: TripIntent) {
+    // Re-entrancy guard: a new ritual may only start from "idle" (the first
+    // attempt) or "error" (a fresh attempt after a failed one). Read from
+    // the ref, not the `stage` state variable closed over by this render —
+    // a second, rapid activation (the receded form's fields/button stay
+    // focusable and keyboard-activatable even though pointer-events: none
+    // blocks clicks; see .intent-form's `inert` below for the other half of
+    // this fix) can fire before React has flushed the first call's
+    // setStage("dealing") and re-rendered, so a check against `stage`
+    // itself would still read the pre-submission value for both calls.
+    // Without this guard, the second call's clearTimers() strands the first
+    // call's still-pending dealtFloor timer (see the comment on that
+    // promise below) — corrupting a search that was about to succeed into a
+    // false "error".
+    if (stageRef.current !== "idle" && stageRef.current !== "error") return;
+    // Claim the slot synchronously, before anything else in this function
+    // runs, so a second call arriving later in the same tick (before this
+    // component has re-rendered and re-run `stageRef.current = stage`
+    // below) is rejected by the check above too.
+    stageRef.current = "dealing";
+
     clearTimers();
     setResult(null);
     userTookControlRef.current = false;
@@ -195,7 +215,17 @@ export function RitualStage() {
   // landmark for "the result".
   return (
     <div className="ritual-layout" data-stage={stage}>
-      <div className="intent-form">
+      {/* Recede in globals.css only sets pointer-events: none, which blocks
+          clicks but not keyboard focus/activation — a Tab to the submit
+          button (or refocusing the still-mounted city input and pressing
+          Enter) could still fire onSubmit while a ritual is already
+          running. `inert` makes the whole subtree genuinely unreachable
+          (unfocusable, not hit-tested, skipped by assistive tech) without
+          unmounting or hiding it — the receded ticket stays visible, it's
+          just no longer part of the interaction surface. Kept in sync with
+          the CSS recede selector's own condition (`:not([data-stage=
+          "idle"])`) so "receded" and "inert" always agree. */}
+      <div className="intent-form" inert={stage !== "idle"}>
         <TripIntentForm onSubmit={startRitual} />
       </div>
       {showScene ? (

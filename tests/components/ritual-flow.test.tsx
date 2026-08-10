@@ -1,6 +1,51 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RitualStage } from "@/components/RitualStage";
+import type { DrawnTarotCard, TarotPosition } from "@/domain/types";
+
+function okResponse(payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function stubCard(position: TarotPosition, id: string): DrawnTarotCard {
+  return {
+    id,
+    number: 0,
+    name: `Карта ${id}`,
+    image: `/tarot/${id}.webp`,
+    archetypes: ["road"],
+    transport: ["railway"],
+    meaning: "значение",
+    meaningReversed: "обратное значение",
+    position,
+    reversed: false,
+  };
+}
+
+// Minimal but complete RitualResultViewModel — used by both new tests below,
+// this one carrying all three spreadCards so TravelResult's spread-panel
+// (the permanent home for the three cards once "revealed") actually renders
+// something to assert against.
+const spreadRitualResponse = {
+  ritualId: "demo",
+  seed: "москва|2026-09-10|2026-09-17|2",
+  spreadCards: [stubCard("Зов", "call"), stubCard("Дар", "gift"), stubCard("Путь", "road")],
+  destination: { name: "Усьвинские Столбы", region: "Пермский край" },
+  prediction: {
+    headline: "Карты указывают на Усьвинские Столбы",
+    opening: "Башня зовет к камню.",
+    summary: "Дорога подтверждается Туту.",
+    cardReadings: [],
+  },
+  roadChoice: { mode: null, reason: "Дорога скрыта туманом.", best: null },
+  transportOffers: [],
+  hotelOffers: [],
+  sourceLinks: [],
+  warnings: [],
+};
 
 // Task 10 disables the submit button until both endpoints are chosen, so the
 // dates must be picked through the calendar before submitting.
@@ -59,5 +104,92 @@ describe("continuous ritual flow", () => {
     fillAndSubmit();
     expect(screen.queryByRole("link", { name: /результат/i })).toBeNull();
     expect(screen.queryByRole("navigation", { name: /экраны/i })).toBeNull();
+  });
+
+  // Fix round (task 11 review, finding 1): the receded form's
+  // pointer-events: none blocks clicks but never made the form keyboard-
+  // inert, so Tab-to-submit-button (or refocusing the city field and
+  // pressing Enter) could fire a second startRitual mid-deal. That second
+  // call's clearTimers() used to strand the first call's still-pending
+  // dealtFloor timer, corrupting a search that was about to succeed into a
+  // false "error". jsdom does not enforce the `inert` attribute's actual
+  // focus/hit-test blocking (it only reflects the attribute — see
+  // RitualStage's own comment on why `inert` alone isn't the full fix), so
+  // this drives the second submission straight through the DOM rather than
+  // via real Tab/Enter — exactly the scenario the startRitual re-entrancy
+  // guard (not the `inert` attribute) has to reject on its own.
+  it("ignores a second submission fired while the first is still dealing", async () => {
+    // A mutable object property (not a bare `let`) so TypeScript doesn't
+    // narrow the pending resolver back to `null` at the read below — it has
+    // no way to know the executor closure runs between the assignment and
+    // that read.
+    const pending: { resolve: ((response: Response) => void) | null } = { resolve: null };
+    const fetchMock = vi.fn(
+      () => new Promise<Response>((resolve) => { pending.resolve = resolve; }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<RitualStage />);
+    fillAndSubmit();
+
+    // Still "dealing" (well short of both the 1800ms floor and the 3000ms
+    // consult threshold) — activate the still-mounted submit button again.
+    await act(async () => { vi.advanceTimersByTime(500); });
+    fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
+
+    // The guard rejects the re-entrant call before it ever builds a
+    // request: exactly one fetch went out, not two competing ones.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Let the deal timers and the dealtFloor elapse, then let the one real
+    // request resolve successfully.
+    await act(async () => { vi.advanceTimersByTime(2_000); });
+    pending.resolve?.(okResponse(spreadRitualResponse));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    // No false failure, and the search that was about to succeed actually
+    // does.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("Карты указывают на Усьвинские Столбы")).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  // Fix round (task 11 review, finding 2): every mock elsewhere in this
+  // suite either never resolves or resolves after the ~1.8s deal floor, so
+  // a regression deleting the dealtFloor half of startRitual's Promise.all
+  // would still pass the whole suite. This is the one case the brief names
+  // by name: "do not flip the third card early, even when the search
+  // returns almost instantly."
+  it("does not flip the third card early even when the search resolves almost instantly", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse(spreadRitualResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<RitualStage />);
+    fillAndSubmit();
+
+    // Let the already-resolving fetch's own promise chain fully settle
+    // while staying well under DEAL_STEP_MS * 2 (the 1800ms floor).
+    await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+
+    // Third slot ("Путь") is still face-down: RitualScene's own
+    // "tarot-card" testid (TravelResult's revealed spread uses a different
+    // testid, "spread-card", so this can't accidentally match that instead).
+    const dealingCards = screen.getAllByTestId("tarot-card");
+    expect(dealingCards).toHaveLength(3);
+    expect(dealingCards[2]).toHaveAttribute("data-revealed", "false");
+    expect(screen.queryByTestId("spread-card")).not.toBeInTheDocument();
+
+    // Cross the floor.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_800); });
+
+    // Now revealed: the dealing scene is gone and TravelResult's own
+    // spread-panel shows all three cards, third included.
+    expect(screen.queryByTestId("tarot-card")).not.toBeInTheDocument();
+    const revealedCards = screen.getAllByTestId("spread-card");
+    expect(revealedCards).toHaveLength(3);
+    revealedCards.forEach((card) => expect(card).toHaveAttribute("data-revealed", "true"));
+
+    vi.unstubAllGlobals();
   });
 });
