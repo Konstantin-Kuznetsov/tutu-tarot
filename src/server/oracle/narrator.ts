@@ -55,9 +55,24 @@ function sourceNoteFor(source: TravelAtlasItem["source"]): string {
   }
 }
 
+// Most atlas entries name the same city twice over -- nearestTransportHub
+// (where MCP is asked to search transport) and hotelSearchCity (where it's
+// asked to search hotels) are literally equal for 13 of 21 entries (e.g.
+// Пермь/Пермь, Владивосток/Владивосток) -- so the un-collapsed sentence read
+// "основное направление — Пермь, остановка в городе Пермь" for most
+// destinations, not just an edge case. Collapsed to one clause when they
+// match; both branches stay in the nominative (city names are never bent by
+// a preposition here, matching the rest of this file).
+function practicalNote(destination: TravelAtlasItem): string {
+  if (destination.nearestTransportHub === destination.hotelSearchCity) {
+    return `Практическая часть маршрута: центр — ${destination.hotelSearchCity}.`;
+  }
+  return `Практическая часть маршрута: основное направление — ${destination.nearestTransportHub}, остановка в городе ${destination.hotelSearchCity}.`;
+}
+
 function summaryFor(input: PredictionInput): string {
   const { destination } = input.selection;
-  const baseSummary = `Маршрут указывает путь: ${destination.region}. ${sourceNoteFor(destination.source)} Практическая часть маршрута: основное направление — ${destination.nearestTransportHub}, остановка в городе ${destination.hotelSearchCity}.`;
+  const baseSummary = `Маршрут указывает путь: ${destination.region}. ${sourceNoteFor(destination.source)} ${practicalNote(destination)}`;
   return [baseSummary, input.roadChoice.reason].filter(Boolean).join(" ");
 }
 

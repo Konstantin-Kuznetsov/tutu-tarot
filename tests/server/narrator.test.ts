@@ -231,6 +231,37 @@ describe("createPrediction", () => {
     expect(result.summary).not.toContain("Проверенный");
   });
 
+  // Regression: 13 of 21 atlas entries have nearestTransportHub ===
+  // hotelSearchCity (this fixture's "Пермь"/"Пермь" among them), which used
+  // to produce "основное направление — Пермь, остановка в городе Пермь" —
+  // the same city named twice in the first paragraph a jury reads, for most
+  // destinations, not an edge case.
+  it("names the city once, not twice, when the transport hub and hotel city are the same place", async () => {
+    const result = await createPrediction(createInput());
+
+    const mentions = result.summary.split("Пермь").length - 1;
+    expect(mentions).toBe(1);
+    expect(result.summary).not.toContain("остановка в городе");
+  });
+
+  it("still names both cities when the transport hub differs from the hotel city", async () => {
+    const baseInput = createInput();
+    const result = await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: {
+          ...baseInput.selection.destination,
+          nearestTransportHub: "Владимир",
+          hotelSearchCity: "Суздаль",
+        },
+      },
+    });
+
+    expect(result.summary).toContain("Владимир");
+    expect(result.summary).toContain("Суздаль");
+  });
+
   it("claims Tutu confirmation for a provereno.tutu destination", async () => {
     const baseInput = createInput();
     const result = await createPrediction({
