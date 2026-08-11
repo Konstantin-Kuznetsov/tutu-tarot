@@ -4,6 +4,7 @@ import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { RoadChoice } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
+import { isOutsideSeasonWindow, seasonWindowCaption } from "@/domain/travel/seasonWindow";
 import { LEG_OUTCOME_COPY, MODE_LABELS, OfferList } from "./OfferList";
 import { ShareButton } from "./ShareButton";
 import { TarotCardView } from "./TarotCardView";
@@ -16,9 +17,10 @@ export interface RitualResultViewModel {
   // `{ name, region }`. It's what sharedReadingFrom below checks for before
   // it will offer a share link. `source`/`sourceUrl`/`routeDays`/`rating`/
   // `seasonWindow` are the same story, one level down: always present on a
-  // real reading (see GuideStrip below, which is what actually reads them),
-  // optional here only so fixtures that predate the guide-facts strip don't
-  // all need updating for a feature they don't exercise.
+  // real reading (see GuideStrip and SeasonMismatchNote below, which are
+  // what actually read them), optional here only so fixtures that predate
+  // the guide-facts strip don't all need updating for a feature they don't
+  // exercise.
   destination: {
     id?: string;
     name: string;
@@ -128,13 +130,21 @@ function pluralDays(days: number): string {
 // guide whose page names no overall season either -- see
 // chechnya-kezenoy-am/suzdal in atlas.ts) the destination's own region
 // fills in, so the strip is never just a bare, contentless label.
+//
+// The season window fact goes through seasonWindowCaption first, not the
+// raw atlas string: without it, "летние месяцы" next to a headline for an
+// October trip reads as a contradiction (a user reported exactly this) --
+// the caption makes explicit that this is the guide's own recommended
+// season, not a description of the dates the traveller chose. See
+// SeasonMismatchNote below for the complementary "your dates don't overlap
+// it at all" line.
 function guideStripText(destination: RitualResultViewModel["destination"]): string | null {
   if (!destination.source) return null;
 
   const facts = [
     destination.routeDays ? pluralDays(destination.routeDays) : null,
     destination.rating ?? null,
-    destination.seasonWindow ?? null,
+    destination.seasonWindow ? seasonWindowCaption(destination.seasonWindow) : null,
   ].filter((fact): fact is string => Boolean(fact));
 
   return [guideSourceLabel(destination.source), ...(facts.length > 0 ? facts : [destination.region])].join(" · ");
@@ -153,6 +163,32 @@ function GuideStrip({ destination }: { destination: RitualResultViewModel["desti
     <a className="guide-strip" href={destination.sourceUrl} target="_blank" rel="noreferrer">
       {text}
     </a>
+  );
+}
+
+// One quiet line under the strip, shown only when we can say with
+// confidence that the traveller's own dates don't overlap the guide's
+// recommended season at all (isOutsideSeasonWindow returns false for a
+// window it can't parse with certainty, exactly like it does for "круглый
+// год" -- see that function's own comment). Turns what would otherwise read
+// as a contradiction into a stated fact, the same honest move the fog road
+// already makes when no route could be checked (see FOG_REASON). Needs both
+// a season window and the trip's own dates, so it renders nothing for the
+// hand-built fixtures that predate `intent` on RitualResultViewModel.
+function SeasonMismatchNote({
+  destination,
+  intent,
+}: {
+  destination: RitualResultViewModel["destination"];
+  intent: RitualResultViewModel["intent"];
+}) {
+  if (!destination.seasonWindow || !intent) return null;
+  if (!isOutsideSeasonWindow(destination.seasonWindow, intent.dateFrom, intent.dateTo)) return null;
+
+  return (
+    <p className="guide-strip__note">
+      Путеводитель Туту рекомендует для этой поездки другое время года, чем вы выбрали.
+    </p>
   );
 }
 
@@ -195,6 +231,7 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
         <p className="result-kicker">Предсказанный маршрут</p>
         <h2>{result.prediction.headline}</h2>
         <GuideStrip destination={result.destination} />
+        <SeasonMismatchNote destination={result.destination} intent={result.intent} />
         <p>{result.prediction.opening}</p>
         <p>{result.prediction.summary}</p>
       </div>

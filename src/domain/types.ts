@@ -62,9 +62,12 @@ export interface TravelAtlasItem {
   // actually runs in, the route's own waypoints, its highlight list, and the
   // guide's own one-line summary. All optional because ten atlas entries are
   // sourced from a regional geo guide rather than a single rated route (see
-  // routeDays/rating's own null-ness for those same ten) and one JSON field
-  // (seasonWindow) is null for two entries even among the rest -- see
-  // atlas.ts's own per-entry comments for which.
+  // routeDays/rating's own null-ness for those same ten) and seasonWindow is
+  // additionally absent for three entries even among the rest: two because
+  // the source page names no overall season at all, and one (hmao-yugra)
+  // because the collector's raw value there was an opening-hours phrase, not
+  // a season, and was dropped -- see atlas.ts's own per-entry comments for
+  // which.
   seasonWindow?: string;
   stops?: string[];
   highlights?: string[];
