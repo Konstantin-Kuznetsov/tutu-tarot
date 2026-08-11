@@ -83,6 +83,8 @@ async function loadSharedResult(code: string): Promise<RitualResultViewModel | n
     transportOffers: offers.transport,
     hotelOffers: offers.hotels,
     warnings: offers.warnings,
+    transportOutcome: offers.transportOutcome,
+    hotelsOutcome: offers.hotelsOutcome,
     intent,
   };
 }

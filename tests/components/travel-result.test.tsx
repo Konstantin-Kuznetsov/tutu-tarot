@@ -151,6 +151,67 @@ describe("TravelResult", () => {
     expect(road).toHaveTextContent("Туту сейчас отвечает не на все запросы");
   });
 
+  // The measured defect this task fixes: "Tutu refused the request" and
+  // "Tutu answered, and there's nothing for these dates" used to render the
+  // exact same vague line. transportOutcome lets the road block say which
+  // one actually happened.
+  it("says plainly that Tutu is not answering when the transport leg failed, distinct from the old vague line", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          roadChoice: { mode: null, reason: FOG_REASON, best: null },
+          warnings: ["Tutu MCP search_multitransport failed with 503"],
+          transportOutcome: "failed",
+        }}
+      />,
+    );
+
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+    expect(road).toHaveTextContent("Туту сейчас не отвечает — этот раздел проверить не удалось.");
+    expect(road).not.toHaveTextContent("Дороги удалось проверить не полностью");
+    expect(road).not.toHaveTextContent("503");
+  });
+
+  it("says nothing was found for these dates when the transport leg came back empty — a real answer, not an error", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          roadChoice: { mode: null, reason: FOG_REASON, best: null },
+          warnings: [],
+          transportOutcome: "empty",
+        }}
+      />,
+    );
+
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+    expect(road).toHaveTextContent("Туту ответил: на эти даты здесь ничего не нашлось. Это не сбой, а честный ответ.");
+    expect(road).not.toHaveTextContent("Туту сейчас не отвечает");
+  });
+
+  it("passes the hotel leg's own outcome to the hotels section, independent of the transport leg's", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          transportOutcome: "served",
+          hotelsOutcome: "failed",
+          hotelOffers: [
+            { id: "hotel-fallback", title: "Открыть поиск отелей на Туту", url: "https://hotel.tutu.ru/" },
+          ],
+        }}
+      />,
+    );
+
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+    // The transport leg was fine -- no outcome note under the road block.
+    expect(road).not.toHaveTextContent("Туту сейчас не отвечает");
+
+    // The hotels section carries its own, separate note for its own outcome.
+    expect(screen.getByText("Туту сейчас не отвечает — этот раздел проверить не удалось.")).toBeInTheDocument();
+  });
+
   it("keeps the prediction above the roads", () => {
     const { container } = render(<TravelResult result={resultWithRoad} />);
     const order = Array.from(container.querySelectorAll("[data-block]")).map(
