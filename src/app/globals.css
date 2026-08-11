@@ -862,6 +862,44 @@ h1 {
   letter-spacing: 0;
 }
 
+/* Guide-strip — the compact, clickable strip of concrete guide facts near
+   the headline (TravelResult's <GuideStrip>), added so the Tutu-guide
+   attribution is visible where a reader actually looks, not buried at the
+   very bottom of the reading. .proof-links further down is untouched and
+   still the fuller trust footer; this is an addition, not a replacement.
+   Pill shape in the same gold/line tokens as the rest of the page — quiet
+   enough not to fight the headline above it or the opening paragraph below,
+   present enough (bordered, gold text, its own row, hover/focus states) to
+   read as clickable. overflow-wrap/max-width guard the same class of 375px
+   overflow bug .prediction-panel/.road__hero already carry a fix for — a
+   season-window string (e.g. "с середины июля по середину сентября") can
+   run long. */
+.guide-strip {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 0 0 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-pill);
+  color: var(--gold-bright);
+  font: 700 var(--fs-xs)/1.4 var(--font-ui);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.guide-strip:hover,
+.guide-strip:focus-visible {
+  border-color: var(--gold-bright);
+  background: rgba(217, 164, 65, 0.1);
+}
+
+.guide-strip:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+}
+
 .spread-panel {
   display: grid;
   gap: 14px;
@@ -1099,10 +1137,13 @@ h1 {
    fresh (see src/app/r/[code]/page.tsx) — same .caps kicker style as the
    mockup's own hero tagline, just centred and line-length-capped since
    this one runs a full sentence rather than a short label. */
+/* Left-aligned, not centred: this line sits directly under the shared page's
+   left-aligned <h1>, and centring it against a left-aligned title read as
+   broken layout rather than as a caption. */
 .share-note {
   max-width: 52ch;
-  margin: 0 auto var(--sp-2);
-  text-align: center;
+  margin: var(--sp-3) 0 var(--sp-4);
+  text-align: left;
 }
 
 .share-fallback {

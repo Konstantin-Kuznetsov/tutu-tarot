@@ -14,10 +14,12 @@ function context(overrides: Partial<NarrationContext> = {}): NarrationContext {
 }
 
 function validPayload(overrides: {
+  opening?: string;
   cardReadings?: Array<{ id: string; text: string }>;
   closingLine?: string;
 } = {}) {
   return {
+    opening: overrides.opening ?? "Карты ведут к Усьвинским Столбам, где скалы над рекой хранят долгое молчание.",
     cardReadings: overrides.cardReadings ?? [
       { id: "tower", text: "Башня рушит старые стены, чтобы освободить дорогу к каменным столбам и тишине." },
       { id: "chariot", text: "Колесница подгоняет решимость, и путь на Урал начинает складываться сам собой." },
@@ -36,6 +38,7 @@ describe("validateNarration", () => {
     const result = validateNarration(raw(validPayload()), context());
 
     expect(result).not.toBeNull();
+    expect(result?.opening).toContain("Усьвинским Столбам");
     expect(result?.cardReadings).toHaveLength(3);
     expect(result?.cardReadings.map((r) => r.id).sort()).toEqual(["chariot", "hermit", "tower"]);
     expect(result?.closingLine).toContain("Дорога уже начертана");
@@ -222,6 +225,26 @@ describe("validateNarration", () => {
       closingLine: "Карты почти указали на Суздаль, но дорога всё же ведёт в другое место совсем.",
     });
     expect(validateNarration(raw(closingNamesOther), context())).toBeNull();
+  });
+
+  // The opening is validated by the exact same isCleanText rule as
+  // cardReadings/closingLine above (see AiNarration's own comment in
+  // validate.ts) -- mirrors the closing-line test above, one case per rule.
+  it("returns null when the opening itself fails a content check", () => {
+    expect(validateNarration(raw({ ...validPayload(), opening: undefined }), context())).toBeNull();
+
+    const shortOpening = validPayload({ opening: "Коротко." });
+    expect(validateNarration(raw(shortOpening), context())).toBeNull();
+
+    const openingWithUrl = validPayload({
+      opening: "Карты ведут к Столбам, подробный маршрут смотрите на https://example.com прямо сейчас.",
+    });
+    expect(validateNarration(raw(openingWithUrl), context())).toBeNull();
+
+    const openingNamesOther = validPayload({
+      opening: "Карты почти открыли дорогу в Суздаль, но в итоге повернули совсем в другую сторону.",
+    });
+    expect(validateNarration(raw(openingNamesOther), context())).toBeNull();
   });
 
   it("never throws on malformed input", () => {

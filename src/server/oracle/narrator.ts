@@ -100,9 +100,33 @@ function summaryFor(input: PredictionInput): string {
   return [baseSummary, input.roadChoice.reason].filter(Boolean).join(" ");
 }
 
+// The live, trip-specific half of the opening -- the departure city -- is
+// deliberately never sent to the model (NarrationRequestInput only carries
+// destination-shaped guide facts, nothing about *this* trip; see its own
+// comment in aiClient.ts). Keeping it app-authored, and recomputed on every
+// call rather than folded into the AI-written text, is what lets a cached
+// narration (keyed on cards+destination, not on trip details -- see
+// narrationCacheKeyParts below) still open with *this* traveller's own
+// departure city on every reading, never whichever city happened to
+// populate the cache first (see the "differs by city across cached calls"
+// case in narrator-cache.test.ts).
+function cityPrefix(input: PredictionInput): string {
+  return `Карты раскрывают путь из города ${input.intent.departureCity}: `;
+}
+
+// The no-AI path's own opening: still entirely app-authored prose (never
+// validated, so it has to be trustworthy on its own), extended with the
+// guide's one-line summary when the atlas has one for this destination --
+// the same guide fact the AI path is handed to write its own opening from
+// (see NarrationRequestInput.oneLine in aiClient.ts). Additive only:
+// destination.oneLine is undefined on fixtures built before the guide-facts
+// merge, so this must fall back to exactly the old sentence when it's
+// absent (see narrator.test.ts's byte-identical-template test, which pins
+// that fixture's exact string).
 function appOpening(input: PredictionInput): string {
   const { destination } = input.selection;
-  return `Карты раскрывают путь из города ${input.intent.departureCity}: ${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
+  const base = `${cityPrefix(input)}${destination.name}, где ${destination.routeTitle.toLocaleLowerCase("ru-RU")}. ${destination.oracleHook}`;
+  return destination.oneLine ? `${base} ${destination.oneLine}` : base;
 }
 
 // TarotCardView rotates a reversed card's artwork 180° and swaps its own
@@ -213,20 +237,23 @@ function narrationCacheKeyParts(identity: NarrationIdentity): string[] {
   ];
 }
 
-// The model writes free text for exactly two things: one reading per drawn
-// card and a closing line (see AiNarration in validate.ts). Everything else
-// on screen -- headline, opening, destination, region, road, price, links,
-// source attribution -- is app data from RitualResult and is built the same
-// way whether or not the AI call succeeds; nothing the model returns can
-// reach those fields. Only the AI call itself (requestNarration) is cached
-// below -- headline/opening/summary are still computed fresh on every call
-// from live input (departure city, road choice from the just-run price
-// search), exactly as before caching existed.
+// The model writes free text for exactly three things: the opening
+// paragraph, one reading per drawn card, and a closing line (see
+// AiNarration in validate.ts). Everything else on screen -- headline,
+// destination, region, road, price, links, source attribution -- is app
+// data from RitualResult and is built the same way whether or not the AI
+// call succeeds; nothing the model returns can reach those fields. Only the
+// AI call itself (requestNarration) is cached below -- headline/summary
+// (and the city clause inside opening -- see cityPrefix's own comment) are
+// still computed fresh on every call from live input (departure city, road
+// choice from the just-run price search), exactly as before caching
+// existed.
 export async function createPrediction(input: PredictionInput): Promise<PredictionText> {
   if (!input.aiApiKey) {
     return templatePrediction(input);
   }
 
+  const { destination } = input.selection;
   const config = resolveAiClientConfig(input.aiApiKey);
   const narrationRequest: NarrationRequestInput = {
     cards: input.spread.cards.map((card) => ({
@@ -235,8 +262,19 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
       position: card.position,
       reversed: card.reversed,
     })),
-    destinationName: input.selection.destination.name,
-    destinationRegion: input.selection.destination.region,
+    destinationName: destination.name,
+    destinationRegion: destination.region,
+    // The deliberate exception to "no extra place names" -- see
+    // NarrationCardInput's own comment in aiClient.ts for why stops
+    // specifically are safe and worth sending. routeDays/stops/highlights/
+    // oneLine are each undefined here whenever the atlas doesn't have them
+    // (the ten regional-geo-guide entries lack routeDays; none lack the
+    // other three), and buildUserPayload drops undefined fields rather than
+    // sending them as null.
+    routeDays: destination.routeDays,
+    stops: destination.stops,
+    highlights: destination.highlights,
+    oneLine: destination.oneLine,
   };
 
   // unstable_cache is called fresh on every createPrediction invocation
@@ -287,8 +325,12 @@ export async function createPrediction(input: PredictionInput): Promise<Predicti
   const textById = new Map(narration.cardReadings.map((reading) => [reading.id, reading.text]));
 
   return {
-    headline: `Карты указывают: ${input.selection.destination.name}`,
-    opening: appOpening(input),
+    headline: `Карты указывают: ${destination.name}`,
+    // The model's own opening, grounded in the guide facts sent above --
+    // only the leading city clause is app-authored and live (see
+    // cityPrefix's own comment on why it's kept out of the cached/model
+    // text).
+    opening: `${cityPrefix(input)}${narration.opening}`,
     cardReadings: input.spread.cards.map((card) => ({
       id: card.id,
       position: card.position,
