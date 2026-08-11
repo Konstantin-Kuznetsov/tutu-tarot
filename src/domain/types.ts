@@ -57,6 +57,18 @@ export interface TravelAtlasItem {
   oracleHook: string;
   routeDays?: number;
   rating?: string;
+  // The four guide facts data/tutu-guides.json carries that the type didn't
+  // already have a place for (routeDays/rating did): the window the route
+  // actually runs in, the route's own waypoints, its highlight list, and the
+  // guide's own one-line summary. All optional because ten atlas entries are
+  // sourced from a regional geo guide rather than a single rated route (see
+  // routeDays/rating's own null-ness for those same ten) and one JSON field
+  // (seasonWindow) is null for two entries even among the rest -- see
+  // atlas.ts's own per-entry comments for which.
+  seasonWindow?: string;
+  stops?: string[];
+  highlights?: string[];
+  oneLine?: string;
 }
 
 export interface DestinationSelection {

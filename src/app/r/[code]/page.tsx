@@ -62,7 +62,21 @@ async function loadSharedResult(code: string): Promise<RitualResultViewModel | n
 
   return {
     prediction,
-    destination: { id: destination.id, name: destination.name, region: destination.region },
+    destination: {
+      id: destination.id,
+      name: destination.name,
+      region: destination.region,
+      // Guide facts for the shared page's own guide strip (TravelResult's
+      // <GuideStrip>) -- the fresh RitualStage/API-route path gets these for
+      // free (it serializes the whole TravelAtlasItem as JSON), but this
+      // page builds its viewModel by hand from the decoded share code, so
+      // they have to be copied over explicitly.
+      source: destination.source,
+      sourceUrl: destination.sourceUrl,
+      routeDays: destination.routeDays,
+      rating: destination.rating,
+      seasonWindow: destination.seasonWindow,
+    },
     spreadCards,
     roadChoice,
     sourceLinks,

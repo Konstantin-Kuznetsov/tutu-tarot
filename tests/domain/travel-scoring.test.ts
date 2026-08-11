@@ -39,6 +39,28 @@ describe("selectDestination", () => {
     expect(travelAtlas.length).toBeGreaterThanOrEqual(30);
   });
 
+  // Regression guard for the guide-facts merge (data/tutu-guides.json):
+  // every entry claiming the verified-route tier must actually link to that
+  // tier's own domain, and no entry may still carry one of the two known-bad
+  // links the merge was supposed to fix -- Wikipedia (usvinskie-stolby's old
+  // sourceUrl) and the bare, non-specific geo index (usvinskie-stolby's old
+  // geoUrl and karelia-ruskeala's old sourceUrl/geoUrl). Checked on both
+  // sourceUrl and geoUrl since either could regress back to one of those.
+  it("links every provereno.tutu entry to provereno.tutu.ru, and no entry to Wikipedia or the bare geo index", () => {
+    for (const destination of travelAtlas) {
+      if (destination.source === "provereno.tutu") {
+        expect(destination.sourceUrl, destination.id).toMatch(/^https:\/\/provereno\.tutu\.ru\//);
+      }
+
+      expect(destination.sourceUrl, destination.id).not.toMatch(/wikipedia\.org/);
+      expect(destination.sourceUrl, destination.id).not.toBe("https://www.tutu.ru/geo/");
+      if (destination.geoUrl) {
+        expect(destination.geoUrl, destination.id).not.toMatch(/wikipedia\.org/);
+        expect(destination.geoUrl, destination.id).not.toBe("https://www.tutu.ru/geo/");
+      }
+    }
+  });
+
   it("carries every tarot archetype in the vocabulary on at least two destinations", () => {
     for (const archetype of TAROT_ARCHETYPE_VOCABULARY) {
       const count = travelAtlas.filter((destination) => destination.tarotArchetypes.includes(archetype)).length;

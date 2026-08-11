@@ -82,6 +82,7 @@ function createInput(overrides: Partial<PredictionInput> = {}): PredictionInput 
 }
 
 const VALID_NARRATION = {
+  opening: "Карты открывают путь к Усьвинским Столбам, где каменные стены хранят долгое северное молчание.",
   cardReadings: [
     { id: "tower", text: "Башня рушит старые стены, чтобы освободить дорогу к каменным столбам и тишине." },
     { id: "chariot", text: "Колесница подгоняет решимость, и путь на Урал начинает складываться сам собой." },
@@ -176,6 +177,28 @@ describe("createPrediction", () => {
     expect(Object.hasOwn(result, "closingLine")).toBe(false);
   });
 
+  // The fallback template improves with the guide-facts merge too, not just
+  // the AI path: when the atlas entry carries a one-line guide summary, the
+  // template opening appends it. Additive on top of the byte-identical test
+  // above -- same fixture, one extra field set on the destination.
+  it("extends the template opening with the guide's one-line summary when the atlas entry has one", async () => {
+    const baseInput = createInput();
+    const result = await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: {
+          ...baseInput.selection.destination,
+          oneLine: "Маршрут ведёт от Перми к северным городкам и каменным стенам Усьвы.",
+        },
+      },
+    });
+
+    expect(result.opening).toBe(
+      "Карты раскрывают путь из города Москва: Усьвинские Столбы, где каменная дорога. Каменные столбы обещают путь к тишине. Маршрут ведёт от Перми к северным городкам и каменным стенам Усьвы.",
+    );
+  });
+
   // TarotCardView rotates a reversed card's art and swaps its own caption
   // to meaningReversed, but omits that caption whenever a reading is
   // supplied -- so the template reading is the only meaning a reversed
@@ -244,15 +267,16 @@ describe("createPrediction", () => {
     expect(result.cardReadings.every((reading) => !/становится|становятся/.test(reading.text))).toBe(true);
   });
 
-  it("renders the AI's card readings and closing line while keeping the app-authored headline, opening and summary", async () => {
+  it("renders the AI's opening, card readings and closing line while keeping the app-authored headline and summary", async () => {
     mockChatCompletion(JSON.stringify(VALID_NARRATION));
 
     const result = await createPrediction(createInput({ aiApiKey: "test-key" }));
 
     expect(result.headline).toBe("Карты указывают: Усьвинские Столбы");
-    expect(result.opening).toBe(
-      "Карты раскрывают путь из города Москва: Усьвинские Столбы, где каменная дорога. Каменные столбы обещают путь к тишине.",
-    );
+    // Only the leading city clause stays app-authored (see cityPrefix's own
+    // comment in narrator.ts) -- the rest of the opening is the model's own
+    // text, grounded in the guide facts sent to it.
+    expect(result.opening).toBe(`Карты раскрывают путь из города Москва: ${VALID_NARRATION.opening}`);
     expect(result.summary).toContain("Пермский край");
     expect(result.closingLine).toBe(VALID_NARRATION.closingLine);
     expect(result.cardReadings).toEqual([
@@ -327,7 +351,7 @@ describe("createPrediction", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("sends the model only the three cards with orientations and the destination name and region -- nothing else", async () => {
+  it("sends the model only the three cards with orientations and the destination name and region when the atlas entry carries no guide facts -- nothing else", async () => {
     const fetchMock = mockChatCompletion(JSON.stringify(VALID_NARRATION));
 
     await createPrediction(createInput({ aiApiKey: "test-key" }));
@@ -347,6 +371,42 @@ describe("createPrediction", () => {
     expect(userMessage).not.toHaveProperty("offers");
     expect(userMessage).not.toHaveProperty("roadChoice");
     expect(userMessage).not.toHaveProperty("travelerCount");
+  });
+
+  // The deliberate exception to "no extra place names" (see
+  // NarrationCardInput's own comment in aiClient.ts): stops, highlights,
+  // routeDays and the one-line summary all travel to the model when the
+  // chosen atlas entry actually carries them, grounding the opening it's
+  // asked to write.
+  it("sends the chosen destination's guide facts (stops, highlights, routeDays, oneLine) to the model when the atlas entry carries them", async () => {
+    const fetchMock = mockChatCompletion(JSON.stringify(VALID_NARRATION));
+    const baseInput = createInput({ aiApiKey: "test-key" });
+
+    await createPrediction({
+      ...baseInput,
+      selection: {
+        ...baseInput.selection,
+        destination: {
+          ...baseInput.selection.destination,
+          routeDays: 6,
+          stops: ["Пермь", "Красновишерск", "Усьвинские столбы"],
+          highlights: ["Скалы над Усьвой", "Кунгурская пещера"],
+          oneLine: "Маршрут ведёт от Перми к северным городкам и каменным стенам Усьвы.",
+        },
+      },
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    const userMessage = JSON.parse(requestBody.messages[1].content);
+
+    expect(userMessage.destination).toEqual({
+      name: "Усьвинские Столбы",
+      region: "Пермский край",
+      routeDays: 6,
+      stops: ["Пермь", "Красновишерск", "Усьвинские столбы"],
+      highlights: ["Скалы над Усьвой", "Кунгурская пещера"],
+      oneLine: "Маршрут ведёт от Перми к северным городкам и каменным стенам Усьвы.",
+    });
   });
 
   it("never puts a raw URL in the summary", async () => {

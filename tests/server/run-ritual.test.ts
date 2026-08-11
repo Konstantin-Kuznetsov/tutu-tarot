@@ -188,4 +188,29 @@ describe("buildRoadChoiceAndSources", () => {
       { label: "Путеводитель Туту", url: "https://www.tutu.ru/geo/" },
     ]);
   });
+
+  // Regression caught by a live check of the guide-facts merge: the ten
+  // atlas entries sourced from a regional geo guide (source: "geo.tutu")
+  // carry a geoUrl identical to their own sourceUrl -- both fields are real
+  // data from data/tutu-guides.json, but the guide *is* the geo page for
+  // those entries, so a naive "always show geoUrl when present" produced
+  // two links with different labels pointing at the exact same URL.
+  it("does not duplicate the proof link when geoUrl is the same URL as sourceUrl", () => {
+    const { sourceLinks } = buildRoadChoiceAndSources({
+      mode: null,
+      pathCard,
+      transportOffers: [],
+      modesSummary: {},
+      destination: {
+        ...destination,
+        source: "geo.tutu",
+        sourceUrl: "https://www.tutu.ru/geo/rossiya/kurort/karelia/",
+        geoUrl: "https://www.tutu.ru/geo/rossiya/kurort/karelia/",
+      },
+    });
+
+    expect(sourceLinks).toEqual([
+      { label: "Источник маршрута", url: "https://www.tutu.ru/geo/rossiya/kurort/karelia/" },
+    ]);
+  });
 });

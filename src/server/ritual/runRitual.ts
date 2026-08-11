@@ -95,12 +95,25 @@ export function buildRoadChoiceAndSources(params: {
     best: bestOfferFor(mode, transportOffers, modesSummary),
   };
 
+  // geoUrl is genuinely a second, distinct link for most atlas entries
+  // (provereno.tutu's own verified route vs. Tutu's regional geo guide),
+  // but for the ten geo.tutu entries the guide *is* the geo page -- their
+  // sourceUrl and geoUrl point at the exact same URL (see atlas.ts's
+  // per-entry comments on why the merge from data/tutu-guides.json still
+  // populates geoUrl there: it is real provenance data, just not a second
+  // page). Rendering both would show two identically-labelled-differently
+  // links to one page, which a 2026-08-11 live check of this exact strip
+  // caught. Comparing the URLs (not the source tier) is what keeps this
+  // correct even if a future atlas entry has some other reason for the two
+  // fields to coincide.
   const sourceLinks: SourceLink[] = [
     {
       label: destination.source === "provereno.tutu" ? "Проверенный маршрут Туту" : "Источник маршрута",
       url: destination.sourceUrl,
     },
-    ...(destination.geoUrl ? [{ label: "Путеводитель Туту", url: destination.geoUrl }] : []),
+    ...(destination.geoUrl && destination.geoUrl !== destination.sourceUrl
+      ? [{ label: "Путеводитель Туту", url: destination.geoUrl }]
+      : []),
   ];
 
   return { roadChoice, sourceLinks };

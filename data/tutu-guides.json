@@ -1,0 +1,770 @@
+[
+  {
+    "id": "usvinskie-stolby",
+    "url": "https://ru.wikipedia.org/wiki/Усьвинские_Столбы",
+    "betterUrl": "https://provereno.tutu.ru/perm-2",
+    "httpStatus": 200,
+    "routeDays": 6,
+    "rating": "8,8",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Пермь",
+      "Архитектурно-этнографический музей «Хохловка»",
+      "Красновишерск",
+      "Чердынь",
+      "Усьвинские столбы",
+      "Каменный город"
+    ],
+    "highlights": [
+      "Скалы над Усьвой",
+      "Кунгурская пещера",
+      "Пермские старые заводы"
+    ],
+    "oneLine": "Маршрут ведёт от Перми к северным городкам, пещере и каменным стенам Усьвы.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/perm_krai/",
+    "notes": "Исходная ссылка ведёт на Википедию; данные собраны с маршрута Туту perm-2 по Пермскому краю."
+  },
+  {
+    "id": "kaliningrad-active",
+    "url": "https://provereno.tutu.ru/kaliningradskaya-2025",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 6,
+    "rating": "9,3",
+    "seasonWindow": "май-октябрь",
+    "stops": [
+      "Калининград",
+      "Светлогорск",
+      "Зеленоградск",
+      "Балтийская коса",
+      "Роминтенская пуща",
+      "Гусев"
+    ],
+    "highlights": [
+      "Балтийские косы",
+      "Прусская архитектура",
+      "Веломаршруты и леса"
+    ],
+    "oneLine": "Балтика здесь соединяет косы, кирхи, курортные города и активные маршруты.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/kaliningrad_oblast/",
+    "notes": null
+  },
+  {
+    "id": "krasnodar-active",
+    "url": "https://provereno.tutu.ru/krasnodarskiy-2025",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 6,
+    "rating": "10",
+    "seasonWindow": "май–октябрь",
+    "stops": [
+      "Минеральные Воды",
+      "Мостовской",
+      "Псебай",
+      "Гуамское ущелье",
+      "Краснодар",
+      "Сочи"
+    ],
+    "highlights": [
+      "Горы и ущелья",
+      "Термальные места",
+      "Сочи и Skypark"
+    ],
+    "oneLine": "Южный маршрут смешивает ущелья, курорты, термы, Краснодар и сочинский экстрим.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/krasnodar_krai/",
+    "notes": null
+  },
+  {
+    "id": "hmao-yugra",
+    "url": "https://provereno.tutu.ru/hmao",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 6,
+    "rating": "9,9",
+    "seasonWindow": "круглосуточно",
+    "stops": [
+      "Когалым",
+      "Русскинская",
+      "Сургут",
+      "Этнографическое стойбище «Хантыйский дворик»",
+      "Шапша",
+      "Ханты-Мансийск"
+    ],
+    "highlights": [
+      "Культура ханты",
+      "Таёжные маршруты",
+      "Югорские музеи"
+    ],
+    "oneLine": "Югра раскрывается через стойбища, северные города, музеи и таёжные впечатления.",
+    "geoUrl": null,
+    "notes": "Точной страницы geo по Югре или ХМАО не найдено; найден только Ханты-Мансийск."
+  },
+  {
+    "id": "murmansk-khibiny",
+    "url": "https://provereno.tutu.ru/murmanskaya-2025",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "9,3",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Апатиты",
+      "Кандалакша",
+      "Кандалакшский залив",
+      "сопка Волосяная",
+      "Кировск",
+      "Долина Малого Вудъявра"
+    ],
+    "highlights": [
+      "Хибины",
+      "Кольские заливы",
+      "Северные тропы"
+    ],
+    "oneLine": "Кольский север даёт горы, заливы, долины и смену арктического настроения.",
+    "geoUrl": null,
+    "notes": "Точной страницы geo по Мурманской области или Хибинам не найдено; найден только Мурманск."
+  },
+  {
+    "id": "arkhangelsk-russian-north",
+    "url": "https://provereno.tutu.ru/arhangelskaya-2025/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 5,
+    "rating": "9,3",
+    "seasonWindow": "май-октябрь",
+    "stops": [
+      "Архангельск",
+      "Малые Корелы",
+      "пароход «Н. В. Гоголь»",
+      "Северодвинск",
+      "остров Ягры",
+      "село Ломоносово"
+    ],
+    "highlights": [
+      "Русский Север",
+      "Деревянное зодчество",
+      "Пароходный круиз"
+    ],
+    "oneLine": "Северный маршрут ведёт через Архангельск, деревянные музеи, острова и поморские места.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/arkhangelsk_oblast/",
+    "notes": null
+  },
+  {
+    "id": "vladivostok",
+    "url": "https://provereno.tutu.ru/vladivostok",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 5,
+    "rating": "10",
+    "seasonWindow": "май—октябрь",
+    "stops": [
+      "Бухта Стеклянная",
+      "Владивосток",
+      "Остров Русский",
+      "Картодром «Змеинка»",
+      "Приморский Сафари-парк",
+      "игорная зона «Приморье»"
+    ],
+    "highlights": [
+      "Море и мосты",
+      "Остров Русский",
+      "Приморские развлечения"
+    ],
+    "oneLine": "Владивосток цепляет морем, мостами, островами и ощущением края материка.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/vladivostok/",
+    "notes": null
+  },
+  {
+    "id": "primorye-lighthouses",
+    "url": "https://provereno.tutu.ru/vladivostok-2",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 7,
+    "rating": "9,0",
+    "seasonWindow": "май–октябрь",
+    "stops": [
+      "Владивосток",
+      "Остров Русский",
+      "Славянка",
+      "Андреевка",
+      "Южно-Морской",
+      "Находка"
+    ],
+    "highlights": [
+      "Приморские маяки",
+      "Береговые посёлки",
+      "Гастрофестиваль"
+    ],
+    "oneLine": "Маршрут идёт вдоль моря, маяков, бухт, посёлков и приморской кухни.",
+    "geoUrl": null,
+    "notes": "Точной страницы geo по Приморскому краю не найдено; найден только Владивосток."
+  },
+  {
+    "id": "dagestan-canyons",
+    "url": "https://provereno.tutu.ru/dagestan",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "8,8",
+    "seasonWindow": "май—ноябрь",
+    "stops": [
+      "Махачкала",
+      "Сулакский район",
+      "Чиркейское водохранилище",
+      "Ирганайское водохранилище",
+      "Хунзах",
+      "Дербент"
+    ],
+    "highlights": [
+      "Каньоны и горы",
+      "Водохранилища",
+      "Дербент и крепости"
+    ],
+    "oneLine": "Дагестан собирает каньоны, горные сёла, древний Дербент и каспийский воздух.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/dagestan/",
+    "notes": null
+  },
+  {
+    "id": "tatarstan-kazan",
+    "url": "https://provereno.tutu.ru/tatarstan",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 5,
+    "rating": "9,0",
+    "seasonWindow": "апрель–октябрь",
+    "stops": [
+      "Лаишево",
+      "Семрук",
+      "Голубые озёра",
+      "Волжская тропа",
+      "Юрьевская пещера",
+      "гора Лобач"
+    ],
+    "highlights": [
+      "Волжские тропы",
+      "Голубые озёра",
+      "Пещера и гора"
+    ],
+    "oneLine": "Татарстан в этом маршруте соединяет воду, тропы, пещеру, кинолокации и Волгу.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/tatarstan/",
+    "notes": null
+  },
+  {
+    "id": "buryatia-baikal",
+    "url": "https://provereno.tutu.ru/buryatiya",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "9,2",
+    "seasonWindow": "февраль–апрель",
+    "stops": [
+      "Улан-Удэ",
+      "Максимиха",
+      "Забайкальский национальный парк",
+      "Баргузинская долина",
+      "Иволгинский дацан",
+      "село Десятниково"
+    ],
+    "highlights": [
+      "Байкальский лёд",
+      "Дацаны",
+      "Баргузинская долина"
+    ],
+    "oneLine": "Бурятский Байкал даёт лёд, степи, дацаны, старые сёла и широкие виды.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/buryatia/",
+    "notes": null
+  },
+  {
+    "id": "altai-chuysky",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/altai_republic/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "конец апреля, с начала июня до начала сентября",
+    "stops": [
+      "Республика Алтай",
+      "Горно-Алтайск",
+      "Чуйский тракт",
+      "Чемал",
+      "Манжерок",
+      "Телецкое озеро"
+    ],
+    "highlights": [
+      "Чуйский тракт",
+      "Горные походы",
+      "Петроглифы и курганы"
+    ],
+    "oneLine": "Горный Алтай зовёт дорогами через хребты, активным отдыхом и древними следами.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/altai_republic/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "baikal-irkutsk",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/baikal/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "с середины июля по середину сентября; с середины февраля по конец марта",
+    "stops": [
+      "Байкал",
+      "остров Ольхон",
+      "мыс Бурхан",
+      "Иркутск",
+      "Улан-Удэ",
+      "Малое Море"
+    ],
+    "highlights": [
+      "Самое глубокое озеро",
+      "Ольхон и мыс Бурхан",
+      "Лёд и нерпа"
+    ],
+    "oneLine": "Байкал цепляет масштабом, чистой водой, островами, льдом и почти морским характером.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/baikal/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "komi-manpupuner",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/komi_republic/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "с июня по сентябрь",
+    "stops": [
+      "Маньпупунёр",
+      "Национальный парк-заповедник «Югыд Ва»",
+      "Гора Манарага",
+      "Воркута",
+      "Водопад Буредан",
+      "Село Ыб"
+    ],
+    "highlights": [
+      "Столбы выветривания",
+      "Северная тайга",
+      "Труднодоступные маршруты"
+    ],
+    "oneLine": "Коми привлекает дикими северными ландшафтами, плато Маньпупунёр и походной тишиной.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/komi_republic/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "tuva-por-bazhyn",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/tuva/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "с середины июня до конца лета",
+    "stops": [
+      "Убсунурская котловина",
+      "Озеро Чагытай",
+      "Солёное озеро Дус-Холь",
+      "Крепость Пор-Бажын",
+      "озеро Тере-Холь",
+      "Храм Устуу-Хурээ"
+    ],
+    "highlights": [
+      "Дикая степь",
+      "Пор-Бажын на острове",
+      "Горячие аржааны"
+    ],
+    "oneLine": "Тыва звучит как далёкая степь с озёрами, аржаанами, буддийскими храмами и Пор-Бажыном.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/tuva/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "khakasia-open-air",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/respublika_hakasiya/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "с середины июня до третьей декады августа",
+    "stops": [
+      "Шира",
+      "Белый Июс",
+      "Аскиз",
+      "Саяногорск",
+      "Абакан",
+      "Озеро Шира"
+    ],
+    "highlights": [
+      "Музей под открытым небом",
+      "Петроглифы",
+      "Озёра и сплавы"
+    ],
+    "oneLine": "Хакасия собирает древние камни, озёра, реки и южносибирские маршруты.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/respublika_hakasiya/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "ingushetia-towers",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/ingushetia/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "с апреля по октябрь",
+    "stops": [
+      "Эгикал",
+      "Башенный комплекс Хамхи",
+      "Таргим",
+      "храм Тхаба-Ерды",
+      "Джейрахское ущелье",
+      "Горнолыжный курорт «Армхи»"
+    ],
+    "highlights": [
+      "Средневековые башни",
+      "Горные ущелья",
+      "Джейрахские виды"
+    ],
+    "oneLine": "Ингушетия держится на башнях, ущельях, древних аулах и резкой горной красоте.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/ingushetia/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "chechnya-kezenoy-am",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/chechnya/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": null,
+    "stops": [
+      "Мечеть «Гордость мусульман»",
+      "Ипподром в Гудермесе",
+      "Ушкалойские башни-близнецы",
+      "Нихалойские водопады",
+      "Горнолыжный курорт «Ведучи»",
+      "Озеро Кезеной-Ам"
+    ],
+    "highlights": [
+      "Башни и ущелья",
+      "Кезеной-Ам",
+      "Водопады и горы"
+    ],
+    "oneLine": "Чечня на странице раскрыта через мечети, башни, водопады, Ведучи и озеро Кезеной-Ам.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/chechnya/",
+    "notes": "Оценка маршрута, единая продолжительность и общий сезон маршрута на странице не указаны."
+  },
+  {
+    "id": "tyumen-thermal",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/tyumen/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "летние месяцы",
+    "stops": [
+      "Тюмень",
+      "река Тура",
+      "Аэропорт «Рощино»",
+      "Транссибирская железнодорожная магистраль",
+      "ЛетоЛето"
+    ],
+    "highlights": [
+      "Термальные источники",
+      "Купеческие усадьбы",
+      "Сибирская история"
+    ],
+    "oneLine": "Тюмень сочетает старую Сибирь, термальные воды, набережную и городскую инфраструктуру.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/tyumen/",
+    "notes": "Оценка маршрута и единая продолжительность маршрута на странице не указаны."
+  },
+  {
+    "id": "suzdal",
+    "url": "https://www.tutu.ru/geo/rossiya/kurort/suzdal/",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": null,
+    "stops": [
+      "Суздаль",
+      "река Каменка",
+      "Золотое кольцо России",
+      "Суздальский кремль",
+      "Щурово городище",
+      "Владимир"
+    ],
+    "highlights": [
+      "Древнерусская архитектура",
+      "Медовуха",
+      "Тихий город у Каменки"
+    ],
+    "oneLine": "Суздаль цепляет древними монастырями, деревянным зодчеством и спокойствием малого города.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/suzdal/",
+    "notes": "Оценка маршрута, единая продолжительность и сезонное окно на странице не указаны."
+  },
+  {
+    "id": "karelia-ruskeala",
+    "url": "https://www.tutu.ru/geo/",
+    "betterUrl": "https://www.tutu.ru/geo/rossiya/kurort/karelia/",
+    "httpStatus": 200,
+    "routeDays": null,
+    "rating": null,
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Кижи",
+      "Валаам",
+      "Горный парк «Рускеала»",
+      "Мраморный каньон",
+      "Водопад Кивач",
+      "Вулкан Гирвас"
+    ],
+    "highlights": [
+      "Рускеала и мрамор",
+      "Кижи и Валаам",
+      "Карельские водопады"
+    ],
+    "oneLine": "Карелия ведёт к Рускеале, островам, водопадам, древним петроглифам и северной кухне.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/karelia/",
+    "notes": "Исходная ссылка была общей страницей geo; данные собраны со страницы Карелии."
+  },
+  {
+    "id": "yamal-tundra",
+    "url": "https://provereno.tutu.ru/yamal",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 6,
+    "rating": "7,6",
+    "seasonWindow": "август–сентябрь, декабрь, март–апрель",
+    "stops": [
+      "Салехард",
+      "Горнокнязевск",
+      "Разъезд Глухариный",
+      "Нефритовая долина",
+      "Массив Янгана-Пэ",
+      "национальный парк «Ингилор»"
+    ],
+    "highlights": [
+      "Тундра и Полярный Урал",
+      "Северные стойбища",
+      "Нацпарк Ингилор"
+    ],
+    "oneLine": "Ямал даёт тундру, полярные дороги, Салехард и суровые маршруты к Ингилору.",
+    "geoUrl": null,
+    "notes": "Точной страницы geo по Ямалу или ЯНАО не найдено."
+  },
+  {
+    "id": "magadan-kolyma",
+    "url": "https://provereno.tutu.ru/magadan",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "9,0",
+    "seasonWindow": "июль–сентябрь",
+    "stops": [
+      "Мыс Нюкля",
+      "Магадан",
+      "бухта Нагаева",
+      "Кавинская долина",
+      "Комплекс «Снегорка»"
+    ],
+    "highlights": [
+      "Колымская природа",
+      "Магаданские бухты",
+      "Фестиваль рыбалки"
+    ],
+    "oneLine": "Магаданский маршрут смешивает бухты, Колыму, рыбалку, долины и северный город.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/magadan_oblast/",
+    "notes": null
+  },
+  {
+    "id": "sheregesh-snow",
+    "url": "https://provereno.tutu.ru/kemerovo",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 5,
+    "rating": "9,2",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Новокузнецк",
+      "Шерегеш",
+      "Таштагол",
+      "Усть-Кабырза",
+      "Усть-Анзас"
+    ],
+    "highlights": [
+      "Шерегеш",
+      "Горная Шория",
+      "Снежный курорт"
+    ],
+    "oneLine": "Кузбасс на странице ведёт от Новокузнецка к Шерегешу и шорским посёлкам.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/sheregesh/",
+    "notes": null
+  },
+  {
+    "id": "taganay-ridge",
+    "url": "https://provereno.tutu.ru/chelyabinsk",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 5,
+    "rating": "8,4",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Челябинск",
+      "Сатка",
+      "Большие притёсы",
+      "Златоуст",
+      "национальный парк «Таганай»",
+      "Магнитогорск"
+    ],
+    "highlights": [
+      "Таганай",
+      "Горные притёсы",
+      "Уральские города"
+    ],
+    "oneLine": "Южный Урал соединяет Челябинск, Таганай, Златоуст, Сатку и индустриальные виды.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/chelyabinsk_oblast/",
+    "notes": null
+  },
+  {
+    "id": "kalmykia-steppe",
+    "url": "https://provereno.tutu.ru/kalmykia",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "8,8",
+    "seasonWindow": "апрель-ноябрь",
+    "stops": [
+      "Элиста",
+      "Адык",
+      "заповедник «Чёрные земли»",
+      "Булуктара",
+      "Ики-Бурульский район",
+      "этнопарк «Церен»"
+    ],
+    "highlights": [
+      "Степь и сайгаки",
+      "Буддийская Элиста",
+      "Этнопарк"
+    ],
+    "oneLine": "Калмыкия раскрывается степью, буддийской столицей, заповедником и этническими стоянками.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/kalmykia/",
+    "notes": null
+  },
+  {
+    "id": "pskov-kremlin",
+    "url": "https://provereno.tutu.ru/pskov",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "7,7",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Псков",
+      "Великие Луки",
+      "Остров",
+      "Изборск",
+      "Мальская долина",
+      "Печоры"
+    ],
+    "highlights": [
+      "Крепости и монастыри",
+      "Изборск и Печоры",
+      "Псковская история"
+    ],
+    "oneLine": "Псковский маршрут держится на крепостях, монастырях, старых городах и долинах.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/pskov_oblast/",
+    "notes": null
+  },
+  {
+    "id": "seliger-lake",
+    "url": "https://provereno.tutu.ru/tver",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 2,
+    "rating": "9,0",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Куженкино",
+      "Осташков",
+      "Торжок",
+      "Селигер"
+    ],
+    "highlights": [
+      "Озеро Селигер",
+      "Осташков",
+      "Торжок"
+    ],
+    "oneLine": "Короткий тверской маршрут ведёт к Селигеру, Осташкову, Торжку и тихой воде.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/seliger/",
+    "notes": null
+  },
+  {
+    "id": "mari-el-fairytale",
+    "url": "https://provereno.tutu.ru/mari-el",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "9,3",
+    "seasonWindow": "май—октябрь",
+    "stops": [
+      "Шоруньжа",
+      "Йошкар-Ола",
+      "Козьмодемьянск",
+      "Экоферма «ЗаАзяково»"
+    ],
+    "highlights": [
+      "Йошкар-Ола",
+      "Марийская культура",
+      "Экоферма"
+    ],
+    "oneLine": "Марий Эл соединяет сказочную городскую архитектуру, этнику, Волгу и деревенский отдых.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/mari_el/",
+    "notes": null
+  },
+  {
+    "id": "udmurtia-forest",
+    "url": "https://provereno.tutu.ru/udmurtia",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 4,
+    "rating": "9,3",
+    "seasonWindow": "май – октябрь",
+    "stops": [
+      "Ижевск",
+      "село Чутырь",
+      "поселок Игра",
+      "деревня Сеп",
+      "Глазов",
+      "Воткинск"
+    ],
+    "highlights": [
+      "Удмуртские сёла",
+      "Иднакар",
+      "Лесные туркомплексы"
+    ],
+    "oneLine": "Удмуртия в маршруте даёт Ижевск, старые городища, деревни, лесные базы и Воткинск.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/udmurtia/",
+    "notes": null
+  },
+  {
+    "id": "yaroslavl-volga",
+    "url": "https://provereno.tutu.ru/yaroslavl",
+    "betterUrl": null,
+    "httpStatus": 200,
+    "routeDays": 3,
+    "rating": "8,8",
+    "seasonWindow": "круглый год",
+    "stops": [
+      "Ярославль",
+      "Гаврилов Ям",
+      "Рыбинск",
+      "Смирново",
+      "Поречье-Рыбное",
+      "Ломы"
+    ],
+    "highlights": [
+      "Волга и старые города",
+      "Рыбинск",
+      "Ярославская провинция"
+    ],
+    "oneLine": "Ярославская область ведёт по Волге, малым городам, усадебным местам и спокойным дорогам.",
+    "geoUrl": "https://www.tutu.ru/geo/rossiya/kurort/yaroslavl_oblast/",
+    "notes": null
+  }
+]

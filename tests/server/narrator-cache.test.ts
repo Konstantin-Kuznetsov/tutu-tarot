@@ -12,6 +12,7 @@ import { createPrediction } from "@/server/oracle/narrator";
 // the code every time), which is what turns a viral link into one paid
 // model call per view without a cache.
 const VALID_NARRATION = {
+  opening: "Карты открывают путь к Усьвинским Столбам, где каменные стены хранят долгое северное молчание.",
   cardReadings: [
     { id: "tower", text: "Башня рушит старые стены, чтобы освободить дорогу к каменным столбам и тишине." },
     { id: "chariot", text: "Колесница подгоняет решимость, и путь на Урал начинает складываться сам собой." },

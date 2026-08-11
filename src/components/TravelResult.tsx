@@ -1,5 +1,5 @@
 import type { PredictionText } from "@/server/oracle/narrator";
-import type { DrawnTarotCard, TripIntent } from "@/domain/types";
+import type { DrawnTarotCard, TravelAtlasItem, TripIntent } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { RoadChoice } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
@@ -14,8 +14,21 @@ export interface RitualResultViewModel {
   // runRitual always returns the full TravelAtlasItem -- but because
   // several existing fixtures/tests build a viewModel by hand with just
   // `{ name, region }`. It's what sharedReadingFrom below checks for before
-  // it will offer a share link.
-  destination: { id?: string; name: string; region: string };
+  // it will offer a share link. `source`/`sourceUrl`/`routeDays`/`rating`/
+  // `seasonWindow` are the same story, one level down: always present on a
+  // real reading (see GuideStrip below, which is what actually reads them),
+  // optional here only so fixtures that predate the guide-facts strip don't
+  // all need updating for a feature they don't exercise.
+  destination: {
+    id?: string;
+    name: string;
+    region: string;
+    source?: TravelAtlasItem["source"];
+    sourceUrl?: string;
+    routeDays?: number;
+    rating?: string;
+    seasonWindow?: string;
+  };
   spreadCards?: DrawnTarotCard[];
   roadChoice: RoadChoice;
   sourceLinks: Array<{ label: string; url: string }>;
@@ -73,6 +86,69 @@ function RoadHero({ best }: { best: NormalizedOffer }) {
   );
 }
 
+// The fixed part of the guide strip's text (see GuideStrip below): what tier
+// of Tutu data this destination's guide actually is. Only "provereno.tutu"
+// is Tutu's verified-route tier -- same three-way distinction the oracle's
+// own summary already makes (see sourceNoteFor in narrator.ts) -- so the
+// label here must never claim more than the source itself does.
+function guideSourceLabel(source: TravelAtlasItem["source"]): string {
+  switch (source) {
+    case "provereno.tutu":
+      return "Проверено Туту";
+    case "geo.tutu":
+      return "Путеводитель Туту";
+    case "fallback":
+      return "Маршрут из открытых источников";
+  }
+}
+
+// Russian noun declension for "день" after a count: 1/21/31 -> день,
+// 2-4/22-24/32-34 -> дня, everything else (5-20, 25-30, ...) -> дней. Every
+// routeDays value the atlas actually carries is small (2-7), but this is
+// correct for any count, not just the ones on hand today.
+function pluralDays(days: number): string {
+  const mod10 = days % 10;
+  const mod100 = days % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${days} день`;
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return `${days} дня`;
+  return `${days} дней`;
+}
+
+// Composed only from facts this destination actually has -- never an empty
+// separator or a dangling "·" for a fact that's absent. Source label is the
+// one fixed part; day count, rating and season window are each appended
+// only when present. When none of those three exist at all (a regional geo
+// guide whose page names no overall season either -- see
+// chechnya-kezenoy-am/suzdal in atlas.ts) the destination's own region
+// fills in, so the strip is never just a bare, contentless label.
+function guideStripText(destination: RitualResultViewModel["destination"]): string | null {
+  if (!destination.source) return null;
+
+  const facts = [
+    destination.routeDays ? pluralDays(destination.routeDays) : null,
+    destination.rating ?? null,
+    destination.seasonWindow ?? null,
+  ].filter((fact): fact is string => Boolean(fact));
+
+  return [guideSourceLabel(destination.source), ...(facts.length > 0 ? facts : [destination.region])].join(" · ");
+}
+
+// The strip itself is the link to the guide page -- not a separate CTA next
+// to quiet text -- so it renders as nothing at all (not a dead span) when
+// either half is missing: no sourceUrl to link to, or no source to build a
+// label from (hand-built fixtures that predate this feature carry neither;
+// see RitualResultViewModel.destination's own comment).
+function GuideStrip({ destination }: { destination: RitualResultViewModel["destination"] }) {
+  const text = guideStripText(destination);
+  if (!destination.sourceUrl || !text) return null;
+
+  return (
+    <a className="guide-strip" href={destination.sourceUrl} target="_blank" rel="noreferrer">
+      {text}
+    </a>
+  );
+}
+
 // Fixed rather than computed from position-in-array, so a block that
 // doesn't render (spread, when the reading carries no cards) leaves a gap
 // in the sequence instead of shifting every later block's delay — a
@@ -111,6 +187,7 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
       <div className="prediction-panel" data-block="prediction" style={blockIndexStyle(BLOCK_INDEX.prediction)}>
         <p className="result-kicker">Предсказанный маршрут</p>
         <h2>{result.prediction.headline}</h2>
+        <GuideStrip destination={result.destination} />
         <p>{result.prediction.opening}</p>
         <p>{result.prediction.summary}</p>
       </div>

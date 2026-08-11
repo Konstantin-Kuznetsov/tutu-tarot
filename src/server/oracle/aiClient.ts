@@ -1,10 +1,18 @@
 import type { TarotPosition } from "@/domain/types";
 import { validateNarration, type AiNarration } from "@/server/oracle/validate";
 
-// Exactly what the model needs to write three card readings and a closing
-// line, and nothing else -- no other atlas entries, no offer titles, no
-// traveller counts. Every extra place name in the prompt is a place name
-// that could come back out in the reply.
+// Exactly what the model needs to write an opening, three card readings and
+// a closing line -- still no other atlas entries, no offer titles, no
+// traveller counts. The rule used to be blanket: every extra place name in
+// the prompt is a place name that could come back out in the reply, so none
+// went in beyond the chosen destination's own name and region. `stops`
+// below is a deliberate, considered exception to that rule, not a
+// contradiction of it: those are the real waypoints of the *chosen* route,
+// not other atlas entries, so hosting them in the prompt makes the model's
+// opening more accurate, not less -- validateNarration (validate.ts) still
+// rejects any name belonging to a *different* atlas destination exactly as
+// before, so the guarantee this rule protects is untouched, only widened to
+// admit the one route actually chosen.
 export interface NarrationCardInput {
   id: string;
   name: string;
@@ -16,6 +24,16 @@ export interface NarrationRequestInput {
   cards: NarrationCardInput[];
   destinationName: string;
   destinationRegion: string;
+  // Guide facts for the model's opening, straight from the chosen
+  // TravelAtlasItem (see PredictionInput -> createPrediction in
+  // narrator.ts). All optional: ten atlas entries are sourced from a
+  // regional geo guide rather than a single rated route and carry no
+  // routeDays, and buildUserPayload below drops whichever of these are
+  // absent rather than sending an empty/undefined field.
+  routeDays?: number;
+  stops?: string[];
+  highlights?: string[];
+  oneLine?: string;
 }
 
 // Every varying part of talking to a gateway is configuration, not code, so
@@ -39,15 +57,16 @@ const AI_TIMEOUT_MS = 8_000;
 
 // Caps completion length so a misbehaving model can't bill for thousands of
 // tokens on a single reading. The validator (validate.ts) already bounds
-// every text field -- three card readings plus a closing line -- at 400
-// characters each, so the JSON reply never legitimately needs more than
-// ~1,600 characters of prose plus its own object/array/key punctuation (ids,
-// braces, quotes): call it ~1,800 characters worst case. Cyrillic tokenizes
+// every text field -- the opening, three card readings, and a closing line,
+// five fields since the opening joined the other two -- at 400 characters
+// each, so the JSON reply never legitimately needs more than ~2,000
+// characters of prose plus its own object/array/key punctuation (ids,
+// braces, quotes): call it ~2,250 characters worst case. Cyrillic tokenizes
 // less efficiently than English (roughly 1.5-2 characters per token instead
-// of ~4), so that reply can cost up to ~1,200 tokens even when every field
-// is fully used. 1,500 leaves headroom for that worst case without leaving
+// of ~4), so that reply can cost up to ~1,500 tokens even when every field
+// is fully used. 1,800 leaves headroom for that worst case without leaving
 // the ceiling anywhere near "thousands of tokens" for a runaway response.
-const MAX_COMPLETION_TOKENS = 1_500;
+const MAX_COMPLETION_TOKENS = 1_800;
 
 // Most corporate AI gateways expose an OpenAI-compatible chat-completions
 // endpoint, so that shape is the default. api.openai.com itself is only
@@ -69,14 +88,15 @@ export const DEFAULT_AI_MODEL = "gpt-4.1-mini";
 // and simply requested from the model too.
 const SYSTEM_PROMPT = [
   "Ты — таролог-рассказчик мистического приложения, которое подбирает путешествие по России с помощью карт Таро.",
-  "Тебе присылают три уже вытянутые карты (с позицией в раскладе и тем, выпала ли карта перевёрнутой) и уже выбранное направление (название и регион).",
+  "Тебе присылают три уже вытянутые карты (с позицией в раскладе и тем, выпала ли карта перевёрнутой), уже выбранное направление (название и регион) и, когда они известны, факты о самом маршруте: продолжительность в днях, список его остановок, список его достопримечательностей и одну фразу-описание из путеводителя Туту.",
   "Направление уже выбрано приложением по другим правилам — ты не выбираешь и не меняешь его, только пишешь о картах и о том, как они ведут к этому направлению.",
-  "Не называй никакое другое направление, город или место, кроме единственного, что дано в запросе.",
+  "Не называй никакое другое направление, город или место, кроме единственного, что дано в запросе, и кроме остановок его собственного маршрута, если они присланы, — упоминать их можно и нужно.",
   "Если в тексте карты обращаются к человеку, для которого сделан расклад, обращайся только на «вы» — вежливая форма (вы, вам, вас, ваш, откройтесь), а не на «ты» (тебе, тебя, твой, откройся): это единственное обращение, которое использует остальной текст приложения.",
   "Верни строго один JSON-объект без markdown, без пояснений и без кодовых блоков, ровно такой формы:",
-  '{"cardReadings":[{"id":"<id карты>","text":"..."},{"id":"<id карты>","text":"..."},{"id":"<id карты>","text":"..."}],"closingLine":"..."}',
+  '{"opening":"...","cardReadings":[{"id":"<id карты>","text":"..."},{"id":"<id карты>","text":"..."},{"id":"<id карты>","text":"..."}],"closingLine":"..."}',
+  "Поле opening — один вступительный абзац о выбранном направлении и его маршруте, до описания карт: используй присланные факты о маршруте, когда они есть, но сложи их в связный текст, а не перечисляй построчно.",
   "В cardReadings должно быть ровно три записи — по одной на каждую присланную карту, id каждой записи должен в точности совпадать с id карты из запроса.",
-  "Каждое поле text и closingLine — связный текст на русском языке (кириллица), от 20 до 400 символов, без ссылок и адресов сайтов, без markdown-разметки и HTML-тегов.",
+  "Каждое поле opening, text и closingLine — связный текст на русском языке (кириллица), от 20 до 400 символов, без ссылок и адресов сайтов, без markdown-разметки и HTML-тегов.",
 ].join(" ");
 
 function buildUserPayload(input: NarrationRequestInput) {
@@ -90,6 +110,15 @@ function buildUserPayload(input: NarrationRequestInput) {
     destination: {
       name: input.destinationName,
       region: input.destinationRegion,
+      // Each guide fact below is simply absent from the JSON.stringify'd
+      // payload when undefined (JSON.stringify drops undefined-valued
+      // object properties), so a destination with no routeDays (the ten
+      // regional-geo-guide entries) sends a destination object with no
+      // routeDays key at all, not an explicit null.
+      routeDays: input.routeDays,
+      stops: input.stops,
+      highlights: input.highlights,
+      oneLine: input.oneLine,
     },
   };
 }

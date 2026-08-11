@@ -10,7 +10,15 @@ export interface AiCardReading {
   text: string;
 }
 
+// opening joins cardReadings/closingLine as free text the model writes: a
+// single introductory paragraph about the chosen destination and route,
+// grounded in whatever guide facts the caller sent (see
+// NarrationRequestInput in aiClient.ts). Validated with the exact same
+// isCleanText rule as the other two fields below -- length bounds, no URLs,
+// predominantly Cyrillic, no other atlas destination's name -- so it can
+// never smuggle in anything the card readings and closing line couldn't.
 export interface AiNarration {
+  opening: string;
   cardReadings: AiCardReading[];
   closingLine: string;
 }
@@ -83,10 +91,13 @@ export function validateNarration(raw: string, context: NarrationContext): AiNar
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
 
-  const record = parsed as { cardReadings?: unknown; closingLine?: unknown };
+  const record = parsed as { opening?: unknown; cardReadings?: unknown; closingLine?: unknown };
   if (!Array.isArray(record.cardReadings) || record.cardReadings.length !== 3) return null;
 
   const forbiddenNames = otherDestinationNames(context.destinationName);
+
+  if (!isCleanText(record.opening, forbiddenNames)) return null;
+
   const seenIds = new Set<string>();
   const cardReadings: AiCardReading[] = [];
 
@@ -104,5 +115,5 @@ export function validateNarration(raw: string, context: NarrationContext): AiNar
 
   if (!isCleanText(record.closingLine, forbiddenNames)) return null;
 
-  return { cardReadings, closingLine: record.closingLine };
+  return { opening: record.opening, cardReadings, closingLine: record.closingLine };
 }

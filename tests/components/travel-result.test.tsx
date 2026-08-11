@@ -217,3 +217,109 @@ describe("TravelResult", () => {
     expect(document.querySelector(".spread-panel__closing")).not.toBeInTheDocument();
   });
 });
+
+// The compact guide-facts strip near the headline (see GuideStrip in
+// TravelResult.tsx) -- added because the only existing guide link sat
+// quietly at the very bottom of the reading and a user reported never
+// finding it. `resultWithRoad`'s own destination carries no guide facts at
+// all (a plain `{ name, region }`, same as most other fixtures in this
+// file), so the tests above already cover "renders nothing without them"
+// implicitly; the cases below build their own destination to cover the
+// strip's actual content.
+describe("TravelResult guide strip", () => {
+  it("renders nothing when the destination carries no source/sourceUrl", () => {
+    render(<TravelResult result={resultWithRoad} />);
+    expect(document.querySelector(".guide-strip")).not.toBeInTheDocument();
+  });
+
+  it("is itself the link to the guide page, and shows source, days, rating and season for a rated route", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "provereno.tutu",
+            sourceUrl: "https://provereno.tutu.ru/kaliningradskaya-2025",
+            routeDays: 6,
+            rating: "9,3",
+            seasonWindow: "май-октябрь",
+          },
+        }}
+      />,
+    );
+
+    const strip = screen.getByRole("link", { name: "Проверено Туту · 6 дней · 9,3 · май-октябрь" });
+    expect(strip).toHaveAttribute("href", "https://provereno.tutu.ru/kaliningradskaya-2025");
+  });
+
+  it("declines the day count correctly (2 дня, not 2 день/2 дней)", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "provereno.tutu",
+            sourceUrl: "https://provereno.tutu.ru/tver",
+            routeDays: 2,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Проверено Туту · 2 дня" })).toBeInTheDocument();
+  });
+
+  // A regional geo guide (no routeDays/rating -- ten atlas entries are this
+  // shape) still has to show something honest, never a bare label or a
+  // dangling "·" for the facts it doesn't have.
+  it("falls back to the region, with no dangling separator, for a regional guide with no days or rating", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            name: "Чечня",
+            region: "Чеченская Республика",
+            source: "geo.tutu",
+            sourceUrl: "https://www.tutu.ru/geo/rossiya/kurort/chechnya/",
+            // No routeDays, rating or seasonWindow -- matches
+            // chechnya-kezenoy-am in atlas.ts exactly.
+          },
+        }}
+      />,
+    );
+
+    const strip = screen.getByRole("link", { name: "Путеводитель Туту · Чеченская Республика" });
+    expect(strip).toHaveAttribute("href", "https://www.tutu.ru/geo/rossiya/kurort/chechnya/");
+    expect(strip.textContent).not.toMatch(/·\s*$/);
+    expect(strip.textContent).not.toMatch(/^\s*·/);
+  });
+
+  it("sits above the spread, right after the headline", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "provereno.tutu",
+            sourceUrl: "https://provereno.tutu.ru/perm-2",
+            routeDays: 6,
+            rating: "8,8",
+          },
+        }}
+      />,
+    );
+
+    const strip = screen.getByRole("link", { name: "Проверено Туту · 6 дней · 8,8" });
+    const spread = screen.getByRole("region", { name: "Расклад карт" });
+    expect(strip.compareDocumentPosition(spread) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Lives inside the prediction block, not a new [data-block] step of its
+    // own -- the stagger sequence must stay exactly as it was.
+    const order = Array.from(document.querySelectorAll("[data-block]")).map((node) => node.getAttribute("data-block"));
+    expect(order).toEqual(["prediction", "spread", "road", "other-roads", "hotels", "sources"]);
+  });
+});
