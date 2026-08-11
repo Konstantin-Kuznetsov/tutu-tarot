@@ -121,7 +121,7 @@ describe("DateRangeCalendar", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("marks the range endpoints with aria-selected and a directional data-position", () => {
+  it("marks the range endpoints with aria-pressed and a directional data-position", () => {
     open();
     // Capture the trigger by reference: picking the end day closes the
     // panel and rewrites the trigger's own accessible name to the label
@@ -139,13 +139,18 @@ describe("DateRangeCalendar", () => {
 
     const start = day("10");
     const end = day("17");
-    expect(start).toHaveAttribute("aria-selected", "true");
+    // aria-pressed, not aria-selected: a plain <button>'s implicit role is
+    // "button", which jsx-a11y/role-supports-aria-props correctly points
+    // out doesn't support aria-selected (that's for option/tab/gridcell
+    // roles) -- aria-pressed is the ARIA-valid way to expose a button's own
+    // toggled/boundary state.
+    expect(start).toHaveAttribute("aria-pressed", "true");
     expect(start).toHaveAttribute("data-position", "start");
-    expect(end).toHaveAttribute("aria-selected", "true");
+    expect(end).toHaveAttribute("aria-pressed", "true");
     expect(end).toHaveAttribute("data-position", "end");
 
     const inRangeDay = day("12");
-    expect(inRangeDay).toHaveAttribute("aria-selected", "false");
+    expect(inRangeDay).toHaveAttribute("aria-pressed", "false");
     expect(inRangeDay).not.toHaveAttribute("data-position");
   });
 });

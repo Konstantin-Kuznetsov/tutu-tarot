@@ -63,8 +63,16 @@ export function RitualStage() {
   const [revealCount, setRevealCount] = useState<0 | 1 | 2>(0);
   const timersRef = useRef<number[]>([]);
   const resultRef = useRef<HTMLDivElement>(null);
+  // Mirrors `stage`, but updated at each setStage call site below instead of
+  // once per render (react-hooks/refs flags a bare `stageRef.current = stage`
+  // in the render body -- a render can be started and discarded without
+  // committing, so mutating a ref as a side effect of rendering is unsafe in
+  // general). Every place `stage` actually changes is an explicit setStage
+  // call inside an event handler, timer callback or promise continuation --
+  // never during render -- so setting the ref right alongside each one keeps
+  // it exactly as current as the old per-render assignment did, without ever
+  // touching it while this component function is being evaluated.
   const stageRef = useRef<Stage>(stage);
-  stageRef.current = stage;
   // Whether the user has taken the wheel/keyboard/touch at any point since
   // the ritual left "idle" — tracked for the component's whole lifetime
   // (see the mount-once effect below), not just while the auto-scroll
@@ -83,7 +91,13 @@ export function RitualStage() {
   }
 
   // Clear every timer on unmount, in addition to the clears already inside
-  // startRitual's success/error paths.
+  // startRitual's success/error paths. `clearTimers` is deliberately left
+  // out of the dependency array: it's a plain function redeclared on every
+  // render, but its body only ever reads/writes `timersRef.current` (a
+  // ref) -- never `stage`, props, or any other reactive value -- so every
+  // render's copy behaves identically. Depending on it (or wrapping it in
+  // useCallback just to satisfy the array) would add ceremony without
+  // changing what actually runs at unmount.
   useEffect(() => clearTimers, []);
 
   async function startRitual(intent: TripIntent) {
@@ -102,9 +116,9 @@ export function RitualStage() {
     // false "error".
     if (stageRef.current !== "idle" && stageRef.current !== "error") return;
     // Claim the slot synchronously, before anything else in this function
-    // runs, so a second call arriving later in the same tick (before this
-    // component has re-rendered and re-run `stageRef.current = stage`
-    // below) is rejected by the check above too.
+    // runs (including the `await` below), so a second call arriving later
+    // in the same tick -- before React has even started processing this
+    // call's setStage("dealing") -- is rejected by the check above too.
     stageRef.current = "dealing";
 
     clearTimers();
@@ -124,7 +138,11 @@ export function RitualStage() {
       window.setTimeout(() => setRevealCount(1), DEAL_STEP_MS),
       window.setTimeout(() => setRevealCount(2), DEAL_STEP_MS * 2),
       window.setTimeout(() => {
-        setStage((current) => (current === "dealing" ? "consulting" : current));
+        setStage((current) => {
+          if (current !== "dealing") return current;
+          stageRef.current = "consulting";
+          return "consulting";
+        });
       }, CONSULT_AFTER_MS),
     );
 
@@ -140,9 +158,11 @@ export function RitualStage() {
       const [data] = await Promise.all([postRitualIntent(intent), dealtFloor]);
       clearTimers();
       setResult(data);
+      stageRef.current = "revealed";
       setStage("revealed");
     } catch {
       clearTimers();
+      stageRef.current = "error";
       setStage("error");
     }
   }
@@ -153,6 +173,7 @@ export function RitualStage() {
     setLocalCards(null);
     setRevealCount(0);
     userTookControlRef.current = false;
+    stageRef.current = "idle";
     setStage("idle");
   }
 

@@ -40,6 +40,11 @@ export function TarotCardView({ card, revealed, testId, readingText }: TarotCard
         {revealed ? (
           <div className="tarot-card__face">
             <small className="tarot-card__position">{card.position}</small>
+            {/* eslint-disable-next-line @next/next/no-img-element --
+                Deliberate: card.image is a local, pre-processed, fixed-
+                dimension WebP (see scripts/prepare-tarot-images.mjs) --
+                next/image would add a transform hop for an asset that
+                already is the exact size it's rendered at. */}
             <img
               className="tarot-card__art"
               src={card.image}

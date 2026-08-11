@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { decodeReading } from "@/domain/share/code";
+import { decodeReading } from "@/domain/share/decode";
 import { resolveSharedReading, type ResolvedSharedReading } from "@/domain/share/reading";
 
 export const alt = "Таро-турагент — расклад: три карты и направление поездки";
@@ -185,6 +185,7 @@ async function ReadingArt({ destination, spreadCards }: ResolvedSharedReading) {
                 src={cardImages[index]}
                 width={150}
                 height={260}
+                alt={`${card.name}${card.reversed ? ", перевёрнутая" : ""}`}
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>
