@@ -26,8 +26,11 @@ export function ritualSeed(intent: TripIntent): string {
 }
 
 // Deterministic 32-bit hash. Same string always yields the same number, so the
-// same intent always yields the same reading.
-function hash(input: string): number {
+// same intent always yields the same reading. Exported so other domain code
+// (destination tie-breaking in travel/scoring.ts) can derive its own
+// seed-based pseudo-randomness from the same pure function instead of
+// growing a second hash implementation.
+export function hash(input: string): number {
   let value = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
     value ^= input.charCodeAt(index);

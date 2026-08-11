@@ -136,6 +136,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
   const selection = selectDestination({
     ...input,
     archetypeWeights: archetypeWeightsFrom(draw.cards),
+    seed: draw.seed,
   });
 
   // Phase 2: reality reports which roads exist, then the third card names one.
