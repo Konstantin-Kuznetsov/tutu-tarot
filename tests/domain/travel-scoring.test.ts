@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { ArchetypeWeights } from "@/domain/tarot/engine";
+import type { TarotArchetype } from "@/domain/types";
 import { travelAtlas } from "@/domain/travel/atlas";
 import { selectDestination } from "@/domain/travel/scoring";
+
+const TAROT_ARCHETYPE_VOCABULARY: TarotArchetype[] = [
+  "solitude",
+  "road",
+  "cliffs",
+  "water",
+  "north",
+  "culture",
+  "food",
+  "sun",
+  "renewal",
+  "mystery",
+  "star",
+];
 
 describe("selectDestination", () => {
   it("uses a broad static atlas curated from Tutu travel guides", () => {
@@ -18,6 +33,22 @@ describe("selectDestination", () => {
       expect(destination.tarotArchetypes.length).toBeGreaterThan(0);
       expect(destination.season.length).toBeGreaterThan(0);
     }
+  });
+
+  it("has at least 30 destinations in the atlas", () => {
+    expect(travelAtlas.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it("carries every tarot archetype in the vocabulary on at least two destinations", () => {
+    for (const archetype of TAROT_ARCHETYPE_VOCABULARY) {
+      const count = travelAtlas.filter((destination) => destination.tarotArchetypes.includes(archetype)).length;
+      expect(count, `archetype "${archetype}" should appear on at least two destinations`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("lists winter for at least 18 destinations", () => {
+    const winterCount = travelAtlas.filter((destination) => destination.season.includes("winter")).length;
+    expect(winterCount).toBeGreaterThanOrEqual(18);
   });
 
   it("selects Usvinskie Stolby for cliffs and road archetypes", () => {
