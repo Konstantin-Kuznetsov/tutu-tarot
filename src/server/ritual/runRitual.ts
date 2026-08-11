@@ -2,7 +2,7 @@ import { archetypeWeightsFrom, drawDestinationCards, drawPathCard } from "@/doma
 import { FOG_REASON, roadReason } from "@/domain/tarot/roadReason";
 import { usableModes } from "@/domain/travel/roads";
 import { selectDestination } from "@/domain/travel/scoring";
-import type { DrawnTarotCard, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
+import type { DrawnTarotCard, LegOutcome, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
 import { createPrediction, type PredictionText } from "@/server/oracle/narrator";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
 import { formatDuration, type NormalizedOffer } from "@/server/tutu/normalize";
@@ -145,6 +145,8 @@ export interface RitualResult {
   hotelOffers: NormalizedOffer[];
   sourceLinks: SourceLink[];
   warnings: string[];
+  transportOutcome: LegOutcome;
+  hotelsOutcome: LegOutcome;
 }
 
 export interface RitualDeps {
@@ -197,5 +199,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     hotelOffers: offers.hotels,
     sourceLinks,
     warnings: offers.warnings,
+    transportOutcome: offers.transportOutcome,
+    hotelsOutcome: offers.hotelsOutcome,
   };
 }

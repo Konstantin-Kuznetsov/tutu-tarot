@@ -1159,6 +1159,17 @@ h1 {
   gap: 10px;
 }
 
+/* Same quiet voice as .road__warning -- this is that same distinction
+   (Tutu refused vs. Tutu answered with nothing, see LEG_OUTCOME_COPY in
+   OfferList.tsx) shown next to the offer grid it actually describes,
+   rather than only under the road block above. Sits above the grid, which
+   still renders its fallback link card underneath either way. */
+.offer-section__note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+}
+
 .offer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));

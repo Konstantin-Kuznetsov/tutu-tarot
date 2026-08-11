@@ -84,3 +84,13 @@ export interface ModeSummary {
 }
 
 export type ModesSummary = Partial<Record<TransportMode, ModeSummary>>;
+
+// What happened to one leg of a Tutu MCP search (transport or hotels),
+// distinct from the diagnostic `warnings` strings: "served" (real offers
+// came back), "empty" (Tutu answered, nothing usable for these dates -- a
+// real answer, not an error) or "failed" (every attempt was refused or
+// could not complete -- the reading was never actually checked). The two
+// failure-adjacent states render different copy (see LEG_OUTCOME_COPY in
+// src/components/OfferList.tsx) because they mean different things to a
+// reader: "empty" is safe to trust, "failed" is not.
+export type LegOutcome = "served" | "empty" | "failed";

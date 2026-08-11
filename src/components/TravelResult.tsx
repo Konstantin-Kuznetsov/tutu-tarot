@@ -1,10 +1,10 @@
 import type { PredictionText } from "@/server/oracle/narrator";
-import type { DrawnTarotCard, TravelAtlasItem, TripIntent } from "@/domain/types";
+import type { DrawnTarotCard, LegOutcome, TravelAtlasItem, TripIntent } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { RoadChoice } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
-import { MODE_LABELS, OfferList } from "./OfferList";
+import { LEG_OUTCOME_COPY, MODE_LABELS, OfferList } from "./OfferList";
 import { ShareButton } from "./ShareButton";
 import { TarotCardView } from "./TarotCardView";
 
@@ -35,6 +35,13 @@ export interface RitualResultViewModel {
   transportOffers: NormalizedOffer[];
   hotelOffers: NormalizedOffer[];
   warnings: string[];
+  // Same story as `destination.id`/`intent` below: always present on a real
+  // reading (see RitualResult.transportOutcome/hotelsOutcome), optional
+  // here only so hand-built test fixtures that predate this feature don't
+  // all need updating. When either is absent, the road block and the offer
+  // sections fall back to the old, undifferentiated `warnings`-based copy.
+  transportOutcome?: LegOutcome;
+  hotelsOutcome?: LegOutcome;
   // Same story as `destination.id`: always present on a real reading
   // (see RitualResult.intent), optional here only so hand-built test
   // fixtures don't all need updating for a feature they don't exercise.
@@ -248,8 +255,15 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
             RitualResultViewModel.warnings for the network payload, e.g.
             "Tutu MCP search_multitransport failed: ..." -- never fit for a
             reader). No [data-block] of its own: it belongs to the road
-            block's own stagger step, not a new one. */}
-        {result.warnings.length > 0 ? (
+            block's own stagger step, not a new one.
+            transportOutcome (when the reading carries one -- see its own
+            comment) picks between "Tutu refused" and "Tutu found nothing",
+            which read as very different facts to someone deciding whether
+            to trust the fog above. Falls back to the old undifferentiated
+            line, unchanged, for readings that predate transportOutcome. */}
+        {result.transportOutcome && result.transportOutcome !== "served" ? (
+          <p className="road__warning">{LEG_OUTCOME_COPY[result.transportOutcome]}</p>
+        ) : !result.transportOutcome && result.warnings.length > 0 ? (
           <p className="road__warning">
             Дороги удалось проверить не полностью — Туту сейчас отвечает не на все запросы.
           </p>
@@ -265,10 +279,16 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           offers={result.transportOffers}
           excludeId={roadChoice.best?.id}
           dataBlock="other-roads"
+          outcome={result.transportOutcome}
         />
       </div>
       <div style={blockIndexStyle(BLOCK_INDEX.hotels)}>
-        <OfferList title="Где остановиться" offers={result.hotelOffers} dataBlock="hotels" />
+        <OfferList
+          title="Где остановиться"
+          offers={result.hotelOffers}
+          dataBlock="hotels"
+          outcome={result.hotelsOutcome}
+        />
       </div>
       <div
         className="proof-links"
