@@ -1137,10 +1137,13 @@ h1 {
    fresh (see src/app/r/[code]/page.tsx) — same .caps kicker style as the
    mockup's own hero tagline, just centred and line-length-capped since
    this one runs a full sentence rather than a short label. */
+/* Left-aligned, not centred: this line sits directly under the shared page's
+   left-aligned <h1>, and centring it against a left-aligned title read as
+   broken layout rather than as a caption. */
 .share-note {
   max-width: 52ch;
-  margin: 0 auto var(--sp-2);
-  text-align: center;
+  margin: var(--sp-3) 0 var(--sp-4);
+  text-align: left;
 }
 
 .share-fallback {
