@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { decodeReading, encodeReading, type SharedReading } from "@/domain/share/code";
+import { encodeReading, type SharedReading } from "@/domain/share/code";
+import { decodeReading } from "@/domain/share/decode";
 
 const reading: SharedReading = {
   cards: [
