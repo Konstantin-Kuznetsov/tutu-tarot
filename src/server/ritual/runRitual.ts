@@ -108,7 +108,16 @@ export function buildRoadChoiceAndSources(params: {
   // fields to coincide.
   const sourceLinks: SourceLink[] = [
     {
-      label: destination.source === "provereno.tutu" ? "Проверенный маршрут Туту" : "Источник маршрута",
+      // Same wording the guide strip uses for the same URL. They used to
+      // disagree -- the strip said "Путеводитель Туту" while this said the
+      // generic "Источник маршрута" -- so one destination showed its single
+      // Tutu page under two different names.
+      label:
+        destination.source === "provereno.tutu"
+          ? "Проверенный маршрут Туту"
+          : destination.source === "geo.tutu"
+            ? "Путеводитель Туту"
+            : "Источник маршрута",
       url: destination.sourceUrl,
     },
     ...(destination.geoUrl && destination.geoUrl !== destination.sourceUrl
