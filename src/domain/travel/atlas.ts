@@ -108,7 +108,13 @@ export const travelAtlas: TravelAtlasItem[] = [
     oracleHook: "Северная масть ведет к тайге, где дорогу освещают огни стойбищ.",
     routeDays: 6,
     rating: "9,9",
-    seasonWindow: "круглосуточно",
+    // No seasonWindow: the collector's raw record (data/tutu-guides.json,
+    // id hmao-yugra) carries "круглосуточно" ("round the clock") here --
+    // that reads like an opening-hours phrase lifted from an attraction on
+    // the source page, not a season, and provereno.tutu.ru/hmao names no
+    // real recommended time of year to fall back to (there's no geoUrl for
+    // this entry either -- see the note just above). Dropped rather than
+    // kept as a value that isn't a season at all.
     stops: [
       "Когалым",
       "Русскинская",

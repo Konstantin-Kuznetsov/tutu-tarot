@@ -900,6 +900,20 @@ h1 {
   outline-offset: 2px;
 }
 
+/* One quiet line under the guide strip -- same muted, product voice as
+   .road__warning -- shown only when TravelResult's SeasonMismatchNote
+   decides the traveller's own dates fall entirely outside the guide's
+   recommended season. max-width/overflow-wrap match the same 375px-overflow
+   guard .guide-strip itself carries, for the same reason: this text is a
+   season-window string too, and can run just as long. */
+.guide-strip__note {
+  max-width: 52ch;
+  margin: 0 0 14px;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
 .spread-panel {
   display: grid;
   gap: 14px;

@@ -310,7 +310,7 @@ describe("TravelResult guide strip", () => {
       />,
     );
 
-    const strip = screen.getByRole("link", { name: "Проверено Туту · 6 дней · 9,3 · май-октябрь" });
+    const strip = screen.getByRole("link", { name: "Проверено Туту · 6 дней · 9,3 · лучшее время: май-октябрь" });
     expect(strip).toHaveAttribute("href", "https://provereno.tutu.ru/kaliningradskaya-2025");
   });
 
@@ -382,5 +382,110 @@ describe("TravelResult guide strip", () => {
     // own -- the stagger sequence must stay exactly as it was.
     const order = Array.from(document.querySelectorAll("[data-block]")).map((node) => node.getAttribute("data-block"));
     expect(order).toEqual(["prediction", "spread", "road", "other-roads", "hotels", "sources"]);
+  });
+});
+
+// The measured defect this task fixes: a user picked 5-15 October and saw
+// "Путеводитель Туту · летние месяцы" with nothing explaining that this is
+// the guide's own recommended season, not a claim about their trip. These
+// cover the quiet line that now states the mismatch outright (see
+// SeasonMismatchNote in TravelResult.tsx and its own comment).
+describe("TravelResult season mismatch note", () => {
+  const baseIntent = { departureCity: "Москва", travelerCount: 2 };
+
+  it("says plainly that the guide recommends a different season when the trip falls outside it", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "geo.tutu",
+            sourceUrl: "https://www.tutu.ru/geo/rossiya/kurort/tyumen/",
+            seasonWindow: "летние месяцы",
+          },
+          intent: { ...baseIntent, dateFrom: "2026-10-05", dateTo: "2026-10-15" },
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("Путеводитель Туту рекомендует для этой поездки другое время года, чем вы выбрали."),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing when the trip falls inside the guide's recommended season", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "geo.tutu",
+            sourceUrl: "https://www.tutu.ru/geo/rossiya/kurort/tyumen/",
+            seasonWindow: "летние месяцы",
+          },
+          intent: { ...baseIntent, dateFrom: "2026-07-01", dateTo: "2026-07-10" },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/рекомендует для этой поездки другое время года/)).not.toBeInTheDocument();
+  });
+
+  it("never renders for a круглый год destination, whatever the dates", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "provereno.tutu",
+            sourceUrl: "https://provereno.tutu.ru/perm-2",
+            seasonWindow: "круглый год",
+          },
+          intent: { ...baseIntent, dateFrom: "2026-01-05", dateTo: "2026-01-15" },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/рекомендует для этой поездки другое время года/)).not.toBeInTheDocument();
+  });
+
+  it("says nothing for a window it cannot parse with certainty, even outside any recognisable season", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "provereno.tutu",
+            sourceUrl: "https://provereno.tutu.ru/hmao",
+            seasonWindow: "круглосуточно",
+          },
+          intent: { ...baseIntent, dateFrom: "2026-10-05", dateTo: "2026-10-15" },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/рекомендует для этой поездки другое время года/)).not.toBeInTheDocument();
+  });
+
+  it("says nothing when the reading carries no intent at all (hand-built fixtures)", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          destination: {
+            ...resultWithRoad.destination,
+            source: "geo.tutu",
+            sourceUrl: "https://www.tutu.ru/geo/rossiya/kurort/tyumen/",
+            seasonWindow: "летние месяцы",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/рекомендует для этой поездки другое время года/)).not.toBeInTheDocument();
   });
 });
