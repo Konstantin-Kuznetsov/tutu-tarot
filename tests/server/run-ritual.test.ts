@@ -210,7 +210,10 @@ describe("buildRoadChoiceAndSources", () => {
     });
 
     expect(sourceLinks).toEqual([
-      { label: "Источник маршрута", url: "https://www.tutu.ru/geo/rossiya/kurort/karelia/" },
+      // "Путеводитель Туту", not the generic "Источник маршрута": a geo.tutu
+      // source is named the same here as it is on the guide strip, so one
+      // destination never shows its single Tutu page under two names.
+      { label: "Путеводитель Туту", url: "https://www.tutu.ru/geo/rossiya/kurort/karelia/" },
     ]);
   });
 });
