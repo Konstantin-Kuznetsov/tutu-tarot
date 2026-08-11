@@ -70,7 +70,7 @@ function label(value: DateRange): string {
 export function DateRangeCalendar({ value, onChange }: DateRangeCalendarProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
-  const today = useMemo(startOfToday, []);
+  const today = useMemo(() => startOfToday(), []);
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -156,7 +156,7 @@ export function DateRangeCalendar({ value, onChange }: DateRangeCalendarProps) {
                             <button
                               type="button"
                               disabled={disabled}
-                              aria-selected={edge}
+                              aria-pressed={edge}
                               data-in-range={inRange}
                               data-edge={edge}
                               data-position={position}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { encodeReading, type SharedReading } from "@/domain/share/code";
 
 type Status = "idle" | "copied" | "error";
@@ -34,6 +34,23 @@ function buildTelegramUrl(shareUrl: string, message: string): string {
   return `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
 }
 
+// window.location.origin never changes for the life of this tab (no
+// same-tab navigation happens away from this component without a full
+// reload), so there is nothing to subscribe to -- a stable no-op is exactly
+// what useSyncExternalStore wants here. Declared at module scope so its
+// identity never changes across renders.
+function subscribeToNothing() {
+  return () => {};
+}
+
+function readOrigin(): string {
+  return window.location.origin;
+}
+
+function readServerOrigin(): null {
+  return null;
+}
+
 export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
   // Held alongside `status`, not derived from it: this button also renders
@@ -46,15 +63,14 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   // This component is rendered inside /r/[code], a server-rendered route,
   // where `window` does not exist -- so the origin can't be read in the
   // component body (that crashed the server render before this fix; see the
-  // Task 13 fix-round-2 report). It's resolved after mount instead, in an
-  // effect, and starts null so the server render and the client's first
-  // render agree (no Telegram anchor yet) -- no hydration mismatch, and no
-  // placeholder link built from the wrong origin.
-  const [origin, setOrigin] = useState<string | null>(null);
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  // Task 13 fix-round-2 report). useSyncExternalStore is the React-sanctioned
+  // way to read a browser-only value like this: readServerOrigin (null)
+  // supplies the server/first-hydration-pass snapshot so the server render
+  // and the client's first render agree (no Telegram anchor yet, no
+  // hydration mismatch) -- readOrigin supplies the true value on every
+  // client render after that, with no setState-in-effect render cascade
+  // (react-hooks/set-state-in-effect) to produce it.
+  const origin = useSyncExternalStore(subscribeToNothing, readOrigin, readServerOrigin);
 
   const shareMessage = buildShareMessage(destinationName);
   const telegramUrl = origin ? buildTelegramUrl(shareUrlFor(origin, reading), shareMessage) : null;

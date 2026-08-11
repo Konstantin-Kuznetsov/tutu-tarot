@@ -1,7 +1,7 @@
 import type { PredictionText } from "@/server/oracle/narrator";
 import type { DrawnTarotCard, LegOutcome, TravelAtlasItem, TripIntent } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
-import type { RoadChoice } from "@/server/ritual/runRitual";
+import type { RoadChoice, SourceLink } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
 import { isOutsideSeasonWindow, seasonWindowCaption } from "@/domain/travel/seasonWindow";
@@ -155,7 +155,12 @@ function guideStripText(destination: RitualResultViewModel["destination"]): stri
 // either half is missing: no sourceUrl to link to, or no source to build a
 // label from (hand-built fixtures that predate this feature carry neither;
 // see RitualResultViewModel.destination's own comment).
-function GuideStrip({ destination }: { destination: RitualResultViewModel["destination"] }) {
+//
+// Exported: the shared-reading page (src/app/r/[code]/page.tsx) renders
+// this synchronously, from data resolveSharedReading already has with no
+// network call, before the road/offers half of that page streams in behind
+// its own Suspense boundary -- see that file's own comment for why.
+export function GuideStrip({ destination }: { destination: RitualResultViewModel["destination"] }) {
   const text = guideStripText(destination);
   if (!destination.sourceUrl || !text) return null;
 
@@ -175,7 +180,10 @@ function GuideStrip({ destination }: { destination: RitualResultViewModel["desti
 // already makes when no route could be checked (see FOG_REASON). Needs both
 // a season window and the trip's own dates, so it renders nothing for the
 // hand-built fixtures that predate `intent` on RitualResultViewModel.
-function SeasonMismatchNote({
+//
+// Exported for the same reason as GuideStrip above -- the shared-reading
+// page renders this synchronously too, right next to it.
+export function SeasonMismatchNote({
   destination,
   intent,
 }: {
@@ -205,7 +213,13 @@ const BLOCK_INDEX = {
   sources: 5,
 } as const;
 
-function blockIndexStyle(index: number): CSSProperties {
+// Exported so the shared-reading page's own two stagger sequences (the
+// frozen half rendered synchronously, and the streamed half inside its
+// Suspense boundary -- see src/app/r/[code]/page.tsx and
+// SharedReadingLive.tsx) drive the exact same `.result [data-block]`
+// animation this file's own blocks use, rather than a second, drifting
+// implementation of the same one-line CSS custom property.
+export function blockIndexStyle(index: number): CSSProperties {
   return { "--block-index": index } as CSSProperties;
 }
 
@@ -220,9 +234,90 @@ function readingTextFor(cardId: string, cardReadings: PredictionText["cardReadin
   return cardReadings.find((reading) => reading.id === cardId)?.text;
 }
 
+// The road hero-or-fog block, factored out of TravelResult so the
+// shared-reading page's own streamed half (SharedReadingLive.tsx) can render
+// the exact same markup once its own search settles, instead of a second
+// copy of this JSX drifting from this one. `blockIndex` is a parameter
+// rather than reaching for TravelResult's own BLOCK_INDEX constant: callers
+// outside this file run their own, independent stagger sequence (see
+// SharedReadingLive's own comment on why its indices start back at 0).
+export function RoadSection({
+  roadChoice,
+  transportOutcome,
+  warnings,
+  blockIndex,
+}: {
+  roadChoice: RoadChoice;
+  transportOutcome?: LegOutcome;
+  warnings: string[];
+  blockIndex: number;
+}) {
+  const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
+
+  return (
+    <section
+      className="road"
+      data-block="road"
+      aria-label="Дорога, которую выбрала карта"
+      style={blockIndexStyle(blockIndex)}
+    >
+      <h3 className="sec"><span>Дорога, которую выбрала карта</span></h3>
+      {roadChoice.best ? (
+        <article className="road__card">
+          {modeLabel ? <p className="caps">{modeLabel}</p> : null}
+          <RoadHero best={roadChoice.best} />
+          <p className="road__reason">{roadChoice.reason}</p>
+        </article>
+      ) : (
+        <div className="road__fog">
+          <div className="rule" aria-hidden="true">
+            <span className="diamond" />
+          </div>
+          <p className="road__reason road__reason--fog">{roadChoice.reason}</p>
+        </div>
+      )}
+      {/* One quiet, product-voiced line rather than the raw warning
+          strings themselves (those are diagnostic English carried in
+          RitualResultViewModel.warnings for the network payload, e.g.
+          "Tutu MCP search_multitransport failed: ..." -- never fit for a
+          reader). No [data-block] of its own: it belongs to the road
+          block's own stagger step, not a new one.
+          transportOutcome (when the reading carries one -- see its own
+          comment) picks between "Tutu refused" and "Tutu found nothing",
+          which read as very different facts to someone deciding whether
+          to trust the fog above. Falls back to the old undifferentiated
+          line, unchanged, for readings that predate transportOutcome. */}
+      {transportOutcome && transportOutcome !== "served" ? (
+        <p className="road__warning">{LEG_OUTCOME_COPY[transportOutcome]}</p>
+      ) : !transportOutcome && warnings.length > 0 ? (
+        <p className="road__warning">
+          Дороги удалось проверить не полностью — Туту сейчас отвечает не на все запросы.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+// The trust footer, factored out for the same reason as RoadSection above.
+export function SourcesSection({ sourceLinks, blockIndex }: { sourceLinks: SourceLink[]; blockIndex: number }) {
+  return (
+    <div
+      className="proof-links"
+      data-block="sources"
+      aria-label="Подтверждения Туту"
+      style={blockIndexStyle(blockIndex)}
+    >
+      {sourceLinks.map((link) => (
+        <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+          {link.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function TravelResult({ result }: { result: RitualResultViewModel }) {
   const { roadChoice } = result;
-  const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
   const reading = sharedReadingFrom(result);
 
   return (
@@ -266,46 +361,12 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           ) : null}
         </section>
       ) : null}
-      <section
-        className="road"
-        data-block="road"
-        aria-label="Дорога, которую выбрала карта"
-        style={blockIndexStyle(BLOCK_INDEX.road)}
-      >
-        <h3 className="sec"><span>Дорога, которую выбрала карта</span></h3>
-        {roadChoice.best ? (
-          <article className="road__card">
-            {modeLabel ? <p className="caps">{modeLabel}</p> : null}
-            <RoadHero best={roadChoice.best} />
-            <p className="road__reason">{roadChoice.reason}</p>
-          </article>
-        ) : (
-          <div className="road__fog">
-            <div className="rule" aria-hidden="true">
-              <span className="diamond" />
-            </div>
-            <p className="road__reason road__reason--fog">{roadChoice.reason}</p>
-          </div>
-        )}
-        {/* One quiet, product-voiced line rather than the raw warning
-            strings themselves (those are diagnostic English carried in
-            RitualResultViewModel.warnings for the network payload, e.g.
-            "Tutu MCP search_multitransport failed: ..." -- never fit for a
-            reader). No [data-block] of its own: it belongs to the road
-            block's own stagger step, not a new one.
-            transportOutcome (when the reading carries one -- see its own
-            comment) picks between "Tutu refused" and "Tutu found nothing",
-            which read as very different facts to someone deciding whether
-            to trust the fog above. Falls back to the old undifferentiated
-            line, unchanged, for readings that predate transportOutcome. */}
-        {result.transportOutcome && result.transportOutcome !== "served" ? (
-          <p className="road__warning">{LEG_OUTCOME_COPY[result.transportOutcome]}</p>
-        ) : !result.transportOutcome && result.warnings.length > 0 ? (
-          <p className="road__warning">
-            Дороги удалось проверить не полностью — Туту сейчас отвечает не на все запросы.
-          </p>
-        ) : null}
-      </section>
+      <RoadSection
+        roadChoice={roadChoice}
+        transportOutcome={result.transportOutcome}
+        warnings={result.warnings}
+        blockIndex={BLOCK_INDEX.road}
+      />
       {/* OfferList renders its own [data-block] section; --block-index is set
           on this wrapper and inherited down to it (custom properties
           inherit through the DOM by default), which staggers it without
@@ -327,18 +388,7 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           outcome={result.hotelsOutcome}
         />
       </div>
-      <div
-        className="proof-links"
-        data-block="sources"
-        aria-label="Подтверждения Туту"
-        style={blockIndexStyle(BLOCK_INDEX.sources)}
-      >
-        {result.sourceLinks.map((link) => (
-          <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
-            {link.label}
-          </a>
-        ))}
-      </div>
+      <SourcesSection sourceLinks={result.sourceLinks} blockIndex={BLOCK_INDEX.sources} />
       {/* No [data-block] here on purpose: the sources block above already
           closes out the animated stagger sequence (BLOCK_INDEX.sources is
           its last step), and this sits right after it, undelayed, rather
