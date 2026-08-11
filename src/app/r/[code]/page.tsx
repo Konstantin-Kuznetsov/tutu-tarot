@@ -1,25 +1,56 @@
 import type { Metadata } from "next";
-import { decodeReading } from "@/domain/share/code";
+import Link from "next/link";
+import type { CSSProperties } from "react";
+import { Suspense } from "react";
+import { decodeReading } from "@/domain/share/decode";
 import { resolveSharedReading } from "@/domain/share/reading";
-import { ritualSeed } from "@/domain/tarot/engine";
-import type { TripIntent } from "@/domain/types";
-import { createPrediction } from "@/server/oracle/narrator";
-import { buildRoadChoiceAndSources } from "@/server/ritual/runRitual";
-import { searchTutuOffers } from "@/server/tutu/mcpClient";
-import { TravelResult, type RitualResultViewModel } from "@/components/TravelResult";
+import type { TravelAtlasItem, TripIntent } from "@/domain/types";
+import { GuideStrip, SeasonMismatchNote, blockIndexStyle, type RitualResultViewModel } from "@/components/TravelResult";
+import { TarotCardView } from "@/components/TarotCardView";
+import { SharedReadingLive } from "@/components/SharedReadingLive";
 
 interface PageProps {
   params: Promise<{ code: string }>;
 }
 
-// This route runs a live Tutu MCP search (searchTutuOffers, an 18s budget --
-// see SEARCH_BUDGET_MS in mcpClient.ts) and then narration, serially, at
-// request time -- same shape as /api/ritual, which already carries this
-// comment and this exact 30s ceiling. Without it, a cold shared link would
-// inherit whatever the platform default is, which can be lower than what
-// this page's own work needs: it would always pass locally (no cold start,
-// warm connections) while risking a mid-search kill in production.
+// This route's streamed half (SharedReadingLive, below) runs a live Tutu MCP
+// search (searchTutuOffers, an 18s budget -- see SEARCH_BUDGET_MS in
+// mcpClient.ts) and then narration -- same shape as /api/ritual, which
+// already carries this comment and this exact 30s ceiling. Without it, a
+// cold shared link would inherit whatever the platform default is, which
+// can be lower than what this route's own work needs: it would always pass
+// locally (no cold start, warm connections) while risking a mid-search kill
+// in production.
 export const maxDuration = 30;
+
+// The frozen half of `RitualResultViewModel.destination` (see that type's
+// own comment): everything GuideStrip/SeasonMismatchNote read, copied over
+// by hand from the atlas item resolveSharedReading already resolved -- no
+// network needed for any of it.
+function destinationViewModel(destination: TravelAtlasItem): RitualResultViewModel["destination"] {
+  return {
+    id: destination.id,
+    name: destination.name,
+    region: destination.region,
+    source: destination.source,
+    sourceUrl: destination.sourceUrl,
+    routeDays: destination.routeDays,
+    rating: destination.rating,
+    seasonWindow: destination.seasonWindow,
+  };
+}
+
+// Shown in place of the road/offers/narration block while SharedReadingLive
+// is still awaiting the search -- in the product's own voice (the exact
+// phrase RitualScene already shows on "/" while the fresh ritual's own
+// search is in flight), not a generic spinner.
+function SharedReadingFallback() {
+  return (
+    <p className="ritual-status" role="status" data-block="live-fallback" style={blockIndexStyle(2)}>
+      Оракул сверяется с дорогами Туту…
+    </p>
+  );
+}
 
 // The prophecy -- which three cards, which orientation, which destination,
 // which road the third card named -- comes straight from the link and is
@@ -27,68 +58,6 @@ export const maxDuration = 30;
 // prices are asked for again, through the same server-side search path the
 // original ritual used, so a reading a stranger opens tomorrow shows today's
 // tickets rather than a snapshot that might no longer be bookable.
-async function loadSharedResult(code: string): Promise<RitualResultViewModel | null> {
-  const reading = decodeReading(code);
-  if (!reading) return null;
-
-  const resolved = resolveSharedReading(reading);
-  if (!resolved) return null;
-  const { destination, spreadCards } = resolved;
-
-  const intent: TripIntent = {
-    departureCity: reading.departureCity,
-    dateFrom: reading.dateFrom,
-    dateTo: reading.dateTo,
-    travelerCount: reading.travelerCount,
-  };
-
-  const offers = await searchTutuOffers({ intent, destination });
-  const pathCard = spreadCards[2];
-  const { roadChoice, sourceLinks } = buildRoadChoiceAndSources({
-    mode: reading.mode,
-    pathCard,
-    transportOffers: offers.transport,
-    modesSummary: offers.modesSummary,
-    destination,
-  });
-
-  const prediction = await createPrediction({
-    intent,
-    spread: { seed: ritualSeed(intent), cards: spreadCards },
-    selection: { destination, score: 0, reasons: [] },
-    roadChoice,
-    aiApiKey: process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY,
-  });
-
-  return {
-    prediction,
-    destination: {
-      id: destination.id,
-      name: destination.name,
-      region: destination.region,
-      // Guide facts for the shared page's own guide strip (TravelResult's
-      // <GuideStrip>) -- the fresh RitualStage/API-route path gets these for
-      // free (it serializes the whole TravelAtlasItem as JSON), but this
-      // page builds its viewModel by hand from the decoded share code, so
-      // they have to be copied over explicitly.
-      source: destination.source,
-      sourceUrl: destination.sourceUrl,
-      routeDays: destination.routeDays,
-      rating: destination.rating,
-      seasonWindow: destination.seasonWindow,
-    },
-    spreadCards,
-    roadChoice,
-    sourceLinks,
-    transportOffers: offers.transport,
-    hotelOffers: offers.hotels,
-    warnings: offers.warnings,
-    transportOutcome: offers.transportOutcome,
-    hotelsOutcome: offers.hotelsOutcome,
-    intent,
-  };
-}
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { code } = await params;
   const reading = decodeReading(code);
@@ -110,9 +79,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function SharedReadingPage({ params }: PageProps) {
   const { code } = await params;
-  const result = await loadSharedResult(code);
+  const reading = decodeReading(code);
+  const resolved = reading ? resolveSharedReading(reading) : null;
 
-  if (!result) {
+  if (!reading || !resolved) {
     return (
       <div className="table">
         <main className="result share-fallback">
@@ -120,11 +90,20 @@ export default async function SharedReadingPage({ params }: PageProps) {
           <p className="ritual-status" role="alert">
             Эта ссылка не открылась — карты рассыпались или её кто-то подделал.
           </p>
-          <a className="btn" href="/">Разложить свой расклад</a>
+          <Link className="btn" href="/">Разложить свой расклад</Link>
         </main>
       </div>
     );
   }
+
+  const { destination, spreadCards } = resolved;
+  const intent: TripIntent = {
+    departureCity: reading.departureCity,
+    dateFrom: reading.dateFrom,
+    dateTo: reading.dateTo,
+    travelerCount: reading.travelerCount,
+  };
+  const destinationVm = destinationViewModel(destination);
 
   return (
     <div className="table">
@@ -133,7 +112,54 @@ export default async function SharedReadingPage({ params }: PageProps) {
         <p className="caps share-note">
           Карты и направление — те же, что выпали изначально. Билеты и отели ищутся заново, для свежих цен.
         </p>
-        <TravelResult result={result} />
+        <section className="travel-result">
+          {/* The frozen half: resolveSharedReading gives the three cards,
+              their orientations and the destination straight from the link
+              itself, with no network call at all -- so this renders in the
+              static shell, flushed immediately, before SharedReadingLive
+              below has even started its search. The headline is
+              deterministic too (createPrediction always sets it to exactly
+              this string -- see narrator.ts) so it can render here rather
+              than waiting on the narration call that decides the rest of
+              the prediction panel's prose. */}
+          <div className="prediction-panel" data-block="prediction" style={blockIndexStyle(0)}>
+            <p className="result-kicker">Предсказанный маршрут</p>
+            <h2>Карты указывают: {destination.name}</h2>
+            <GuideStrip destination={destinationVm} />
+            <SeasonMismatchNote destination={destinationVm} intent={intent} />
+          </div>
+          <section className="spread-panel" data-block="spread" aria-label="Расклад карт" style={blockIndexStyle(1)}>
+            <div className="spread-panel__header">
+              <p className="result-kicker">Расклад карт</p>
+              <h3>Три знака дороги</h3>
+            </div>
+            <div className="spread-grid">
+              {spreadCards.map((card, index) => (
+                <div
+                  className="spread-card-shell"
+                  key={`${card.position}-${card.id}`}
+                  style={{ "--card-order": index } as CSSProperties}
+                >
+                  {/* No readingText: the per-card written reading comes out
+                      of createPrediction, which streams in below -- until
+                      then TarotCardView falls back to the deck's own
+                      meaning, exactly as it does everywhere else a reading
+                      hasn't been written yet. */}
+                  <TarotCardView card={card} revealed testId="spread-card" />
+                </div>
+              ))}
+            </div>
+          </section>
+          {/* The streamed half: road, offers, and the rest of the oracle's
+              prose (see SharedReadingLive's own comment), none of which can
+              be known before the search settles. Suspense is what actually
+              makes this stream -- Next flushes everything above immediately
+              and swaps this boundary's fallback for the real content once
+              the awaits inside SharedReadingLive resolve. */}
+          <Suspense fallback={<SharedReadingFallback />}>
+            <SharedReadingLive reading={reading} destination={destination} spreadCards={spreadCards} intent={intent} />
+          </Suspense>
+        </section>
       </main>
     </div>
   );
