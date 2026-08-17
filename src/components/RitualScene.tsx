@@ -93,6 +93,12 @@ export function RitualScene({ stage, slots = DEFAULT_SLOTS }: RitualSceneProps) 
             </div>
           ))}
         </div>
+        {/* The front half of the same haze, mounted after the spread so it
+            paints over it (see RitualMist's `layer` prop and
+            `.ritual-mist--veil`). Kept as a sibling of the row rather than
+            a child of any one slot so a single cloud covers all three
+            cards at once. */}
+        <RitualMist variant="gather" layer="veil" />
       </div>
       <p className="ritual-status" role="status">
         {stage === "consulting" ? (

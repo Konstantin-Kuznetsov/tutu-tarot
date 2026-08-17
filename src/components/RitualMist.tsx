@@ -24,9 +24,33 @@
 // `transform`/`opacity` (see the brief's performance constraints, and the
 // comment on `.ritual-mist__ring` in globals.css for why that combination
 // stays cheap).
-export function RitualMist({ variant }: { variant: "gather" | "disperse" }) {
+// `layer` picks which side of the cards this copy paints on. Both are the
+// same markup and the same two turning rings; only the stacking and the
+// weight differ (see `.ritual-mist--veil` in globals.css):
+//  - "behind" (the default): the glow the cards sit in front of. This is
+//    the original, and on its own it is almost entirely hidden -- measured
+//    directly, the ring pair is 420/320px centred in a stage box that is
+//    exactly the row of cards (620x455 at a 1280 viewport), so the only
+//    mist a viewer ever actually saw was the slivers between the three
+//    cards, which reads as a warm edge glow rather than as haze.
+//  - "veil": the same haze in *front* of the cards, thin enough to see
+//    through. This is what makes the brief's staging legible -- cards
+//    materialising *in the centre of the mist* means the mist is between
+//    the viewer and the card as it arrives, and then thins away.
+// Mounting both is what makes a card look like it is inside the cloud
+// rather than lit from behind it.
+export function RitualMist({
+  variant,
+  layer = "behind",
+}: {
+  variant: "gather" | "disperse";
+  layer?: "behind" | "veil";
+}) {
   return (
-    <div className={`ritual-mist ritual-mist--${variant}`} aria-hidden="true">
+    <div
+      className={`ritual-mist ritual-mist--${variant}${layer === "veil" ? " ritual-mist--veil" : ""}`}
+      aria-hidden="true"
+    >
       <div className="ritual-mist__ring ritual-mist__ring--a" />
       <div className="ritual-mist__ring ritual-mist__ring--b" />
     </div>

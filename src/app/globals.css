@@ -906,6 +906,68 @@ h1 {
   animation: mist-spin-reverse 30s linear infinite;
 }
 
+/* The front half of the haze (RitualMist's layer="veil") — the fix for a
+   mist that was built correctly and then almost never seen. Measured on the
+   running page: `.ritual-mist` resolves to the stage box, which is exactly
+   the row of cards (620x455 at a 1280 viewport), and the rings inside it are
+   420/320px centred — so every painted pixel of mist sat behind three opaque
+   cards, and all that reached the viewer were the slivers between them. It
+   read as a warm edge glow, not as weather.
+   z-index 3 clears .spread-card-shell / .ritual-scene__slot (both z-index 1)
+   and .tarot-card inside them (also 1), so this paints over the cards; it
+   inherits `pointer-events: none` from `.ritual-mist`, so nothing here can
+   swallow a click. `screen` blending makes it lighten like haze catching
+   light rather than dim the artwork like a grey scrim. */
+.ritual-mist--veil {
+  z-index: 3;
+  /* Vertical only, deliberately: spilling the cloud above and below the row
+     stops it reading as a rectangle exactly the size of the cards, while a
+     *horizontal* negative inset is the one direction that could push the
+     page into the 375px overflow this file has already had to fix twice
+     (see `.ritual-mist`'s overflow comment and `.tarot-card`'s reveal
+     rule). Nothing here can widen the page. */
+  inset: -90px 0;
+  mix-blend-mode: screen;
+}
+
+/* Sized so that ring + blur still fits inside the (now taller) box with
+   room to spare — 520 + 2*26px of blur = 572, against a box that is 620
+   wide and 612 tall at a 1280 viewport — so `.ritual-mist`'s `overflow:
+   hidden` never actually cuts the cloud, and no hard clipped edge appears.
+   Blurred more than the rear rings (26px vs 16px): this layer is between
+   the viewer and the cards, so it has to stay soft enough to read the
+   artwork through. Still a static filter animated only on transform/opacity
+   — see `.ritual-mist__ring`'s comment for why that stays cheap. */
+.ritual-mist--veil .ritual-mist__ring {
+  width: min(74vw, 520px);
+  filter: blur(26px);
+}
+
+.ritual-mist--veil .ritual-mist__ring--b {
+  width: min(56vw, 380px);
+}
+
+/* Thickens fast, then settles to a thin lingering haze instead of holding
+   at full weight. The rear layer can hold at .85 all wait long because it
+   is behind the cards; this one is on top of them, and the consulting wait
+   can run the full 18s search budget (SEARCH_BUDGET_MS, mcpClient.ts) — a
+   46% veil sitting over the artwork for eighteen seconds would stop being
+   atmosphere and start being a smudge. 1500ms to settle rather than the
+   rear layer's 900ms: the cloud is still visibly thinning as the first card
+   turns (DEAL_STEP_MS = 900ms), which is what "the card resolves out of the
+   mist" actually looks like. */
+.ritual-mist--veil.ritual-mist--gather {
+  animation: mist-veil-gather 1500ms ease-out forwards;
+}
+
+/* Picks up exactly where the gather keyframe left off (.26), so the handover
+   from RitualScene to TravelResult's spread — which happens in a single tick
+   — shows one continuous cloud rather than a second one popping in at a
+   different weight. Two classes beat `.ritual-mist--disperse`'s own .85. */
+.ritual-mist--veil.ritual-mist--disperse {
+  --mist-opacity: .26;
+}
+
 .tarot-card {
   /* The component root is a <figure> (for its figcaption); reset the UA
      default figure margin (1em 40px) or the card shrinks and misaligns
@@ -1038,26 +1100,41 @@ h1 {
 
 /* Adapts the shared `.back` look to sit layered under .tarot-card__face
    inside .tarot-card (see TarotCardView, which mounts `class="back
-   tarot-card__back"`). Only `position` and `width` are added here —
-   `.back` already supplies `aspect-ratio: 100/172`, and deliberately
-   nothing here sets `height` or `inset`/`top`/`left`/etc.
-   `position: absolute` is required so the back doesn't take its own grid
-   row once .tarot-card__face is also mounted (both stay in the DOM at
-   once — .tarot-card__face is simply omitted before reveal). Leaving
-   inset/height unset is what makes `aspect-ratio` resolve at all: setting
-   `inset: 0` (as the old private copy did) fully determines both
-   dimensions from the containing block before aspect-ratio ever gets a
-   say, which is exactly why that copy rendered as a stretched rectangle
-   instead of a 100/172 card (see the 2026-08-09 review). With only width
-   fixed, height comes from aspect-ratio, and `place-items: center` on
-   .tarot-card (already there for exactly this) centers the resulting
-   shorter box — so back is always the correct card shape, and is always
-   fully contained inside .tarot-card__face's larger box (same width, same
-   x-position, centered on the y-axis) with no back pixels visible past
-   its edges. */
+   tarot-card__back"`). `position: absolute` is required so the back doesn't
+   take its own grid row once .tarot-card__face is also mounted (both stay
+   in the DOM at once — .tarot-card__face is simply omitted before reveal).
+
+   This used to keep `.back`'s own 100/172 ratio and only pin `width`,
+   letting `place-items: center` centre the resulting shorter box inside
+   .tarot-card's taller 1/2.3 one. That was deliberate (a 2026-08-09 review
+   had found a stretched back) but it left the back genuinely smaller than
+   the card: measured on the running page, a 188x432 card held a 186x320
+   back with 56px of card showing above and below it. `.tarot-card
+   [data-revealed="false"]` paints those strips with the same crosshatch so
+   the *pattern* matched — but `.back`'s own 1px gold border still drew a
+   full rectangle 56px in from the card's own 1px gold border, so a
+   face-down card read as a frame inside a frame. Invisible while the cards
+   were small; obvious the moment they were enlarged.
+
+   So the back now simply *is* the card's footprint: inset:0 against a
+   zero-padding .tarot-card, with `aspect-ratio`/`width`/`height` explicitly
+   returned to auto so none of them can re-derive a shorter box, and no
+   border of its own — .tarot-card's border is the card's edge, and one edge
+   is the whole point. Nothing about the standalone `.back` primitive
+   changes: the entry-screen fan and .ritual-scene__deck still get the true
+   100/172 card shape, which is correct for them because they have no
+   caption to make room for. Only the ratio mismatch *inside* .tarot-card is
+   resolved, and in the direction the card box actually dictates. */
 .tarot-card__back {
   position: absolute;
-  width: 100%;
+  inset: 0;
+  width: auto;
+  height: auto;
+  aspect-ratio: auto;
+  border: 0;
+  /* Follows .tarot-card's own 8px rather than `.back`'s --r-card, so the
+     two curves can't disagree at the corners now that they share an edge. */
+  border-radius: inherit;
 }
 
 /* display:block (and overflow-wrap below, plus .tarot-card__face strong's
@@ -1927,6 +2004,17 @@ h1 {
 @keyframes mist-disperse {
   from { opacity: var(--mist-opacity, .85); }
   to { opacity: 0; }
+}
+
+/* Front-veil gather: thicken, then settle — see `.ritual-mist--veil
+   .ritual-mist--gather` for why this one doesn't just hold at its peak the
+   way `mist-gather` does. The .26 it ends on is the same value
+   `.ritual-mist--veil.ritual-mist--disperse` starts from; keep the two in
+   sync or the cloud will visibly jump when the spread takes over. */
+@keyframes mist-veil-gather {
+  0% { opacity: 0; }
+  40% { opacity: .58; }
+  100% { opacity: .26; }
 }
 
 @keyframes ritual-blink {
