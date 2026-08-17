@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { DrawnTarotCard, TarotPosition } from "@/domain/types";
+import { RitualMist } from "./RitualMist";
 import { TarotCardView } from "./TarotCardView";
 
 // "idle" is kept only so a standalone render (see ritual-scene.test.tsx,
@@ -64,21 +65,34 @@ export function RitualScene({ stage, slots = DEFAULT_SLOTS }: RitualSceneProps) 
         <div className="back" />
         <div className="back" />
       </div>
-      <div className="ritual-scene__spread">
-        {slots.map((slot, index) => (
-          <div
-            className="ritual-scene__slot"
-            key={slot.position}
-            style={{ "--ritual-order": index } as CSSProperties}
-          >
-            {slot.card ? (
-              <TarotCardView card={slot.card} revealed={slot.revealed} testId="tarot-card" />
-            ) : (
-              <FaceDownSlot />
-            )}
-            <span className="ritual-scene__pos">{slot.position}</span>
-          </div>
-        ))}
+      {/* .ritual-scene__stage wraps the mist and the spread together so the
+          mist can be positioned (position:absolute; inset:0) against this
+          wrapper specifically, rather than against .ritual-scene itself
+          (which also contains the deck fan and the status line — an inset
+          there would size the mist to the whole scene, not just the row of
+          cards it needs to gather behind). See RitualMist's own comment for
+          what "gather" means here: this is where "mist gathers and begins
+          to turn" (req 1) actually starts, timed to finish its own fade-in
+          (900ms, globals.css) right as the first card's reveal timer
+          (DEAL_STEP_MS, RitualStage.tsx) fires. */}
+      <div className="ritual-scene__stage">
+        <RitualMist variant="gather" />
+        <div className="ritual-scene__spread">
+          {slots.map((slot, index) => (
+            <div
+              className="ritual-scene__slot"
+              key={slot.position}
+              style={{ "--ritual-order": index } as CSSProperties}
+            >
+              {slot.card ? (
+                <TarotCardView card={slot.card} revealed={slot.revealed} testId="tarot-card" />
+              ) : (
+                <FaceDownSlot />
+              )}
+              <span className="ritual-scene__pos">{slot.position}</span>
+            </div>
+          ))}
+        </div>
       </div>
       <p className="ritual-status" role="status">
         {stage === "consulting" ? (

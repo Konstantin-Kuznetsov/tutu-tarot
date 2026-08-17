@@ -604,6 +604,18 @@ h1 {
   transform: rotate(-1deg) translateY(-5px);
 }
 
+/* Wraps the mist and the spread grid together (see RitualScene.tsx's own
+   comment on why): gives RitualMist's position:absolute/inset:0 a
+   containing block scoped to just this row. Explicit width matches
+   .ritual-scene__spread's own min(620px,100%) below so nesting it one
+   level deeper changes nothing about that calc (100% now resolves against
+   this box instead of .ritual-scene directly, but this box is already
+   capped to the same value, so the result is identical either way). */
+.ritual-scene__stage {
+  position: relative;
+  width: min(620px, 100%);
+}
+
 .ritual-scene__spread {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -611,29 +623,89 @@ h1 {
   width: min(620px, 100%);
 }
 
-/* The slot deals in on a timer; whether it's showing a face-down back or a
-   revealed face is a React-driven swap (see RitualScene), not part of this
-   animation — the entrance plays identically either way. */
+/* Fix round (while building the mist ritual): whether a slot shows a
+   face-down back or a revealed face is a React-driven swap (see
+   RitualScene), not part of the entrance animation below — but the
+   animation itself used to live *here*, on the whole slot (card box +
+   position label together), not on the card alone. That's the exact class
+   of bug `.spread-card-shell`/`.tarot-card`'s own reveal already had to fix
+   once (see that rule's comment) — reproduced directly on the pre-mist
+   code too, so this predates this task, but it sits in exactly the area
+   this task is already touching and the brief requires a verified
+   no-overflow sequence, so it's fixed here rather than left in place.
+   Scoping the animation down to `.ritual-scene__slot .tarot-card` below
+   (the card's own pinned-height box, independent of the label) was the
+   first half of the fix, mirroring the established pattern — but on its
+   own it wasn't enough: at 375px this row's cards are narrow (~120px)
+   against a *tall* 1/2.3 box (~275px), and this animation's original 2D
+   `rotate()` swings the box's full diagonal (not just half its height the
+   way `.spread-card-shell`'s 3D rotateX/rotateZ does), so even scoped to
+   just the card, the same -8deg still measured 377-381px at 375px, and
+   dialing it down still measured over at -2deg. Verified empirically at
+   every step (see the card-reveal report) down to removing the rotation
+   outright below, keeping only the translate/scale drop-and-settle -- the
+   safer fix once a small angle on a tall, narrow box kept reopening the
+   same class of bug, rather than chasing an ever-smaller angle further.
+
+   position:relative + z-index:1 (added alongside the mist, req 1-2): the
+   mist behind this row (RitualMist, position:absolute, z-index:0) must
+   never paint over a card. Without an explicit z-index here, this slot
+   would be a plain non-positioned, normal-flow box — CSS stacks *any*
+   positioned element (the mist included, regardless of its z-index) above
+   normal-flow content, so the mist would win and hide the cards. Giving the
+   slot its own explicit stacking position (rather than leaning on DOM
+   order, which happens to work today only because the mist is inserted
+   first) keeps this correct even if the markup is ever reordered. */
 .ritual-scene__slot {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   display: grid;
   gap: var(--sp-3);
   justify-items: center;
+}
+
+/* The card's own entrance (see the long comment above) — same keyframe,
+   same timing, just scoped to this narrower, pinned-aspect-ratio box
+   instead of the whole slot. Base opacity/transform mirror the keyframe's
+   own `0%` step (rather than an `animation-fill-mode:both`) so the box
+   already reads as "not yet dealt" for the whole pre-delay wait, with no
+   flash of an unrotated, fully opaque card before its own delay elapses —
+   the same technique the original slot-level rule used. */
+.ritual-scene__slot .tarot-card {
+  width: 100%;
   opacity: 0;
-  transform: translate3d(-16px, 30px, 0) rotate(-8deg) scale(.94);
+  transform: translate3d(-6px, 20px, 0) scale(.96);
   animation: ritual-deal var(--t-deal) var(--ease) forwards;
   animation-delay: calc(var(--ritual-order, 0) * 170ms);
 }
 
-.ritual-scene__slot .tarot-card {
-  width: 100%;
-}
-
+/* The label gets its own quiet fade on the same delay, rather than the
+   card's rotation/scale (which would reopen the same overflow the comment
+   above just fixed for the card, since a rotated label sitting *under* a
+   rotated card box is exactly the extra height that caused it). Opacity
+   only -- see @keyframes card-content-fade. */
 .ritual-scene__pos {
   font: 700 11px/1 var(--font-ui);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--text-dim);
+  animation: card-content-fade 300ms ease-out both;
+  animation-delay: calc(var(--ritual-order, 0) * 170ms);
+}
+
+/* Req 2: a card revealed mid-wait (RitualStage flips `revealed` on its own
+   timer, independent of the slot's own entrance above) still has to read as
+   "resolving out of the mist" rather than an unanimated pop — before this,
+   TarotCardView's conditional render (no face at all -> full face) simply
+   appeared with no transition. A single fade+rise (reusing card-content-
+   rise, the same beat keyframe the result's own reveal uses below) rather
+   than the fuller flight-from-centre treatment .spread-card-shell gets:
+   this is the quick preview during the wait, not the grand reveal — that
+   one plays once, in full, for all three cards together once TravelResult
+   takes over (see its own comment on `.spread-card-shell .tarot-card`). */
+.ritual-scene__slot .tarot-card__face {
+  animation: card-content-rise 420ms ease-out both;
 }
 
 .ritual-scene__dot {
@@ -647,6 +719,158 @@ h1 {
 
 .ritual-scene__dot:nth-child(3) {
   animation-delay: .6s;
+}
+
+/* ── Ritual mist (req 1 and 3) ── The staged sequence's connective tissue:
+   RitualStage.tsx uses this in two places (see RitualMist.tsx) — gathered
+   over RitualScene's own row while the two seed cards deal, and again,
+   already-visible, behind TravelResult's spread-grid until the third card
+   settles. Both instances share this same markup/styling; only the
+   opacity animation (`--gather`/`--disperse` below) differs.
+
+   Sized and positioned entirely by its own box, never by top/left/width
+   changes over time (req: transform-only flight, no reflow) — inset:0
+   fills whatever stage wrapper it's placed in (.ritual-scene__stage or
+   .spread-stage), and `place-items:center` centers the (fixed-size) rings
+   inside that box without either of them needing their own translate.
+   z-index:0 pairs with the explicit z-index:1 on .ritual-scene__slot and
+   .spread-card-shell below/above (see those rules' own comments) — plain
+   0 rather than a negative value, since a negative z-index here would
+   compare against whichever ancestor happens to establish the nearest
+   stacking context, which nothing here promises will always be a
+   containing block with an opaque background between it and the page —
+   get that wrong and the mist silently paints behind the page's own
+   background instead of just behind the cards. Comparing two small
+   positive-ish values (0 vs 1) has no such trap. */
+.ritual-mist {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  /* Each ring is a square box painted as a circle (border-radius:50%) and
+     spun continuously — a rotated square's *axis-aligned bounding box*
+     grows up to sqrt(2) times its own side length at 45 degrees, even
+     though the visible circle inside it never changes size or position
+     (a circle is rotationally symmetric; only the box's own unpainted
+     corners sweep outward). getBoundingClientRect()/layout overflow are
+     computed from that box, not from what border-radius actually paints,
+     so without this the rings measured up to 384px of scrollWidth at a
+     375px viewport (verified directly) purely from that phantom corner
+     sweep, despite the ring's own width already being capped well under
+     the viewport. Clipping here costs nothing visible: both rings'
+     painted circles are sized to fit inside .ritual-mist's own box with
+     margin at every viewport this app supports (verified directly), so
+     everything this clips was already unpainted, invisible box corners. */
+  overflow: hidden;
+}
+
+/* Req 1: starts gathering the instant RitualScene mounts (no delay) and
+   finishes its own fade-in right as the first card's reveal timer
+   (DEAL_STEP_MS = 900ms, RitualStage.tsx) fires — chosen to match that
+   constant deliberately, so "the mist gathers, then the first card
+   resolves out of it" lines up without RitualStage needing to know
+   anything about this animation. `forwards` fill holds the mist at its
+   gathered opacity for the rest of the dealing/consulting wait (no need to
+   loop the opacity — only the rings underneath keep turning, via their own
+   separate, infinite animation). */
+.ritual-mist--gather {
+  --mist-opacity: .85;
+  animation: mist-gather 900ms ease-out forwards;
+}
+
+/* Req 3: starts already at the gathered opacity from its very first frame
+   (see `animation-delay` below and @keyframes mist-disperse's own `0%`) —
+   this reads as the *same* mist from RitualScene continuing, not a second
+   one starting from nothing, since TravelResult mounts in the same tick
+   RitualScene unmounts. The delay (1860ms) and duration (1300ms) are
+   deliberately literal, not calc()'d off .spread-card-shell's own
+   --card-stagger/--card-extra-hold custom properties: those live on each
+   card shell individually (with the third card overriding them locally),
+   not on a shared ancestor this sibling element could inherit from, and
+   duplicating the declarations onto a shared ancestor just to calc() them
+   here would be more moving parts for the same result. The numbers below
+   are hand-derived from those same constants and must be kept in sync if
+   they ever change:
+     1860ms = 2 * --card-stagger (800ms) + the third card's own
+              --card-extra-hold (260ms) -- the exact moment the third
+              card's own turn begins, so the mist starts thinning right as
+              the last card resolves, not before or long after.
+     1300ms = comfortably past the third card's own --card-turn-duration
+              (760ms) plus its content beats (meaning lands at
+              --card-turn-duration again past the turn, i.e. ~1520ms after
+              1860ms) -- the mist is fully gone by ~3160ms, a beat after
+              the whole reveal (~2940ms, measured) has settled, rather than
+              vanishing out from under a card still mid-turn. */
+.ritual-mist--disperse {
+  --mist-opacity: .85;
+  animation: mist-disperse 1300ms ease-in 1860ms both;
+}
+
+/* Blurred once, statically -- filter never appears in any animated
+   property list in this file, only `transform` (rotation) and `opacity`
+   (the wrapper's gather/disperse above) ever do. A browser can rasterize a
+   blurred layer's texture once and then merely recompose it under a
+   `transform: rotate()` on the GPU each frame, without re-running the blur
+   -- that's what keeps this affordable to animate continuously; an
+   *animated* blur (or a much larger blurred area) would force a much more
+   expensive re-blur on every frame instead. Sized in vw units, not against
+   the stage wrapper's own (wide, short) box: a circle centred and capped
+   at min(74vw, 420px) can never exceed 74% of the viewport's own width
+   regardless of how narrow or wide its container is, which is what keeps
+   it from ever being the thing that pushes the page into horizontal
+   overflow (verified directly -- see the card-reveal report). Two layers
+   only (req: not a particle system), stacked via `grid-area:1/1` on the
+   shared .ritual-mist grid (both rings placed in the grid's one implicit
+   cell) rather than position:absolute + a manual translate(-50%,-50%),
+   which would need combining with each ring's own animated rotate() in
+   every keyframe -- grid-area sidesteps that entirely. will-change hints
+   the browser to promote each ring to its own compositor layer up front. */
+.ritual-mist__ring {
+  grid-area: 1 / 1;
+  width: min(74vw, 420px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(16px);
+  will-change: transform;
+}
+
+/* Two conic gradients (inherently angular, so rotation actually reads as
+   movement -- a radially symmetric gradient would look identical at every
+   angle and the spin would be invisible) in the app's own gold/wine
+   palette, deliberately not the reference clip's light/pastel one (see the
+   brief: steal the staging, not the palette). Counter-rotating at
+   different speeds (22s / 30s) for an organic, turbulent turn rather than
+   two rings spinning in lockstep. */
+.ritual-mist__ring--a {
+  background:
+    conic-gradient(from 0deg,
+      transparent 0deg,
+      rgba(217, 164, 65, .62) 55deg,
+      transparent 130deg,
+      rgba(140, 50, 71, .5) 210deg,
+      transparent 280deg,
+      rgba(217, 164, 65, .48) 330deg,
+      transparent 360deg),
+    radial-gradient(circle at 38% 42%, rgba(242, 198, 109, .55), transparent 55%);
+  animation: mist-spin 22s linear infinite;
+}
+
+.ritual-mist__ring--b {
+  width: min(58vw, 320px);
+  opacity: .85;
+  background:
+    conic-gradient(from 140deg,
+      transparent 0deg,
+      rgba(140, 50, 71, .46) 70deg,
+      transparent 160deg,
+      rgba(217, 164, 65, .5) 240deg,
+      transparent 320deg,
+      transparent 360deg),
+    radial-gradient(circle at 62% 58%, rgba(80, 40, 90, .5), transparent 60%);
+  animation: mist-spin-reverse 30s linear infinite;
 }
 
 .tarot-card {
@@ -926,9 +1150,25 @@ h1 {
   letter-spacing: 0;
 }
 
+/* Wraps the mist and the grid together — see TravelResult.tsx's own comment
+   on why (gives RitualMist's inset:0 a containing block scoped to just this
+   row, not the whole panel). */
+.spread-stage {
+  position: relative;
+}
+
 .spread-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 220px));
+  /* The cards are the product's best asset, and were small relative to the
+     page (220px ceiling). Raised to 300px -- a meaningful jump (+36%) at
+     desktop width -- while the floor (150px) and the narrow-viewport
+     override below (max-width:760px, which drops the floor further, to
+     96px) are both untouched, so nothing about the 375px-safe behaviour
+     changes: minmax()'s own ceiling can only ever be reached if the
+     container has room for it, never forced past the container the way a
+     fixed width could be (verified directly at both 375px and 1280px --
+     see the card-reveal report). */
+  grid-template-columns: repeat(3, minmax(150px, 300px));
   gap: 14px;
   align-items: stretch;
 }
@@ -938,8 +1178,12 @@ h1 {
   /* Anchors the landing-glow pseudo-element below (req 3 of the card-reveal
      brief) -- purely a positioning context, changes nothing about layout or
      flow, so it can't reopen the 375px-overflow bug documented on
-     `.tarot-card`'s own reveal rule just below. */
+     `.tarot-card`'s own reveal rule just below. Explicit z-index:1 (added
+     alongside the ritual mist) pairs with .ritual-mist's own z-index:0 in
+     .spread-stage -- see .ritual-scene__slot's own comment on why this
+     needs to be explicit rather than left to rely on DOM order. */
   position: relative;
+  z-index: 1;
   /* How far apart each card's own reveal starts. 120ms (the old value) is
      below human reaction time, so all three effectively land at once and
      read as a UI block loading rather than three cards being turned one at
@@ -955,6 +1199,15 @@ h1 {
   --card-turn-duration: 640ms;
   --glow-peak: 0.75;
   --glow-duration: 1100ms;
+  /* Req 2: "the cards materialise in the centre of the mist ... rather
+     than fading in where it will finally sit" -- the middle card (this
+     default) has no column to travel from, so it only gets the scale/turn
+     already in @keyframes card-reveal; the outer two cards get a
+     translateX offset added on top (see the two overrides below), read by
+     that same keyframe's `0%` step. 0% here, not a length, so it inherits
+     cleanly with no effect if this rule is ever reused somewhere without
+     the override pattern below. */
+  --enter-x: 0%;
 }
 
 /* The third card gets a little more weight than the first two -- it is the
@@ -972,6 +1225,26 @@ h1 {
   --card-turn-duration: 760ms;
   --glow-peak: 1;
   --glow-duration: 1400ms;
+  /* Mirrors :nth-child(1)'s own --enter-x below (same distance, opposite
+     sign -- "same gesture", just from the other side of the centre, per
+     the brief's own instruction not to make the third card a different
+     animation, only a longer-held one). */
+  --enter-x: -85%;
+}
+
+/* Req 2, left card: materialises at the mist's centre (the middle column)
+   and travels to its own slot as it turns, rather than simply fading in
+   already in place. A percentage, not a pixel value: translateX resolves
+   against *this element's own* width (not the grid track), so "85% of its
+   own width" reads as "about one column over" at any card size -- mobile's
+   much narrower cards included -- without needing a second, viewport-
+   specific number (verified directly at 375px and 1280px, mid-flight and
+   settled -- see the card-reveal report). Positive because this card ends
+   up left of centre: its 0% state sits translated *right* of that (toward
+   the middle), and the keyframe animates it back to 0 -- i.e. left, into
+   its own slot. */
+.spread-grid > .spread-card-shell:nth-child(1) {
+  --enter-x: 85%;
 }
 
 /* card-reveal now targets the card figure itself, not the shell around it
@@ -1503,12 +1776,12 @@ h1 {
 @keyframes ritual-deal {
   0% {
     opacity: 0;
-    transform: translate3d(-16px, 30px, 0) rotate(-8deg) scale(.94);
+    transform: translate3d(-6px, 20px, 0) scale(.96);
   }
 
   70% {
     opacity: 1;
-    transform: translate3d(0, -6px, 0) rotate(2deg) scale(1.02);
+    transform: translate3d(0, -3px, 0) scale(1.008);
   }
 
   100% {
@@ -1525,15 +1798,26 @@ h1 {
                 needs to be opaque almost immediately rather than fading
                 across the whole duration.
      8% -> 100% the actual turn, on an "ease-out-back" curve whose y-value
-                briefly exceeds 1 before settling -- for a translateY/
-                rotateX/rotateZ/scale animating toward 0/0/0/1, that
+                briefly exceeds 1 before settling -- for a translate/
+                rotateX/rotateZ/scale animating toward 0/0/0/0/1, that
                 overshoot reads as the card dropping slightly past level
                 and recovering, the way a real card dropped on cloth
-                settles rather than glides to a stop. */
+                settles rather than glides to a stop.
+
+   `translate(var(--enter-x, 0%), 26px)` (req 2, added alongside the ritual
+   mist) is the "materialises at the mist's centre, then travels to its own
+   slot" flight: --enter-x is 0 for the middle card (no column to travel
+   from) and +/-85% for the outer two (see .spread-card-shell's own
+   comment) -- entirely transform, never top/left/width/margin, so this
+   still can't reflow or reopen the 375px-overflow bug the comment above
+   this keyframe documents. The ease-out-back curve above already applies
+   to this component too, since it's all one `transform` interpolation --
+   the horizontal travel gets the same slight overshoot-and-settle as the
+   turn, for free. */
 @keyframes card-reveal {
   0% {
     opacity: 0;
-    transform: translateY(26px) rotateX(20deg) rotateZ(-5deg) scale(0.97);
+    transform: translate(var(--enter-x, 0%), 26px) rotateX(20deg) rotateZ(-5deg) scale(0.97);
     animation-timing-function: linear;
   }
 
@@ -1544,7 +1828,7 @@ h1 {
 
   100% {
     opacity: 1;
-    transform: translateY(0) rotateX(0) rotateZ(0) scale(1);
+    transform: translate(0, 0) rotateX(0) rotateZ(0) scale(1);
   }
 }
 
@@ -1583,6 +1867,35 @@ h1 {
   100% { opacity: 0; }
 }
 
+/* Ritual mist (req 1 and 3) -- see `.ritual-mist`'s own comment for the
+   full staging. The two rings spin continuously and independently of
+   opacity (`infinite`, no fill-mode needed) -- opacity is the only thing
+   `.ritual-mist--gather`/`--disperse` ever animate, so the turn never
+   pauses or resets as the haze gathers or thins. Full rotations (0 ->
+   360deg / 0 -> -360deg) rather than a back-and-forth wobble: a full spin
+   loops seamlessly (0deg and 360deg are the same rendered angle), so
+   `infinite` never stutters at the loop boundary the way a partial-arc
+   ping-pong would. */
+@keyframes mist-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes mist-spin-reverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes mist-gather {
+  from { opacity: 0; }
+  to { opacity: var(--mist-opacity, .85); }
+}
+
+@keyframes mist-disperse {
+  from { opacity: var(--mist-opacity, .85); }
+  to { opacity: 0; }
+}
+
 @keyframes ritual-blink {
   0%, 60%, 100% { opacity: .2; }
   30% { opacity: 1; }
@@ -1599,7 +1912,9 @@ h1 {
    blocks by up to a few hundred ms. "No stagger at all" (this task's own
    requirement for reduced motion) needs animation:none outright. */
 @media (prefers-reduced-motion: reduce) {
-  .ritual-scene__slot,
+  .ritual-scene__slot .tarot-card,
+  .ritual-scene__pos,
+  .ritual-scene__slot .tarot-card__face,
   .spread-card-shell .tarot-card,
   .spread-card-shell .tarot-card__position,
   .spread-card-shell .tarot-card__art,
@@ -1620,17 +1935,21 @@ h1 {
     transform: none;
   }
 
-  .ritual-scene__slot {
-    opacity: 1;
-    transform: none;
-  }
-
   /* The landing glow (req 3) is a transient moment, not a resting state
      worth keeping -- under reduced motion it's suppressed entirely rather
      than left permanently bloomed under every card. */
   .spread-card-shell::before {
     animation: none;
     opacity: 0;
+  }
+
+  /* The whole mist ritual (req 1-3) is motion by definition -- a rotating,
+     gathering/dispersing haze has no meaningful "resting" frame to freeze
+     on, unlike the cards above (which settle into a real, static layout).
+     display:none removes it from rendering entirely: no mist, exactly as
+     the brief asks, and zero paint/compositing cost left behind either. */
+  .ritual-mist {
+    display: none;
   }
 
   .result [data-block] {

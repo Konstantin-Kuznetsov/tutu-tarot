@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
 import { isOutsideSeasonWindow, seasonWindowCaption } from "@/domain/travel/seasonWindow";
 import { LEG_OUTCOME_COPY, MODE_LABELS, OfferList } from "./OfferList";
+import { RitualMist } from "./RitualMist";
 import { ShareButton } from "./ShareButton";
 import { TarotCardView } from "./TarotCardView";
 
@@ -341,17 +342,30 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
             <p className="result-kicker">Расклад карт</p>
             <h3>Три знака дороги</h3>
           </div>
-          <div className="spread-grid">
-            {result.spreadCards.map((card, index) => (
-              <div className="spread-card-shell" key={`${card.position}-${card.id}`} style={{ "--card-order": index } as CSSProperties}>
-                <TarotCardView
-                  card={card}
-                  revealed
-                  testId="spread-card"
-                  readingText={readingTextFor(card.id, result.prediction.cardReadings)}
-                />
-              </div>
-            ))}
+          {/* .spread-stage wraps the mist and the grid together, the same
+              way RitualScene's own .ritual-scene__stage does (see that
+              component's comment) — position:relative here gives the mist's
+              position:absolute/inset:0 a containing block scoped to just
+              this row, not the whole .spread-panel (which also carries the
+              header and closing line above/below it). This is the moment
+              the brief's mist ritual actually finishes: the "disperse"
+              variant starts already visible (reading as the same mist from
+              RitualScene continuing, not a new one), then fades out once
+              the third card lands — see RitualMist's own comment. */}
+          <div className="spread-stage">
+            <RitualMist variant="disperse" />
+            <div className="spread-grid">
+              {result.spreadCards.map((card, index) => (
+                <div className="spread-card-shell" key={`${card.position}-${card.id}`} style={{ "--card-order": index } as CSSProperties}>
+                  <TarotCardView
+                    card={card}
+                    revealed
+                    testId="spread-card"
+                    readingText={readingTextFor(card.id, result.prediction.cardReadings)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
           {/* A coda, not a heading -- one quiet line after the spread, only
               ever set when the AI wrote one and it passed validation (see
