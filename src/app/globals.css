@@ -935,6 +935,43 @@ h1 {
 
 .spread-card-shell {
   min-width: 0;
+  /* Anchors the landing-glow pseudo-element below (req 3 of the card-reveal
+     brief) -- purely a positioning context, changes nothing about layout or
+     flow, so it can't reopen the 375px-overflow bug documented on
+     `.tarot-card`'s own reveal rule just below. */
+  position: relative;
+  /* How far apart each card's own reveal starts. 120ms (the old value) is
+     below human reaction time, so all three effectively land at once and
+     read as a UI block loading rather than three cards being turned one at
+     a time; 800ms is enough for a viewer to register each card separately.
+     The third card ("Путь") holds an extra beat on top -- see its own
+     :nth-child(3) rule below -- and every animation-delay in this file's
+     card-reveal sequence (the turn, the glow, and each of the label/
+     artwork/name/meaning beats inside the card) is built from these two
+     custom properties, so the stagger and the third card's extra weight
+     both come from one place. */
+  --card-stagger: 800ms;
+  --card-extra-hold: 0ms;
+  --card-turn-duration: 640ms;
+  --glow-peak: 0.75;
+  --glow-duration: 1100ms;
+}
+
+/* The third card gets a little more weight than the first two -- it is the
+   card that names the road, and it could only be drawn once the search
+   itself had answered. Same gesture as cards 1-2, just held longer: a
+   longer hold before it starts, a longer (and slightly brighter) glow once
+   it lands, and its own turn takes a beat longer to settle -- nothing here
+   changes *what* plays, only *how long*. :nth-child(3) rather than a data
+   attribute: `.spread-grid` always renders exactly three `.spread-card-
+   shell` siblings (TravelResult only mounts the spread panel at all when
+   `spreadCards.length` is truthy, and a reading always draws exactly three
+   cards), so grid position and card role always coincide. */
+.spread-grid > .spread-card-shell:nth-child(3) {
+  --card-extra-hold: 260ms;
+  --card-turn-duration: 760ms;
+  --glow-peak: 1;
+  --glow-duration: 1400ms;
 }
 
 /* card-reveal now targets the card figure itself, not the shell around it
@@ -948,11 +985,123 @@ h1 {
    its own entrance animation had settled. Scoping the animation back to
    just `.tarot-card` keeps the rotating box exactly the card's own pinned
    height, independent of how long its reading is, and the reading itself
-   simply appears without competing for the same transform. */
+   simply appears without competing for the same transform.
+
+   Opacity now reaches 1 within the keyframe's first few percent (see
+   @keyframes card-reveal) instead of fading across the whole duration: this
+   box's own transform is "the card turning" -- the weight/overshoot a real
+   dropped card has on landing -- and everything printed on the card (the
+   position label, the artwork, the name, the meaning) fades in on its own
+   later timeline nested inside this box, below. A child's rendered opacity
+   is always parent-opacity times its own -- that's how CSS opacity
+   compositing works -- so if this box stayed at opacity 0 for its whole
+   duration, nothing inside it could ever become visible before it did,
+   which is exactly what "the label resolves first, then the card turns
+   beneath it" and "artwork, then name, then meaning" both need. z-index
+   only exists so this box reliably paints over the glow pseudo-element
+   below regardless of paint-order edge cases -- both are already in the
+   right order by default, this just makes it explicit. */
 .spread-card-shell .tarot-card {
   width: 100%;
-  animation: card-reveal 620ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
-  animation-delay: calc(var(--card-order, 0) * 120ms);
+  z-index: 1;
+  animation: card-reveal var(--card-turn-duration, 640ms) both;
+  animation-delay: calc(var(--card-order, 0) * var(--card-stagger, 800ms) + var(--card-extra-hold, 0ms));
+}
+
+/* Beat 0: the position label ("Зов"/"Дар"/"Путь") is the first thing on the
+   card to resolve -- the question the card is about to answer, read before
+   the answer itself. No added delay of its own (it starts the instant the
+   card's own delay above elapses) and it finishes quickly, well before the
+   artwork's own beat next. */
+.spread-card-shell .tarot-card__position {
+  animation: card-content-rise 260ms ease-out both;
+  animation-delay: calc(var(--card-order, 0) * var(--card-stagger, 800ms) + var(--card-extra-hold, 0ms));
+}
+
+/* Beat 1: the artwork -- you see the card. Opacity only, deliberately no
+   transform: `[data-reversed="true"] .tarot-card__art` below sets a static
+   `rotate(180deg)`, and an *animated* transform on this same element would
+   win the cascade for this animation's own duration and fill, undoing that
+   rotation for every reversed card the moment the animation finished.
+   Delayed to roughly a third of the card's own turn -- scales with
+   `--card-turn-duration` so the third card's longer, heavier turn still
+   reveals its artwork at the same relative moment in its own gesture. */
+.spread-card-shell .tarot-card__art {
+  animation: card-content-fade 320ms ease-out both;
+  animation-delay: calc(
+    var(--card-order, 0) * var(--card-stagger, 800ms) + var(--card-extra-hold, 0ms) +
+    var(--card-turn-duration, 640ms) * 0.3
+  );
+}
+
+/* Beat 2: the name (and, on a reversed card, its "перевёрнутая" flag right
+   under it) -- you're told what the card is. */
+.spread-card-shell .tarot-card__face figcaption > strong,
+.spread-card-shell .tarot-card__flag {
+  display: block;
+  animation: card-content-rise 280ms ease-out both;
+  animation-delay: calc(
+    var(--card-order, 0) * var(--card-stagger, 800ms) + var(--card-extra-hold, 0ms) +
+    var(--card-turn-duration, 640ms) * 0.66
+  );
+}
+
+/* The flag's own resting opacity is 0.75 (see .tarot-card__flag's own rule
+   below) -- a dimmed marker, not full-strength text. card-content-rise's
+   `to` keyframe reads this custom property (falling back to fully opaque
+   for every other element that shares the same keyframe) so the shared
+   animation doesn't flatten that dimming out once it finishes. */
+.spread-card-shell .tarot-card__flag {
+  --reveal-opacity: 0.75;
+}
+
+/* Beat 3: the meaning -- what the card is telling you. Two selectors
+   because TarotCardView renders one or the other, never both (see its own
+   comment): the deck's short stock phrase inside the card's figcaption
+   when no written reading exists yet, or the AI/template reading as a
+   sibling paragraph after the whole figure once one does. Both land on the
+   same beat -- right as the card's own turn finishes -- so which one is
+   showing never changes the rhythm. */
+.spread-card-shell .tarot-card__face figcaption > p,
+.spread-card-shell .tarot-card-reading {
+  animation: card-content-rise 320ms ease-out both;
+  animation-delay: calc(
+    var(--card-order, 0) * var(--card-stagger, 800ms) + var(--card-extra-hold, 0ms) +
+    var(--card-turn-duration, 640ms)
+  );
+}
+
+/* Landing glow (req 3): a warm light blooms under the card as it lands and
+   fades -- light answering the card, not decorating it. Lives on
+   `.spread-card-shell`, not `.tarot-card`: `.tarot-card` has
+   `overflow: hidden` for its own crosshatch/face clipping, and a glow that
+   needs to spill past the card's own edges onto the dark cloth around it
+   can't be a child of an overflow:hidden box. The pseudo-element itself is
+   transparent and exactly the card's own footprint (`aspect-ratio` mirrors
+   `.tarot-card`'s own ratio, so it always sits under the card regardless of
+   how long the written reading below it runs, and it never touches
+   `.spread-card-shell`'s own box size); the visible warmth is a
+   `box-shadow`, which -- unlike a background -- paints past its own casting
+   box's edges, so the bloom can reach the cloth without this element ever
+   being physically larger than the card it sits under (and so it can never
+   be the thing that reopens the 375px-overflow bug documented above). Only
+   `opacity` animates; the shadow's shape and colour are constant, so this
+   stays on the same transform/opacity/filter list as every other animation
+   in this file. rgba(217, 164, 65, …) is `--gold` (#d9a441) written as
+   components -- box-shadow can't take a var() for just the alpha channel of
+   a hex colour, the same reason the border/background rules earlier in
+   this file already spell gold out this way. */
+.spread-card-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  aspect-ratio: 1 / 2.3;
+  border-radius: 8px;
+  box-shadow: 0 26px 40px 8px rgba(217, 164, 65, 0.55);
+  pointer-events: none;
+  z-index: 0;
+  animation: card-glow var(--glow-duration, 1100ms) ease-out both;
+  animation-delay: calc(var(--card-order, 0) * var(--card-stagger, 800ms) + var(--card-extra-hold, 0ms));
 }
 
 /* The written reading for this card (template or AI) -- rendered as a
@@ -963,7 +1112,11 @@ h1 {
    reading up to 400 characters long. overflow-wrap matches every other
    AI/user-facing prose block in this file (e.g. .prediction-panel,
    .road__hero) for the same reason: an unbroken run must never be the thing
-   that forces horizontal overflow. */
+   that forces horizontal overflow. Its own reveal (opacity + translateY
+   only, set above alongside `.tarot-card__face figcaption > p`) never
+   rotates, so animating it here can't reproduce the rotation-driven
+   overflow `.tarot-card`'s own reveal comment warns about, despite this
+   element sometimes running a couple hundred pixels tall. */
 .tarot-card-reading {
   margin: var(--sp-2) 0 0;
   color: var(--text-dim);
@@ -1364,16 +1517,70 @@ h1 {
   }
 }
 
+/* The card's own physical turn (req 4: weight on landing). Two segments,
+   each with its own per-keyframe `animation-timing-function` (the curve
+   that plays *into* that keyframe from the previous one):
+     0% -> 8%   a fast, linear-ish opacity snap -- see the long comment on
+                `.spread-card-shell .tarot-card` above for why this box
+                needs to be opaque almost immediately rather than fading
+                across the whole duration.
+     8% -> 100% the actual turn, on an "ease-out-back" curve whose y-value
+                briefly exceeds 1 before settling -- for a translateY/
+                rotateX/rotateZ/scale animating toward 0/0/0/1, that
+                overshoot reads as the card dropping slightly past level
+                and recovering, the way a real card dropped on cloth
+                settles rather than glides to a stop. */
 @keyframes card-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) rotateX(20deg) rotateZ(-5deg) scale(0.97);
+    animation-timing-function: linear;
+  }
+
+  8% {
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotateX(0) rotateZ(0) scale(1);
+  }
+}
+
+/* Beat keyframe for the artwork (req 2) -- opacity only, see
+   `.spread-card-shell .tarot-card__art`'s own comment on why it never
+   touches `transform`. */
+@keyframes card-content-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Shared beat keyframe for the label, the name/flag and the meaning (req 2
+   and req 5) -- a small rise alongside the fade reads as the text
+   "resolving" into place rather than merely appearing. `--reveal-opacity`
+   lets `.tarot-card__flag` land at its own dimmed resting opacity (0.75)
+   instead of the fully-opaque default every other element sharing this
+   keyframe uses -- see that selector's own comment. */
+@keyframes card-content-rise {
   from {
     opacity: 0;
-    transform: translateY(24px) rotateX(18deg) rotateZ(-4deg);
+    transform: translateY(10px);
   }
 
   to {
-    opacity: 1;
-    transform: translateY(0) rotateX(0) rotateZ(0);
+    opacity: var(--reveal-opacity, 1);
+    transform: translateY(0);
   }
+}
+
+/* Landing-glow keyframe (req 3) -- blooms to `--glow-peak` and fades back
+   to nothing; see `.spread-card-shell::before`'s own comment for why the
+   element itself, not this keyframe, carries the shadow's shape/colour. */
+@keyframes card-glow {
+  0% { opacity: 0; }
+  40% { opacity: var(--glow-peak, 0.75); }
+  100% { opacity: 0; }
 }
 
 @keyframes ritual-blink {
@@ -1393,13 +1600,37 @@ h1 {
    requirement for reduced motion) needs animation:none outright. */
 @media (prefers-reduced-motion: reduce) {
   .ritual-scene__slot,
-  .spread-card-shell .tarot-card {
+  .spread-card-shell .tarot-card,
+  .spread-card-shell .tarot-card__position,
+  .spread-card-shell .tarot-card__art,
+  .spread-card-shell .tarot-card__face figcaption > strong,
+  .spread-card-shell .tarot-card__face figcaption > p,
+  .spread-card-shell .tarot-card-reading {
     animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Kept out of the group above: the flag's own resting opacity is 0.75
+     (see .tarot-card__flag's own rule), a dimmed marker rather than
+     full-strength text -- with or without motion. */
+  .spread-card-shell .tarot-card__flag {
+    animation: none;
+    opacity: 0.75;
+    transform: none;
   }
 
   .ritual-scene__slot {
     opacity: 1;
     transform: none;
+  }
+
+  /* The landing glow (req 3) is a transient moment, not a resting state
+     worth keeping -- under reduced motion it's suppressed entirely rather
+     than left permanently bloomed under every card. */
+  .spread-card-shell::before {
+    animation: none;
+    opacity: 0;
   }
 
   .result [data-block] {
