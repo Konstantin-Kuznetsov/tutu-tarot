@@ -82,8 +82,13 @@ test("a reversed card shows its name, its separated flag, and its meaning, with 
 
   // Let .spread-card-shell's own card-reveal animation settle before
   // measuring boxes below -- see the identical comment in
-  // tarot-card-geometry.spec.ts for why this is needed since Task 11.
-  await page.waitForTimeout(1000);
+  // tarot-card-geometry.spec.ts for why this is needed since Task 11, and
+  // for the --card-stagger/--card-turn-duration math the wait is built
+  // from. This test only measures cards.nth(0) and cards.nth(1) (order 0
+  // and 1, neither of them the third card's own extra-held turn), so the
+  // worst case here is the second card: 1 x 800ms stagger + 640ms turn =
+  // 1440ms until its rotateX/rotateZ has settled; padded to 1800ms.
+  await page.waitForTimeout(1800);
 
   const uprightCard = cards.nth(0); // "Башня"
   const reversedCard = cards.nth(1); // "Звезда", reversed

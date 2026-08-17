@@ -71,8 +71,7 @@ test("a face-down card renders at 100/172, and the revealed face fully covers th
   const cards = page.getByTestId("spread-card");
   await expect(cards).toHaveCount(3);
 
-  // Let .spread-card-shell's own card-reveal animation settle (620ms
-  // duration + up to 240ms stagger delay = 860ms worst case) before
+  // Let .spread-card-shell's own card-reveal animation settle before
   // measuring. toHaveCount(3) only proves the nodes exist, not that their
   // entrance animation (which includes rotateX/rotateZ -- see @keyframes
   // card-reveal) has finished; a box measured mid-rotation is foreshortened
@@ -82,7 +81,15 @@ test("a face-down card renders at 100/172, and the revealed face fully covers th
   // (RitualScene) now loads two real tarot card images during the pre
   // -reveal wait, and that extra decode/render load reliably eats the
   // margin this test was quietly depending on.
-  await page.waitForTimeout(1000);
+  //
+  // Worst case is the third card ("Путь"): its own turn only starts once
+  // two stagger gaps (2 x 800ms) plus its own extra hold (260ms) have
+  // elapsed -- see --card-stagger/--card-extra-hold in globals.css -- and
+  // its turn itself runs --card-turn-duration (760ms, longer than the
+  // other two cards' 640ms -- the third card's own extra weight). 2 * 800
+  // + 260 + 760 = 2620ms until that card's own rotateX/rotateZ has fully
+  // settled; padded to 3000ms for real-browser paint/layout margin.
+  await page.waitForTimeout(3000);
 
   for (let i = 0; i < 3; i += 1) {
     const card = cards.nth(i);

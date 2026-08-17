@@ -92,9 +92,17 @@ test("no card's reading escapes its card box, and the page has no horizontal ove
   const cards = page.getByTestId("spread-card");
   await expect(cards).toHaveCount(3);
 
-  // Let .spread-card-shell's own card-reveal animation settle -- same
-  // reasoning as tarot-card-geometry.spec.ts's identical wait.
-  await page.waitForTimeout(1000);
+  // Let .spread-card-shell's own card-reveal animation settle before the
+  // geometry checks below -- see tarot-card-geometry.spec.ts for the full
+  // --card-stagger/--card-turn-duration math. This test's own geometry
+  // check (the reading paragraph's box vs its shell's box) is looser than
+  // that one: `.tarot-card-reading` is a sibling of `.tarot-card`, not a
+  // descendant, so it never inherits the card's own rotateX/rotateZ turn --
+  // its own reveal (see globals.css) is a translateY-only rise, which can't
+  // move its horizontal extent. 1500ms comfortably covers every card's
+  // meaning-beat fade (the last of the three within-card beats) without
+  // needing the third card's own extra-held turn to fully finish.
+  await page.waitForTimeout(1500);
 
   // The readings themselves must actually be on screen -- not the deck's
   // own stock meaning, which the fix replaces them with.
