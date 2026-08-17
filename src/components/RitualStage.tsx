@@ -63,6 +63,7 @@ export function RitualStage() {
   const [revealCount, setRevealCount] = useState<0 | 1 | 2>(0);
   const timersRef = useRef<number[]>([]);
   const resultRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLDivElement>(null);
   // Mirrors `stage`, but updated at each setStage call site below instead of
   // once per render (react-hooks/refs flags a bare `stageRef.current = stage`
   // in the render body -- a render can be started and discarded without
@@ -220,6 +221,33 @@ export function RitualStage() {
     return () => window.clearTimeout(timer);
   }, [stage]);
 
+  // Same follow, same restraint, for the dealing scene: the collapsed
+  // ticket strip above it (globals.css) already gives the mist/cards most
+  // of the viewport on its own, but this is the difference between
+  // "mostly on screen" and the scene actually opening flush with the top
+  // edge the traveler is already looking at, on every screen size rather
+  // than relying on the strip's height alone. Deliberately the same
+  // mechanism as the "revealed" effect above, not a second one: fires once
+  // per attempt on entering "dealing" (the scene mounts once and stays
+  // through "consulting" without remounting, so this never re-fires for
+  // the same attempt), abandons for good the instant the user has taken
+  // control since submitting, and never runs under reduced motion.
+  useEffect(() => {
+    if (stage !== "dealing") return;
+    const reduced =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+
+    const timer = window.setTimeout(() => {
+      if (!userTookControlRef.current) {
+        sceneRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      }
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [stage]);
+
   const showScene = stage === "dealing" || stage === "consulting";
   const slots: RitualSceneSlot[] = [
     { position: "Зов", card: localCards?.[0] ?? null, revealed: revealCount >= 1 },
@@ -250,7 +278,9 @@ export function RitualStage() {
         <TripIntentForm onSubmit={startRitual} />
       </div>
       {showScene ? (
-        <RitualScene stage={stage === "consulting" ? "consulting" : "dealing"} slots={slots} />
+        <div ref={sceneRef}>
+          <RitualScene stage={stage === "consulting" ? "consulting" : "dealing"} slots={slots} />
+        </div>
       ) : null}
       {stage === "revealed" && result ? (
         <div className="result" ref={resultRef}>

@@ -517,6 +517,39 @@ h1 {
   padding: var(--sp-6) var(--sp-5) var(--sp-5);
 }
 
+/* Recede to an actual strip, not just a shrunk copy of the idle screen.
+   `transform: scale(.92)` above is visual only — transforms never affect
+   layout, so the fan/caps/subtitle/rule/fine-print below kept reserving
+   their full idle-screen height (~625px, measured) even while scaled down,
+   pushing the whole ritual mostly below the fold. These five are pure
+   decoration for the idle entry screen; once a ritual is running the
+   traveler only needs what they asked for, which the still-visible .ticket
+   already carries in full (city, dates, party size, the receded button).
+   display:none (not opacity/visibility:hidden, which the entry-screen
+   .intent-form transition above already animates) is deliberate: only
+   removing these from layout actually reclaims the height for the scene
+   below — the whole point of this rule. h1 is kept (see its own rule
+   directly below) rather than hidden here: at a shrunk size it still reads
+   fine as a strip heading, unlike these five which have no small form that
+   still makes sense mid-ritual. */
+.ritual-layout:not([data-stage="idle"]) .intent-form .fan,
+.ritual-layout:not([data-stage="idle"]) .intent-form .caps,
+.ritual-layout:not([data-stage="idle"]) .intent-form .sub,
+.ritual-layout:not([data-stage="idle"]) .intent-form .rule,
+.ritual-layout:not([data-stage="idle"]) .intent-form .fine {
+  display: none;
+}
+
+/* h1 survives the collapse above but not at its idle hero size (--fs-hero,
+   clamp(34px, 5vw, 54px) — sized to anchor a whole empty screen, not a
+   strip next to a ticket). Shrunk to --fs-l (22px, the same size the
+   scene's own "Карты ложатся на стол…" status line uses just below it) so
+   it still reads as a small caption over the ticket rather than competing
+   with the ticket or the scene for the traveler's attention. */
+.ritual-layout:not([data-stage="idle"]) .intent-form h1 {
+  font-size: var(--fs-l);
+}
+
 /* Shared status line — the scene's own "cards are landing"/"still
    searching" copy (ported from the mockup's `.status`) and the error
    message below both read as the same considered, in-flow voice rather
