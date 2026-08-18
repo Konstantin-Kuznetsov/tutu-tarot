@@ -366,11 +366,6 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
                 </div>
               ))}
             </div>
-            {/* Front half of the haze, same as RitualScene mounts — here it
-                thins away on the card-reveal schedule, which is the beat the
-                brief calls "the mist disperses as it spins and the cards
-                settle onto the cloth". */}
-            <RitualMist variant="disperse" layer="veil" />
           </div>
           {/* A coda, not a heading -- one quiet line after the spread, only
               ever set when the AI wrote one and it passed validation (see

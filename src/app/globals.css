@@ -906,66 +906,109 @@ h1 {
   animation: mist-spin-reverse 30s linear infinite;
 }
 
-/* The front half of the haze (RitualMist's layer="veil") — the fix for a
-   mist that was built correctly and then almost never seen. Measured on the
-   running page: `.ritual-mist` resolves to the stage box, which is exactly
-   the row of cards (620x455 at a 1280 viewport), and the rings inside it are
-   420/320px centred — so every painted pixel of mist sat behind three opaque
-   cards, and all that reached the viewer were the slivers between them. It
-   read as a warm edge glow, not as weather.
-   z-index 3 clears .spread-card-shell / .ritual-scene__slot (both z-index 1)
-   and .tarot-card inside them (also 1), so this paints over the cards; it
-   inherits `pointer-events: none` from `.ritual-mist`, so nothing here can
-   swallow a click. `screen` blending makes it lighten like haze catching
-   light rather than dim the artwork like a grey scrim. */
-.ritual-mist--veil {
-  z-index: 3;
-  /* Vertical only, deliberately: spilling the cloud above and below the row
-     stops it reading as a rectangle exactly the size of the cards, while a
-     *horizontal* negative inset is the one direction that could push the
-     page into the 375px overflow this file has already had to fix twice
-     (see `.ritual-mist`'s overflow comment and `.tarot-card`'s reveal
-     rule). Nothing here can widen the page. */
-  inset: -90px 0;
-  mix-blend-mode: screen;
+/* ============================================================
+   The full-screen swirl (.ritual-fog / RitualFog)
+   ------------------------------------------------------------
+   Distinct from .ritual-mist above, which is the close-in haze in and
+   around the row of cards. This is the room the ritual happens in: the
+   whole viewport clouds over, turns, and clears. `position: fixed` is what
+   makes it the *viewport* rather than the column -- .ritual-layout carries
+   no transform/filter of its own (the scale lives on .intent-form, a
+   descendant), so nothing hijacks the fixed containing block. Fixed
+   elements contribute nothing to the document's scrollable overflow, so
+   unlike every other oversized thing in this file it cannot reopen the
+   375px horizontal-overflow bug -- verified anyway (scrollWidth stays equal
+   to innerWidth at every size captured).
+
+   z-index 2 puts it over the page, including the cards. That is the whole
+   point and it is the lesson `.ritual-mist` had to learn the hard way:
+   that layer was measured sitting entirely behind three opaque cards, so
+   the only haze that ever reached a viewer was the slivers between them.
+   Fog you can only see behind things is not fog. This one is
+   `pointer-events: none` and aria-hidden, so covering the page costs
+   nothing in interaction or assistive tech, and its own timeline takes it
+   to zero once the reading is on screen.
+
+   Opacity is animated on this wrapper and rotation on the layers inside:
+   two elements rather than one, so the entrance (scale + fade) and the
+   continuous turn never have to share a transform property or a keyframe.
+   ============================================================ */
+.ritual-fog {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
 }
 
-/* Sized so that ring + blur still fits inside the (now taller) box with
-   room to spare — 520 + 2*26px of blur = 572, against a box that is 620
-   wide and 612 tall at a 1280 viewport — so `.ritual-mist`'s `overflow:
-   hidden` never actually cuts the cloud, and no hard clipped edge appears.
-   Blurred more than the rear rings (26px vs 16px): this layer is between
-   the viewer and the cards, so it has to stay soft enough to read the
-   artwork through. Still a static filter animated only on transform/opacity
-   — see `.ritual-mist__ring`'s comment for why that stays cheap. */
-.ritual-mist--veil .ritual-mist__ring {
-  width: min(74vw, 520px);
-  filter: blur(26px);
+/* Each layer is a square far larger than the viewport, centred on it and
+   spun about that centre. 150vmax is not arbitrary: a rotating square only
+   covers the viewport at every angle if its side is at least the viewport's
+   diagonal, which is at most sqrt(2) x vmax ~ 141vmax -- anything smaller
+   sweeps its own corner into view. background-size: 100% 100% (one stretched
+   copy, not a repeat) is what lets each SVG's baked-in radial mask line up
+   with the layer's own centre, which is what hollows out the middle where
+   the cards are and fades the rim to nothing. The SVGs are stretched well
+   past their 1024px intrinsic size and stay soft, because fog has no fine
+   detail to lose. */
+.ritual-fog__layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150vmax;
+  height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
+  background-image: url("/fog/swirl.svg");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: .78;
 }
 
-.ritual-mist--veil .ritual-mist__ring--b {
-  width: min(56vw, 380px);
+/* Deliberately NOT `mix-blend-mode: screen`, which is what the first
+   version of this used. Measured on the running prototype, blending three
+   full-viewport layers cost a median of 17.6ms per frame with 48 of 145
+   frames past 33ms; dropping the blend mode took the same scene to a median
+   of 8.3ms, p95 9ms, and zero frames past 33ms. Over a backdrop this dark
+   (--cloth is near-black) `screen` and normal compositing land in almost
+   the same place anyway, so the whole cost bought nothing: the luminance
+   now comes from the SVGs' own colours instead.
+
+   `will-change` and the turn are scoped to a running ritual rather than
+   sitting on the base rule -- at idle the fog is invisible and there is no
+   reason to keep two viewport-sized compositor layers promoted. Both the
+   dealing and consulting selectors resolve to the same animation-name, so
+   advancing between those stages does not restart the turn: the fog keeps
+   turning through the whole wait rather than jumping back to 0deg the
+   moment the search starts. */
+.ritual-layout:not([data-stage="idle"]) .ritual-fog__layer {
+  will-change: transform;
 }
 
-/* Thickens fast, then settles to a thin lingering haze instead of holding
-   at full weight. The rear layer can hold at .85 all wait long because it
-   is behind the cards; this one is on top of them, and the consulting wait
-   can run the full 18s search budget (SEARCH_BUDGET_MS, mcpClient.ts) — a
-   46% veil sitting over the artwork for eighteen seconds would stop being
-   atmosphere and start being a smudge. 1500ms to settle rather than the
-   rear layer's 900ms: the cloud is still visibly thinning as the first card
-   turns (DEAL_STEP_MS = 900ms), which is what "the card resolves out of the
-   mist" actually looks like. */
-.ritual-mist--veil.ritual-mist--gather {
-  animation: mist-veil-gather 1500ms ease-out forwards;
+.ritual-layout:not([data-stage="idle"]) .ritual-fog__layer {
+  animation: fog-spin 42s linear infinite;
 }
 
-/* Picks up exactly where the gather keyframe left off (.26), so the handover
-   from RitualScene to TravelResult's spread — which happens in a single tick
-   — shows one continuous cloud rather than a second one popping in at a
-   different weight. Two classes beat `.ritual-mist--disperse`'s own .85. */
-.ritual-mist--veil.ritual-mist--disperse {
-  --mist-opacity: .26;
+/* Rolls in thick, then thins. The peak (.95, at 38% of 2600ms ~ 1000ms) is
+   deliberately near-total and deliberately brief: it lands just as the
+   cards are dealt and the first reveal timer fires (DEAL_STEP_MS = 900ms,
+   RitualStage.tsx), so the cards are genuinely hard to make out at the
+   moment they arrive and then emerge as the fog thins. It settles at .42
+   and holds there through the consulting wait, which can run the full 18s
+   search budget -- thick enough to still read as weather, thin enough to
+   read the artwork and the status line through. The scale is the fog
+   rushing inward rather than fading up on the spot. */
+.ritual-layout[data-stage="dealing"] .ritual-fog,
+.ritual-layout[data-stage="consulting"] .ritual-fog {
+  animation: fog-roll 2600ms cubic-bezier(.22, .61, .36, 1) forwards;
+}
+
+/* Clears once the reading is on screen -- picks up at the same .42 the roll
+   settled on, so the handover is one continuous cloud, and pulls outward as
+   it goes (the mirror of the entrance) rather than simply dimming. Slower
+   than it arrived: fog banks disperse more lazily than they gather. */
+.ritual-layout[data-stage="revealed"] .ritual-fog {
+  animation: fog-clear 2200ms ease-in forwards;
 }
 
 .tarot-card {
@@ -2006,15 +2049,27 @@ h1 {
   to { opacity: 0; }
 }
 
-/* Front-veil gather: thicken, then settle — see `.ritual-mist--veil
-   .ritual-mist--gather` for why this one doesn't just hold at its peak the
-   way `mist-gather` does. The .26 it ends on is the same value
-   `.ritual-mist--veil.ritual-mist--disperse` starts from; keep the two in
-   sync or the cloud will visibly jump when the spread takes over. */
-@keyframes mist-veil-gather {
-  0% { opacity: 0; }
-  40% { opacity: .58; }
-  100% { opacity: .26; }
+/* Full-screen fog (.ritual-fog). Rotation only -- the wrapper owns opacity
+   and scale, this owns the turn, so neither animation ever has to carry the
+   other's property. A full turn for a seamless `infinite` loop, same reason
+   as mist-spin above. */
+@keyframes fog-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* The .42 that fog-roll settles on is the same value fog-clear starts from;
+   keep the two in sync or the fog will visibly jump when the reading
+   appears. */
+@keyframes fog-roll {
+  0% { opacity: 0; transform: scale(1.28); }
+  38% { opacity: .95; transform: scale(1.06); }
+  100% { opacity: .42; transform: scale(1); }
+}
+
+@keyframes fog-clear {
+  0% { opacity: .42; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.18); }
 }
 
 @keyframes ritual-blink {
@@ -2069,6 +2124,10 @@ h1 {
      on, unlike the cards above (which settle into a real, static layout).
      display:none removes it from rendering entirely: no mist, exactly as
      the brief asks, and zero paint/compositing cost left behind either. */
+  /* Same reasoning as .ritual-mist just below: a turning, rushing
+     viewport-wide cloud is motion by definition and has no meaningful
+     still form, so it is removed outright rather than frozen. */
+  .ritual-fog,
   .ritual-mist {
     display: none;
   }
