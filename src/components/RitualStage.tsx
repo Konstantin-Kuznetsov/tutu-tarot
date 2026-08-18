@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { drawDestinationCards } from "@/domain/tarot/engine";
 import type { DrawnTarotCard, TripIntent } from "@/domain/types";
 import { TripIntentForm } from "./TripIntentForm";
+import { RitualFog } from "./RitualFog";
 import { RitualScene, type RitualSceneSlot } from "./RitualScene";
 import { TravelResult, type RitualResultViewModel } from "./TravelResult";
 
@@ -264,6 +265,13 @@ export function RitualStage() {
   // landmark for "the result".
   return (
     <div className="ritual-layout" data-stage={stage}>
+      {/* The full-screen swirl the whole ritual happens inside. A sibling
+          of everything else and position:fixed in CSS, so it spans the
+          viewport rather than this column, and mounted at every stage --
+          `data-stage` on this same element is what decides when it is
+          visible (see RitualFog's own comment on why it is not mounted
+          conditionally). */}
+      <RitualFog />
       {/* Recede in globals.css only sets pointer-events: none, which blocks
           clicks but not keyboard focus/activation — a Tab to the submit
           button (or refocusing the still-mounted city input and pressing

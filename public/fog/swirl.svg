@@ -1,0 +1,66 @@
+<!-- Procedural fog for the ritual's full-screen swirl (.ritual-fog in
+     globals.css). Not a photo or a painted texture: feTurbulence generates
+     the cloud, so this file is a couple of kilobytes, is resolution
+     independent (it is stretched across ~2000px on a desktop viewport and
+     stays soft, because fog has no fine detail to lose), and its palette is
+     the app's own rather than something sampled from stock art.
+
+     Both hues live in this one file on purpose. They started as two
+     separate layers, counter-rotating, which looked right and cost too
+     much: measured on the running ritual at 1440x900, two full-viewport
+     translucent layers dropped 38 of 182 frames past 33ms, and one layer
+     dropped 1. Shrinking the layers barely moved it (37), so the cost was
+     the overlap itself, not the pixel count. Compositing the two noise
+     fields here instead means one layer, one rotation, and one blend the
+     browser performs once at raster time rather than every frame.
+
+     How each field is built, in the order the filter runs:
+       feTurbulence  fractalNoise is the cloudy variant (turbulence proper
+                     gives harsher, veined wisps). stitchTiles keeps the
+                     noise seamless at the tile edges. The two baseFrequency
+                     values differ per axis on purpose: equal values give
+                     isotropic blobs, an x/y pair stretches the cloud into
+                     drifting banks.
+       feColorMatrix flattens every pixel to one colour and derives alpha
+                     from a channel of the noise. The slope is the whole
+                     trick: a gentle ramp gives a uniform wash with no
+                     shape, a steep one clips the low half to fully
+                     transparent so the cloud has edges and gaps to see the
+                     cards through. The two fields read different channels
+                     (red, then green) so the same maths yields independent
+                     shapes.
+
+     On baseFrequency: tune it against a screenshot of the real page, never
+     against this 1024px tile. The layer is stretched to 150vmax (~1920px on
+     a 1280px-wide viewport), so the first values tried here (0.003) put a
+     single cloud at ~625px on screen, wider than half the viewport, and the
+     fog read as a flat tint rather than weather.
+
+     Note for editors: XML comments may not contain a double hyphen, so this
+     file cannot use the double-hyphen aside the rest of the codebase
+     writes. An invalid comment does not warn; the whole document silently
+     fails to parse and the fog renders as nothing. Both fog files shipped
+     exactly that way once. tests/assets/silent-failures.test.ts guards it. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
+  <defs>
+    <radialGradient id="m" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="24%" stop-color="#fff" stop-opacity="0.38"/>
+      <stop offset="56%" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="k"><rect width="1024" height="1024" fill="url(#m)"/></mask>
+    <filter id="gold" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0056 0.0094" numOctaves="5" seed="11" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 1.00  0 0 0 0 0.84  0 0 0 0 0.50  1.75 0 0 0 -0.72"/>
+    </filter>
+    <filter id="wine" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0036 0.0062" numOctaves="4" seed="29" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.78  0 0 0 0 0.22  0 0 0 0 0.46  0 1.45 0 0 -0.62"/>
+    </filter>
+  </defs>
+  <g mask="url(#k)">
+    <rect width="1024" height="1024" filter="url(#wine)" opacity="0.85"/>
+    <rect width="1024" height="1024" filter="url(#gold)"/>
+  </g>
+</svg>
