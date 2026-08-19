@@ -979,3 +979,57 @@ describe("formatPrice", () => {
     expect(formatted).not.toMatch(/\d \d/);
   });
 });
+
+// Verbatim from a live Москва → Пермь response on 2026-08-19. This is the
+// shape that used to yield nothing: on an ordinary rail variant the ladder
+// lives on `fares.seat_categories`, and `price_from` there is a bare number,
+// while the same field on an interchange leg is `{ amount, currency }`.
+// Reading only the object form left every real train with an empty ladder.
+const permRailResponse = {
+  variants: [
+    {
+      transport: "railway",
+      price: { amount: 3997.31, currency: "RUB" },
+      duration_min: 1300,
+      carriers: ["ФПК"],
+      legs: [{ label: "outbound", segments: [{ from: "Москва", to: "Пермь", voyage_no: "145А" }] }],
+      fares: {
+        count: 31,
+        price_from: 3997.31,
+        price_to: 16292.88,
+        currency: "RUB",
+        refundable_count: 27,
+        changeable_count: 0,
+        seat_categories: {
+          RESERVED_SEAT: { count: 16, price_from: 3997.31 },
+          COMPARTMENT: { count: 14, price_from: 4141.08 },
+          LUX: { count: 1, price_from: 16292.88 },
+        },
+      },
+    },
+  ],
+};
+
+describe("the fare ladder on an ordinary train", () => {
+  it("reads a bare-number price_from, not just the object form", () => {
+    const [offer] = normalizeTransportOffers(permRailResponse);
+
+    expect(offer.seatCategories?.map((c) => c.label)).toEqual(["плацкарт", "купе", "люкс"]);
+    expect(offer.seatCategories?.map((c) => Math.round(c.priceFrom))).toEqual([3997, 4141, 16293]);
+  });
+
+  // `count` here is how many fare rows are on sale in that category, not how
+  // many seats remain. Showing «16 мест» would invent a fact.
+  it("never mistakes the fare count for seats left", () => {
+    const [offer] = normalizeTransportOffers(permRailResponse);
+    for (const category of offer.seatCategories ?? []) {
+      expect(category.seatsLeft).toBeUndefined();
+    }
+  });
+
+  it("still reads the object form used by an interchange leg", () => {
+    const [first] = readInterchangePlan(pskovAbakanResponse)!.legs;
+    expect(first.seatCategories.map((c) => Math.round(c.priceFrom))).toEqual([2501, 2767, 7089, 28029]);
+    expect(first.seatCategories[2].seatsLeft).toBe(2);
+  });
+});
