@@ -49,6 +49,7 @@ export async function SharedReadingLive({ reading, destination, spreadCards, int
     transportOffers: offers.transport,
     modesSummary: offers.modesSummary,
     destination,
+    interchangePlan: offers.interchangePlan,
   });
 
   const prediction = await createPrediction({
@@ -75,9 +76,10 @@ export async function SharedReadingLive({ reading, destination, spreadCards, int
         transportOutcome={offers.transportOutcome}
         warnings={offers.warnings}
         roadNote={roadUnavailableNote(offers.unavailable)}
+        interchangePlan={offers.interchangePlan}
         blockIndex={LIVE_BLOCK_INDEX.road}
       />
-      {offers.interchangePlan ? (
+      {offers.interchangePlan && roadChoice.best ? (
         <InterchangePlanSection plan={offers.interchangePlan} blockIndex={LIVE_BLOCK_INDEX.interchange} />
       ) : null}
       <div style={blockIndexStyle(LIVE_BLOCK_INDEX.otherRoads)}>
@@ -86,7 +88,7 @@ export async function SharedReadingLive({ reading, destination, spreadCards, int
           offers={offers.transport}
           excludeId={roadChoice.best?.id}
           dataBlock="other-roads"
-          outcome={offers.transportOutcome}
+          outcome={offers.interchangePlan && !roadChoice.best ? undefined : offers.transportOutcome}
         />
       </div>
       <div style={blockIndexStyle(LIVE_BLOCK_INDEX.hotels)}>
