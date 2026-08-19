@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { MyReadingsDialog } from "./MyReadingsDialog";
 import { encodeReading, type SharedReading } from "@/domain/share/code";
 
 type Status = "idle" | "copied" | "error";
 
-const SHARE_TITLE = "Таро-турагент";
 
 interface ShareButtonProps {
   reading: SharedReading;
@@ -25,33 +24,11 @@ function shareUrlFor(origin: string, reading: SharedReading): string {
   return `${origin}/r/${encodeReading(reading)}`;
 }
 
-function buildShareMessage(destinationName: string): string {
-  return `Карты выбрали для меня «${destinationName}». Загляните в расклад:`;
-}
-
-function buildTelegramUrl(shareUrl: string, message: string): string {
-  const encodedUrl = encodeURIComponent(shareUrl);
-  const encodedText = encodeURIComponent(message);
-  return `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
-}
-
 // window.location.origin never changes for the life of this tab (no
 // same-tab navigation happens away from this component without a full
 // reload), so there is nothing to subscribe to -- a stable no-op is exactly
 // what useSyncExternalStore wants here. Declared at module scope so its
 // identity never changes across renders.
-function subscribeToNothing() {
-  return () => {};
-}
-
-function readOrigin(): string {
-  return window.location.origin;
-}
-
-function readServerOrigin(): null {
-  return null;
-}
-
 export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
   // Held alongside `status`, not derived from it: this button also renders
@@ -71,10 +48,7 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   // hydration mismatch) -- readOrigin supplies the true value on every
   // client render after that, with no setState-in-effect render cascade
   // (react-hooks/set-state-in-effect) to produce it.
-  const origin = useSyncExternalStore(subscribeToNothing, readOrigin, readServerOrigin);
 
-  const shareMessage = buildShareMessage(destinationName);
-  const telegramUrl = origin ? buildTelegramUrl(shareUrlFor(origin, reading), shareMessage) : null;
 
   function handleClick() {
     // Reads window.location.origin directly here rather than reusing the
@@ -86,14 +60,6 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
     // that click somehow lands before the effect has run.
     const shareUrl = shareUrlFor(window.location.origin, reading);
     setUrl(shareUrl);
-
-    if (typeof navigator.share === "function") {
-      // Fire-and-forget: the OS share sheet owns its own UI from here, and
-      // a user who cancels it makes navigator.share() reject -- that is not
-      // a failure this button needs to report.
-      navigator.share({ title: SHARE_TITLE, text: shareMessage, url: shareUrl }).catch(() => {});
-      return;
-    }
 
     // Everything below must run with no `await` ahead of the clipboard
     // call. Safari revokes the click's user-activation the instant
@@ -138,12 +104,7 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
       <button type="button" className="btn" onClick={handleClick}>
         Поделиться раскладом
       </button>
-      {telegramUrl ? (
-        <a href={telegramUrl} target="_blank" rel="noreferrer noopener" className="btn btn--secondary">
-          Telegram
-        </a>
-      ) : null}
-      {/* Quieter than the two beside it, and last: sharing acts on the
+      {/* Quieter than the button beside it, and last: sharing acts on the
           reading in front of you, while this only looks past it. Opens over
           the reading rather than navigating away -- a reading costs a Tutu
           search to produce, and glancing at your history should not cost you

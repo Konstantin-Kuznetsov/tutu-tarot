@@ -737,6 +737,15 @@ h1 {
    around the scene, matching the mockup: the cards sit directly on the
    page's own dark table. */
 .ritual-scene {
+  /* `width: 100%` is load-bearing since .ritual-layout became a flex column:
+     an auto margin on the cross axis cancels a flex item's stretch, so this
+     shrank to its own content instead of filling to the 620px cap. With the
+     card art not yet decoded that content is narrow, so the three slots
+     rendered at ~70x160 for the first few frames and then snapped to
+     188x432 once the first image landed -- the flash of tiny, pictureless
+     cards. Filling the line breaks the circular sizing: the row's width no
+     longer depends on what is inside it. */
+  width: 100%;
   max-width: 620px;
   margin: 0 auto;
   padding: var(--sp-6) 0;

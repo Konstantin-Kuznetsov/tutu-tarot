@@ -32,17 +32,6 @@ afterEach(() => {
 });
 
 describe("ShareButton", () => {
-  it("uses navigator.share when it is available", () => {
-    const share = vi.fn().mockResolvedValue(undefined);
-    stubNavigatorProp("share", share);
-
-    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
-    fireEvent.click(screen.getByRole("button", { name: /Поделиться/ }));
-
-    expect(share).toHaveBeenCalledTimes(1);
-    const shared = share.mock.calls[0][0] as { url: string };
-    expect(shared.url).toMatch(/\/r\/[A-Za-z0-9_-]+$/);
-  });
 
   it("falls back to writing the URL to the clipboard when share is absent", async () => {
     deleteNavigatorProp("share");
@@ -88,28 +77,6 @@ describe("ShareButton", () => {
     await screen.findByText(/не удалось/i);
   });
 
-  it("renders the Telegram share control", () => {
-    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
-    const telegramLink = screen.getByRole("link", { name: /Telegram/ });
-    expect(telegramLink).toBeInTheDocument();
-  });
 
-  it("encodes both URL and message in the Telegram share href", () => {
-    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
-    const telegramLink = screen.getByRole("link", { name: /Telegram/ });
-    const href = telegramLink.getAttribute("href");
 
-    expect(href).toContain("https://t.me/share/url?");
-    expect(href).toContain("url=");
-    expect(href).toContain("text=");
-    expect(href).toContain(encodeURIComponent("Карты выбрали для меня «Горный Алтай». Загляните в расклад:"));
-  });
-
-  it("opens the Telegram link in a new tab with security attributes", () => {
-    render(<ShareButton reading={reading} destinationName="Горный Алтай" />);
-    const telegramLink = screen.getByRole("link", { name: /Telegram/ });
-
-    expect(telegramLink.getAttribute("target")).toBe("_blank");
-    expect(telegramLink.getAttribute("rel")).toBe("noreferrer noopener");
-  });
 });
