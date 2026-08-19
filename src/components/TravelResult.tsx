@@ -291,10 +291,11 @@ function pluralSeats(count: number): string {
   return `${count} мест`;
 }
 
-function SeatFares({ categories }: { categories?: SeatCategory[] }) {
+function SeatFares({ categories, partial }: { categories?: SeatCategory[]; partial?: boolean }) {
   if (!categories || categories.length === 0) return null;
 
   return (
+    <>
     <ul className="fares" aria-label="Классы вагонов">
       {categories.map((category) => (
         <li className="fare" key={category.code}>
@@ -310,6 +311,14 @@ function SeatFares({ categories }: { categories?: SeatCategory[] }) {
         </li>
       ))}
     </ul>
+    {/* A ladder of three chips reads as "these are the classes on sale", and
+        sometimes that is not true: Tutu's `uncategorized_fares` says some
+        fare rows could not be classified at all, and a category code we have
+        no Russian label for is dropped rather than shown raw. Either way the
+        absence of a rung stops meaning "not available", so the claim has to
+        be withdrawn out loud rather than left standing. */}
+    {partial ? <p className="fares-note">Это не полный список классов.</p> : null}
+    </>
   );
 }
 
@@ -364,7 +373,7 @@ function PlanCard({ plan }: { plan: InterchangePlan }) {
                   {when || duration ? (
                     <span className="leg__when">{[when, duration].filter(Boolean).join(" · ")}</span>
                   ) : null}
-                  <SeatFares categories={leg.seatCategories} />
+                  <SeatFares categories={leg.seatCategories} partial={leg.seatLadderPartial} />
                 </span>
                 {typeof leg.priceFrom === "number" ? (
                   <span className="leg__price">от {formatPrice(leg.priceFrom)}</span>
@@ -442,7 +451,7 @@ export function RoadSection({
         <article className="road__card">
           {modeLabel ? <p className="caps">{modeLabel}</p> : null}
           <RoadHero best={roadChoice.best} />
-          <SeatFares categories={roadChoice.best.seatCategories} />
+          <SeatFares categories={roadChoice.best.seatCategories} partial={roadChoice.best.seatLadderPartial} />
           <p className="road__reason">{roadChoice.reason}</p>
         </article>
       ) : planIsTheRoad && interchangePlan ? (

@@ -1033,3 +1033,58 @@ describe("the fare ladder on an ordinary train", () => {
     expect(first.seatCategories[2].seatsLeft).toBe(2);
   });
 });
+
+describe("the ladder admits when it is not the whole list", () => {
+  const withCategories = (seatCategories: Record<string, unknown>, uncategorized?: unknown) => ({
+    variants: [{
+      transport: "railway",
+      legs: [{ label: "outbound", segments: [{ from: "a", to: "b" }] }],
+      fares: { seat_categories: seatCategories, ...(uncategorized === undefined ? {} : { uncategorized_fares: uncategorized }) },
+    }],
+  });
+
+  it("says nothing when every category was understood", () => {
+    const [offer] = normalizeTransportOffers(withCategories({
+      RESERVED_SEAT: { price_from: 3997 },
+      COMPARTMENT: { price_from: 4141 },
+    }));
+    expect(offer.seatCategories).toHaveLength(2);
+    expect(offer.seatLadderPartial).toBeUndefined();
+  });
+
+  // Tutu's own signal. The playbook is explicit: a category missing from the
+  // list means "not on sale" -- unless this says some rows could not be
+  // classified, in which case the absence proves nothing.
+  it("flags Tutu's own uncategorized fares", () => {
+    const [offer] = normalizeTransportOffers(
+      withCategories({ RESERVED_SEAT: { price_from: 3997 } }, 4),
+    );
+    expect(offer.seatLadderPartial).toBe(true);
+  });
+
+  // The hole from the other side, and not hypothetical: LUX appears in live
+  // responses and is absent from the playbook's own list of four categories.
+  // Dropping a code we cannot label is right; dropping it silently would
+  // leave a shortened ladder looking complete.
+  it("flags a category code it has no label for", () => {
+    const [offer] = normalizeTransportOffers(withCategories({
+      RESERVED_SEAT: { price_from: 3997 },
+      SOMETHING_NEW: { price_from: 9000 },
+    }));
+    expect(offer.seatCategories?.map((c) => c.code)).toEqual(["RESERVED_SEAT"]);
+    expect(offer.seatLadderPartial).toBe(true);
+  });
+
+  it("does not flag an empty or absent uncategorized field", () => {
+    expect(normalizeTransportOffers(withCategories({ COMPARTMENT: { price_from: 1 } }, 0))[0].seatLadderPartial)
+      .toBeUndefined();
+    expect(normalizeTransportOffers(withCategories({ COMPARTMENT: { price_from: 1 } }, []))[0].seatLadderPartial)
+      .toBeUndefined();
+  });
+
+  it("carries no flag at all when there is no ladder to qualify", () => {
+    const [offer] = normalizeTransportOffers(withCategories({ UNKNOWN_ONLY: { price_from: 5 } }));
+    expect(offer.seatCategories).toBeUndefined();
+    expect(offer.seatLadderPartial).toBeUndefined();
+  });
+});

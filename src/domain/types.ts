@@ -133,6 +133,9 @@ export interface SeatCategory {
 // all, even though the plan as a whole has no single ticket.
 export interface InterchangeLeg {
   trainNumber?: string;
+  // True when the ladder below is known NOT to be the whole picture -- see
+  // NormalizedOffer.seatLadderPartial.
+  seatLadderPartial?: boolean;
   from: string;
   to: string;
   departureAt?: string;
