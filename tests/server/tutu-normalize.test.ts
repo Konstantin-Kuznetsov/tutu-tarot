@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { callToolWithRetry, searchTutuOffers } from "@/server/tutu/mcpClient";
-import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary, readUnavailable } from "@/server/tutu/normalize";
+import { normalizeHotelOffers, normalizeTransportOffers, readInterchangePlan, readModesSummary, readUnavailable, stationCity } from "@/server/tutu/normalize";
 import type { TravelAtlasItem, TripIntent } from "@/domain/types";
 
 const intent: TripIntent = {
@@ -826,5 +826,117 @@ describe("readUnavailable", () => {
   it("is empty when the response carries no meta at all", () => {
     expect(readUnavailable({ variants: [] })).toEqual([]);
     expect(readUnavailable(null)).toEqual([]);
+  });
+});
+
+// Verbatim from a live Псков → Абакан response on 2026-08-19, trimmed to the
+// fields under test. The shape that matters: railway reports `count: 0` --
+// there is no direct train -- and the plan hangs off that same zero-count
+// entry. readModesSummary drops zero-count modes by design, which is exactly
+// why readInterchangePlan reads the raw meta itself.
+const pskovAbakanResponse = {
+  variants: [],
+  meta: {
+    modes_summary: {
+      avia: { count: 2, min_price: 50542, min_duration_min: 360 },
+      railway: {
+        count: 0,
+        min_price: null,
+        min_duration_min: null,
+        interchange_routes: [
+          {
+            via: ["Москва"],
+            transfer_count: 1,
+            departure_at: "2026-10-14T19:23:00+03:00",
+            arrival_at: "2026-10-19T06:30:00+07:00",
+            duration_min: 6187,
+            price_from: { amount: 13320.16, currency: "RUB" },
+            price_basis: "sum_of_cheapest_fare_per_leg",
+            legs: [
+              {
+                train_number: "010У",
+                from: "Псков — Псков-Пасс. (2004500)",
+                to: "Москва — Ленинградский вокзал (2006004)",
+                departure_at: "2026-10-14T19:23:00+03:00",
+                arrival_at: "2026-10-15T06:47:00+03:00",
+                duration_min: 684,
+                price_from: { amount: 2501.26, currency: "RUB" },
+                seats_left: 52,
+                seat_categories: {
+                  COMPARTMENT: { price_from: { amount: 7088.7, currency: "RUB" }, seats_left: 2 },
+                  RESERVED_SEAT: { price_from: { amount: 2767.42, currency: "RUB" }, seats_left: 13 },
+                  SEDENTARY: { price_from: { amount: 2501.26, currency: "RUB" }, seats_left: 52 },
+                  SOFT: { price_from: { amount: 28028.76, currency: "RUB" }, seats_left: 5 },
+                },
+                checkout_url: "https://mtp-deeplink.tutu.ru/api/v1/deeplink/explicit/train?source=mcp",
+              },
+              {
+                train_number: "068Ы",
+                from: "Москва — Ярославский вокзал (2000002)",
+                to: "Абакан, 2038230",
+                departure_at: "2026-10-15T23:20:00+03:00",
+                arrival_at: "2026-10-19T06:30:00+07:00",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    unavailable: [],
+  },
+};
+
+describe("readInterchangePlan", () => {
+  it("finds the plan on a railway entry whose count is zero", () => {
+    // The regression this exists for: readModesSummary skips count<=0, so a
+    // plan read through it would never be seen at all.
+    expect(readModesSummary(pskovAbakanResponse).railway).toBeUndefined();
+
+    const plan = readInterchangePlan(pskovAbakanResponse);
+    expect(plan).not.toBeNull();
+    expect(plan?.via).toEqual(["Москва"]);
+    expect(plan?.transferCount).toBe(1);
+    expect(plan?.durationMin).toBe(6187);
+    expect(plan?.priceFrom).toBe(13320.16);
+    expect(plan?.legs).toHaveLength(2);
+  });
+
+  it("carries each leg's own train, times and bookable link", () => {
+    const [first, second] = readInterchangePlan(pskovAbakanResponse)!.legs;
+
+    expect(first.trainNumber).toBe("010У");
+    expect(first.priceFrom).toBe(2501.26);
+    expect(first.url).toContain("mtp-deeplink.tutu.ru");
+    // A plan has no single ticket, but every leg does -- that is what makes
+    // it showable at all.
+    expect(second.trainNumber).toBe("068Ы");
+    expect(second.url).toBeUndefined();
+  });
+
+  it("reads the fare ladder cheapest-first with seats left", () => {
+    const [first] = readInterchangePlan(pskovAbakanResponse)!.legs;
+
+    expect(first.seatCategories.map((c) => c.label)).toEqual(["сидячий", "плацкарт", "купе", "СВ"]);
+    expect(first.seatCategories.map((c) => Math.round(c.priceFrom))).toEqual([2501, 2767, 7089, 28029]);
+    expect(first.seatCategories[2]).toMatchObject({ code: "COMPARTMENT", seatsLeft: 2 });
+  });
+
+  it("returns null when there is no plan, rather than an empty shell", () => {
+    expect(readInterchangePlan({ meta: { modes_summary: { railway: { count: 5 } } } })).toBeNull();
+    expect(readInterchangePlan({ variants: [] })).toBeNull();
+    expect(readInterchangePlan(null)).toBeNull();
+    // A plan with no legs is nothing to show and nothing to link to.
+    expect(readInterchangePlan({
+      meta: { modes_summary: { railway: { interchange_routes: [{ via: ["Москва"], legs: [] }] } } },
+    })).toBeNull();
+  });
+});
+
+describe("stationCity", () => {
+  it("keeps the city and drops the platform, terminal and geo id", () => {
+    expect(stationCity("Псков — Псков-Пасс. (2004500)")).toBe("Псков");
+    expect(stationCity("Москва — Шереметьево (SVO), терм. B")).toBe("Москва");
+    expect(stationCity("Абакан, 2038230")).toBe("Абакан");
+    expect(stationCity("Тверь")).toBe("Тверь");
   });
 });

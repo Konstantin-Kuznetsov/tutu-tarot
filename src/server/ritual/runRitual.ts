@@ -3,7 +3,7 @@ import { FOG_REASON, roadReason } from "@/domain/tarot/roadReason";
 import { usableModes } from "@/domain/travel/roads";
 import { roadUnavailableNote } from "@/domain/travel/roadUnavailable";
 import { selectDestination } from "@/domain/travel/scoring";
-import type { DrawnTarotCard, LegOutcome, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
+import type { DrawnTarotCard, InterchangePlan, LegOutcome, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
 import { createPrediction, type PredictionText } from "@/server/oracle/narrator";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
 import { formatDuration, type NormalizedOffer } from "@/server/tutu/normalize";
@@ -92,10 +92,17 @@ export function buildRoadChoiceAndSources(params: {
 }): { roadChoice: RoadChoice; sourceLinks: SourceLink[] } {
   const { mode, pathCard, transportOffers, modesSummary, destination } = params;
 
+  // The shape of the road, not just its mode: the third card's own reading
+  // speaks about the change when there is one (roadReason). Computed here,
+  // in the tail both a fresh ritual and the shared-link page share, so a
+  // reopened link gets the same sentence as the reading that minted it.
+  const best = bestOfferFor(mode, transportOffers, modesSummary);
   const roadChoice: RoadChoice = {
     mode,
-    reason: mode ? roadReason(pathCard, mode) : FOG_REASON,
-    best: bestOfferFor(mode, transportOffers, modesSummary),
+    reason: mode
+      ? roadReason(pathCard, mode, { transfers: best?.transfers, via: best?.via })
+      : FOG_REASON,
+    best,
   };
 
   // geoUrl is genuinely a second, distinct link for most atlas entries
@@ -147,6 +154,10 @@ export interface RitualResult {
   transportOffers: NormalizedOffer[];
   hotelOffers: NormalizedOffer[];
   sourceLinks: SourceLink[];
+  // Shown whenever Tutu offers one, not only when the road is fog: a
+  // two-train plan is useful next to a found flight as well as instead of
+  // nothing.
+  interchangePlan: InterchangePlan | null;
   // Tutu's own reason for an empty transport leg, rendered in the oracle's
   // voice (roadUnavailable.ts), or null when the response said nothing
   // worth repeating. Never a substitute for the fog line -- it sits under
@@ -206,6 +217,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     transportOffers: offers.transport,
     hotelOffers: offers.hotels,
     sourceLinks,
+    interchangePlan: offers.interchangePlan ?? null,
     roadNote: roadUnavailableNote(offers.unavailable),
     warnings: offers.warnings,
     transportOutcome: offers.transportOutcome,

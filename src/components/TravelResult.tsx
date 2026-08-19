@@ -1,10 +1,11 @@
 import type { PredictionText } from "@/server/oracle/narrator";
-import type { DrawnTarotCard, LegOutcome, TravelAtlasItem, TripIntent } from "@/domain/types";
+import type { DrawnTarotCard, InterchangePlan, LegOutcome, SeatCategory, TravelAtlasItem, TripIntent } from "@/domain/types";
 import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { RoadChoice, SourceLink } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
 import { isOutsideSeasonWindow, seasonWindowCaption } from "@/domain/travel/seasonWindow";
+import { formatDuration, stationCity } from "@/server/tutu/normalize";
 import { LEG_OUTCOME_COPY, MODE_LABELS, OfferList } from "./OfferList";
 import { RitualMist } from "./RitualMist";
 import { ShareButton } from "./ShareButton";
@@ -48,6 +49,9 @@ export interface RitualResultViewModel {
   // Same story as the two outcomes above: always present on a real reading,
   // optional here so fixtures that predate it need no updating.
   roadNote?: string | null;
+  // Same story: always present on a real reading (null when Tutu offered no
+  // plan), optional here so fixtures that predate it need no updating.
+  interchangePlan?: InterchangePlan | null;
   // Same story as `destination.id`: always present on a real reading
   // (see RitualResult.intent), optional here only so hand-built test
   // fixtures don't all need updating for a feature they don't exercise.
@@ -212,9 +216,12 @@ const BLOCK_INDEX = {
   prediction: 0,
   spread: 1,
   road: 2,
-  otherRoads: 3,
-  hotels: 4,
-  sources: 5,
+  // The two-train plan sits directly under the road it complements, before
+  // the flat list of other tickets: it is a way through, not one more offer.
+  interchange: 3,
+  otherRoads: 4,
+  hotels: 5,
+  sources: 6,
 } as const;
 
 // Exported so the shared-reading page's own two stagger sequences (the
@@ -245,6 +252,143 @@ function readingTextFor(cardId: string, cardReadings: PredictionText["cardReadin
 // rather than reaching for TravelResult's own BLOCK_INDEX constant: callers
 // outside this file run their own, independent stagger sequence (see
 // SharedReadingLive's own comment on why its indices start back at 0).
+const MONTHS_SHORT = [
+  "янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
+];
+
+// Reads the wall clock straight out of the ISO string instead of going
+// through Date. That is not laziness, it is the only correct option here: a
+// departure stamped 2026-10-14T19:23:00+03:00 leaves at 19:23 by the
+// station's clock, and `new Date(...).toLocaleString()` would rewrite it
+// into whoever is reading's own timezone -- so a traveller in Vladivostok
+// would be told their Moscow train leaves at 02:23. The same class of bug
+// the calendar already has a non-UTC regression test for.
+function wallClock(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
+  if (!match) return null;
+  const [, , month, day, hour, minute] = match;
+  const monthName = MONTHS_SHORT[Number(month) - 1];
+  if (!monthName) return null;
+  return `${Number(day)} ${monthName} ${hour}:${minute}`;
+}
+
+// The fare ladder as chips (сидячий / плацкарт / купе / СВ), cheapest first.
+// Renders nothing at all when the mode has no ladder -- every non-rail offer,
+// and any rail response that does not carry `fares.seat_categories`. Same
+// rule as everywhere else here: show the fact when it exists, stay quiet
+// when it does not, never invent a rung.
+// Russian noun declension for "место" after a count: 1/21 -> место,
+// 2-4/22-24 -> места, everything else -> мест. Shipped once as a bare
+// `${n} мест` and rendered «купе · 2 мест», which a screenshot caught --
+// the third declension slip of this feature, and the reason every count in
+// this file now goes through a function.
+function pluralSeats(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} место`;
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return `${count} места`;
+  return `${count} мест`;
+}
+
+function SeatFares({ categories }: { categories?: SeatCategory[] }) {
+  if (!categories || categories.length === 0) return null;
+
+  return (
+    <ul className="fares" aria-label="Классы вагонов">
+      {categories.map((category) => (
+        <li className="fare" key={category.code}>
+          <b>
+            {category.label}
+            {/* Seats left is shown only when it is small enough to matter.
+                "52 места" is not news; "2 места" changes a decision. */}
+            {typeof category.seatsLeft === "number" && category.seatsLeft <= 10
+              ? ` · ${pluralSeats(category.seatsLeft)}`
+              : null}
+          </b>
+          <span>от {Math.round(category.priceFrom)} RUB</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// A two-train plan for a route with no direct train. Deliberately NOT styled
+// as a bookable card: dashed border, no single price presented as the fare,
+// and a closing line saying plainly that this is two purchases. Tutu itself
+// keeps these out of its ranked variant list for exactly that reason, and
+// the third card never names one -- a plan is not a road the oracle can
+// promise, it is a way through that the product owes the traveller anyway.
+export function InterchangePlanSection({ plan, blockIndex }: { plan: InterchangePlan; blockIndex: number }) {
+  const total = formatDuration(plan.durationMin);
+  const departure = wallClock(plan.departureAt);
+
+  return (
+    <section
+      className="road"
+      data-block="interchange"
+      aria-label="Путь с пересадкой"
+      style={blockIndexStyle(blockIndex)}
+    >
+      <h3 className="sec"><span>Но путь всё же есть</span></h3>
+      <article className="plan">
+        <div className="plan__head">
+          {/* "Через Москву" would need the accusative, and no Russian
+              toponym is declined by this codebase -- the first draft of this
+              line shipped «Через Москва» and a test caught it. After a colon
+              the nominative is correct for every name. */}
+          <p className="plan__title">
+            {plan.via.length > 0
+              ? `${plan.transferCount > 1 ? "Пересадки" : "Пересадка"}: ${plan.via.join(", ")}`
+              : `${plan.transferCount > 1 ? "Пересадки" : "Пересадка"} в пути`}
+          </p>
+          {typeof plan.priceFrom === "number" ? (
+            <b className="plan__total">от {Math.round(plan.priceFrom)} RUB</b>
+          ) : null}
+          <p className="plan__meta">
+            {[total ? `В пути ${total}` : null, departure ? `отправление ${departure}` : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+
+        <ol className="plan__legs">
+          {plan.legs.map((leg, index) => {
+            const when = [wallClock(leg.departureAt), wallClock(leg.arrivalAt)].filter(Boolean).join(" → ");
+            const duration = formatDuration(leg.durationMin);
+            const where = `${stationCity(leg.from)} → ${stationCity(leg.to)}`;
+
+            return (
+              <li className="leg" key={`${leg.trainNumber ?? index}-${index}`}>
+                <span className="leg__no">{leg.trainNumber ?? index + 1}</span>
+                <span className="leg__where">
+                  {leg.url ? (
+                    <a href={leg.url} target="_blank" rel="noreferrer">{where}</a>
+                  ) : (
+                    where
+                  )}
+                  {when || duration ? (
+                    <span className="leg__when">{[when, duration].filter(Boolean).join(" · ")}</span>
+                  ) : null}
+                  <SeatFares categories={leg.seatCategories} />
+                </span>
+                {typeof leg.priceFrom === "number" ? (
+                  <span className="leg__price">от {Math.round(leg.priceFrom)} RUB</span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+
+        <p className="plan__honesty">
+          Это план, а не билет: покупать нужно два раза, каждую ногу отдельно. Цена — сумма самых
+          дешёвых тарифов на каждом отрезке, поэтому итог может отличаться.
+        </p>
+      </article>
+    </section>
+  );
+}
+
 export function RoadSection({
   roadChoice,
   transportOutcome,
@@ -275,6 +419,7 @@ export function RoadSection({
         <article className="road__card">
           {modeLabel ? <p className="caps">{modeLabel}</p> : null}
           <RoadHero best={roadChoice.best} />
+          <SeatFares categories={roadChoice.best.seatCategories} />
           <p className="road__reason">{roadChoice.reason}</p>
         </article>
       ) : (
@@ -403,6 +548,9 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
           on this wrapper and inherited down to it (custom properties
           inherit through the DOM by default), which staggers it without
           OfferList needing to know about the ritual's animation scheme. */}
+      {result.interchangePlan ? (
+        <InterchangePlanSection plan={result.interchangePlan} blockIndex={BLOCK_INDEX.interchange} />
+      ) : null}
       <div style={blockIndexStyle(BLOCK_INDEX.otherRoads)}>
         <OfferList
           title="Билеты по предсказанию"

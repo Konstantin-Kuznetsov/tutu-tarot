@@ -5,7 +5,7 @@ import { createPrediction } from "@/server/oracle/narrator";
 import { buildRoadChoiceAndSources } from "@/server/ritual/runRitual";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
 import { OfferList } from "./OfferList";
-import { RoadSection, SourcesSection, blockIndexStyle } from "./TravelResult";
+import { InterchangePlanSection, RoadSection, SourcesSection, blockIndexStyle } from "./TravelResult";
 import { ShareButton } from "./ShareButton";
 import { roadUnavailableNote } from "@/domain/travel/roadUnavailable";
 
@@ -27,9 +27,10 @@ interface SharedReadingLiveProps {
 const LIVE_BLOCK_INDEX = {
   detail: 0,
   road: 1,
-  otherRoads: 2,
-  hotels: 3,
-  sources: 4,
+  interchange: 2,
+  otherRoads: 3,
+  hotels: 4,
+  sources: 5,
 } as const;
 
 // The streamed half of the shared-reading page (src/app/r/[code]/page.tsx):
@@ -76,6 +77,9 @@ export async function SharedReadingLive({ reading, destination, spreadCards, int
         roadNote={roadUnavailableNote(offers.unavailable)}
         blockIndex={LIVE_BLOCK_INDEX.road}
       />
+      {offers.interchangePlan ? (
+        <InterchangePlanSection plan={offers.interchangePlan} blockIndex={LIVE_BLOCK_INDEX.interchange} />
+      ) : null}
       <div style={blockIndexStyle(LIVE_BLOCK_INDEX.otherRoads)}>
         <OfferList
           title="Билеты по предсказанию"
