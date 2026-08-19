@@ -121,7 +121,16 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
             holds a wordmark and nothing else, and a <nav> landmark with no
             navigation in it is a lie told to screen readers. */}
         <header className="lumora__nav">
-          <span className="lumora__logo">Lumora</span>
+          {/* The company's own wordmark, not the product's: «Таро-турагент»
+              is what the heading below says. A raw <img> rather than
+              next/image because the file is a 4KB vector that is already
+              exactly the shape it renders at -- an optimiser pass would be
+              a transform hop for nothing. Width and height carry the SVG's
+              own viewBox (208x54) so the row reserves its space before the
+              file arrives; CSS pins the height and lets the width follow.
+              eslint-disable-next-line @next/next/no-img-element */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="lumora__logo" src="/tutu-logo.svg" alt="Туту" width={208} height={54} />
         </header>
 
         {/* The document's only <main>. It used to be the tarot entry

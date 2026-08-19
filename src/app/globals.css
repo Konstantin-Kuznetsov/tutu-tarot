@@ -2837,15 +2837,16 @@ h1 {
   flex: none;
 }
 
+/* Height is pinned and width follows the file's own 208x54 ratio, so the
+   mark can never be squashed by a stray width. The italic/font-size rules
+   that used to live here went with the text wordmark they styled, and the
+   640px bump with them: a logo does not need a second size, it needs one
+   that fits. The artwork is white and stays white -- the hero's dark state
+   (`[data-dark="true"]`) only re-inks `.lumora__hero`, not this. */
 .lumora__logo {
-  color: #fff;
-  font-style: italic;
-  font-size: 1.25rem;
-  line-height: 1.2;
-}
-
-@media (min-width: 640px) {
-  .lumora__logo { font-size: 1.5rem; }
+  display: block;
+  height: 52px;
+  width: auto;
 }
 
 /* The navigation (desktop pill, hamburger and mobile overlay), the badge,
