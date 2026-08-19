@@ -75,7 +75,7 @@ test("a face-down card is exactly the card's own box, and never shows around the
   });
 
   await page.goto("/");
-  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Откуда").fill("Москва");
   await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();

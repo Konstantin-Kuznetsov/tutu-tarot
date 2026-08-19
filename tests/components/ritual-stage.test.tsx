@@ -44,7 +44,7 @@ describe("RitualStage", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<RitualStage />);
-    fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
+    fireEvent.change(screen.getByLabelText("Откуда"), { target: { value: "Москва" } });
     pickFutureDateRange();
     fireEvent.change(screen.getByLabelText("Путешественники"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
@@ -106,7 +106,7 @@ describe("RitualStage", () => {
     vi.stubGlobal("XMLHttpRequest", FakeXMLHttpRequest);
 
     render(<RitualStage />);
-    fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
+    fireEvent.change(screen.getByLabelText("Откуда"), { target: { value: "Москва" } });
     pickFutureDateRange();
     fireEvent.change(screen.getByLabelText("Путешественники"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));

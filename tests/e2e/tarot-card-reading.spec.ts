@@ -84,7 +84,7 @@ test("no card's reading escapes its card box, and the page has no horizontal ove
   });
 
   await page.goto("/");
-  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Откуда").fill("Москва");
   await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();

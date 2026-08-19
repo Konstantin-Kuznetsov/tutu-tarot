@@ -8,7 +8,7 @@ describe("TripIntentForm", () => {
     const onSubmit = vi.fn();
     render(<TripIntentForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: " Москва " } });
+    fireEvent.change(screen.getByLabelText("Откуда"), { target: { value: " Москва " } });
     const { from, to } = pickFutureDateRange();
     fireEvent.change(screen.getByLabelText("Путешественники"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
@@ -25,7 +25,7 @@ describe("TripIntentForm", () => {
     const onSubmit = vi.fn();
     render(<TripIntentForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
+    fireEvent.change(screen.getByLabelText("Откуда"), { target: { value: "Москва" } });
     const submit = screen.getByRole("button", { name: "Начать расклад" });
     expect(submit).toBeDisabled();
 

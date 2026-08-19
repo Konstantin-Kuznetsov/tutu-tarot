@@ -59,7 +59,7 @@ const spreadRitualResponse = {
 // month); mirrored here with getAllByRole()[0] since RTL has no Playwright
 // -style .first().
 function fillAndSubmit() {
-  fireEvent.change(screen.getByLabelText("Город вылета"), { target: { value: "Москва" } });
+  fireEvent.change(screen.getByLabelText("Откуда"), { target: { value: "Москва" } });
   fireEvent.click(screen.getByRole("button", { name: /Когда поедете/ }));
   fireEvent.click(screen.getByRole("button", { name: "Следующий месяц" }));
   fireEvent.click(screen.getAllByRole("button", { name: "10" })[0]);

@@ -46,7 +46,7 @@ export function TripIntentForm({ onSubmit }: { onSubmit(intent: TripIntent): voi
         >
           <div className="field">
             <label className="lab" htmlFor="departureCity">
-              Город вылета
+              Откуда
             </label>
             <input
               id="departureCity"

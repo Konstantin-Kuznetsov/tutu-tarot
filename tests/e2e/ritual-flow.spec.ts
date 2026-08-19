@@ -73,7 +73,7 @@ test("result screen has no horizontal overflow at 375px even with a long unbroke
   });
 
   await page.goto("/");
-  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Откуда").fill("Москва");
   await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
@@ -150,7 +150,7 @@ test("ritual flow reaches Tutu-backed result", async ({ page }) => {
   });
 
   await page.goto("/");
-  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Откуда").fill("Москва");
   await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
@@ -238,7 +238,7 @@ test("holds the third card until Tutu MCP answers, on one page throughout", asyn
   });
 
   await page.goto("/");
-  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Откуда").fill("Москва");
   await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
@@ -338,7 +338,7 @@ test("a shared reading link reproduces the same cards, orientations and destinat
   });
 
   await page.goto("/");
-  await page.getByLabel("Город вылета").fill("Москва");
+  await page.getByLabel("Откуда").fill("Москва");
   await pickFutureDateRange(page);
   await page.getByLabel("Путешественники").fill("2");
   await page.getByRole("button", { name: "Начать расклад" }).click();
