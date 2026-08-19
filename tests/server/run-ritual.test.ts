@@ -271,3 +271,66 @@ describe("etrain is a strictly additive mode", () => {
     expect(result.roadChoice.mode).not.toBe("etrain");
   });
 });
+
+// The page contradicted itself: «Дорога скрыта туманом: карты не увидели ни
+// одного пути» sitting directly above five flights the same response had
+// found. Two ways in, one rule out -- fog is only for an empty search.
+describe("fog is only for an empty search", () => {
+  const card: DrawnTarotCard = {
+    id: "hermit", number: 9, name: "Отшельник", image: "/tarot/09-hermit.webp",
+    archetypes: ["solitude"], transport: ["railway", "etrain"],
+    meaning: "тишина", meaningReversed: "одиночество тяготит",
+    position: "Путь", reversed: false,
+  };
+  const place = {
+    id: "baikal", name: "Байкал", region: "Иркутская область",
+    routeTitle: "Байкал", anchorPlace: "Байкал", nearestTransportHub: "Иркутск",
+    hotelSearchCity: "Иркутск", tags: [], season: [], mood: [], tarotArchetypes: [],
+    source: "geo.tutu" as const, sourceUrl: "https://example.com", oracleHook: "знак",
+  };
+
+  // The third card can name nothing even when roads exist: drawPathCard
+  // falls back to the whole deck once every card that could name a usable
+  // mode is already on the table, and the card it lands on may carry none.
+  it("says the road was not named, not that nothing was found", () => {
+    const { roadChoice } = buildRoadChoiceAndSources({
+      mode: null,
+      pathCard: card,
+      transportOffers: [],
+      modesSummary: { avia: { count: 5, minPrice: 33948, minDurationMin: 415 } },
+      destination: place,
+    });
+
+    expect(roadChoice.reason).not.toContain("туман");
+    expect(roadChoice.reason).toContain("дороги есть");
+  });
+
+  it("keeps the fog when Tutu really found nothing", () => {
+    const { roadChoice } = buildRoadChoiceAndSources({
+      mode: null,
+      pathCard: card,
+      transportOffers: [],
+      modesSummary: {},
+      destination: place,
+    });
+
+    expect(roadChoice.reason).toContain("туман");
+  });
+
+  // The shared-link case: the mode is frozen into the code, so a reading
+  // that found nothing in September reopens in October with flights on the
+  // page and a null mode in the link.
+  it("does not repeat a stale fog when today's search finds roads", () => {
+    const { roadChoice } = buildRoadChoiceAndSources({
+      mode: null,
+      pathCard: card,
+      transportOffers: [
+        { id: "t-0", title: "Авиабилеты: Nordwind", mode: "avia", url: "https://avia.tutu.ru/" },
+      ],
+      modesSummary: { avia: { count: 5, minPrice: 33948, minDurationMin: 415 } },
+      destination: place,
+    });
+
+    expect(roadChoice.reason).not.toContain("туман");
+  });
+});

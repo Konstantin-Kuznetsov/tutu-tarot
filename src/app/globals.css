@@ -943,6 +943,17 @@ h1 {
   overflow: hidden;
 }
 
+/* The flex column that lets the scrolling panel take the remaining height --
+   scoped to [open] deliberately. A bare `.mydialog { display: flex }`
+   overrides the browser's own `dialog:not([open]) { display: none }`,
+   because author styles beat the UA sheet whatever their specificity, and a
+   closed dialog then renders inline at the foot of the page. Caught by an
+   end-to-end test asserting the dialog is hidden after Escape. */
+.mydialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 .mydialog::backdrop {
   /* Dark enough that the reading underneath reads as set aside rather than
      merely dimmed, with a blur so its cards don't compete with the tiles. */
@@ -953,8 +964,19 @@ h1 {
 /* The scrolling half. Kept separate from the dialog box so the box itself
    can stay `overflow: hidden` and keep its rounded corners clipping the
    tiles at the top and bottom edges. */
+/* The reading behind the dialog is frozen in place by pinning the body (see
+   MyReadingsDialog): `position: fixed` with a negative `top` keeps it
+   looking exactly where it was, and closing puts the scroll back. Attempts
+   that did not work, in order: `html:has(dialog[open]) { overflow: hidden }`
+   stopped the wheel but could not undo the jump showModal itself causes,
+   because a viewport with hidden overflow cannot be scrolled programmatically
+   either; restoring on the next frame failed for the same reason. */
 .mydialog__panel {
-  max-height: inherit;
+  /* min-height:0 is the load-bearing half: a flex item's default minimum is
+     its content, so without it the panel refuses to shrink below the full
+     height of the list and never scrolls. */
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-6) var(--sp-5) var(--sp-6);

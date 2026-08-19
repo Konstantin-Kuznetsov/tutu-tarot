@@ -20,6 +20,22 @@ const REVERSED: Record<TransportMode, string> = {
 export const FOG_REASON =
   "Дорога скрыта туманом: карты не увидели ни одного пути, который можно проверить сегодня.";
 
+// The fog line is a claim about today's reality -- "не увидели ни одного
+// пути" -- and there are two ways for it to be false while still being
+// shown. The third card can fail to name a mode even though roads exist:
+// drawPathCard falls back to the whole deck when every card that could name
+// a usable mode is already on the table, and the card it lands on may carry
+// none of them. And a shared link freezes the mode it was minted with, so a
+// reading that found nothing in September can be reopened in October when
+// flights exist again.
+//
+// Both produce the same contradiction on screen -- «карты не увидели ни
+// одного пути» directly above five flights -- so the fog is reserved for
+// the case where Tutu really did find nothing, and this says the true thing
+// instead: the cards named no single road, but roads are there.
+export const ROAD_UNNAMED_REASON =
+  "Карты не указали на один путь — но дороги есть: билеты ниже.";
+
 // The clause below reads "с N пересадкой/пересадками", which is the
 // instrumental case -- and in the instrumental every plural collapses to one
 // form, so unlike the nominative there is no 2-4 / 5+ split to make. Only
