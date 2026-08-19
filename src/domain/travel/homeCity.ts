@@ -23,8 +23,20 @@ import type { TravelAtlasItem } from "@/domain/types";
 // not decoration: a traveller in Орёл who types «Орел» -- as most people do,
 // and as most keyboards encourage -- must still be recognised as being in
 // the same city the atlas might spell with ё.
+// Memoised because the strings on the other side of the comparison are
+// static: the atlas's 31 names and anchors never change, and normalising all
+// 62 of them on every call is pure waste. The reachability test makes that
+// visible -- it runs 29 568 draws, and the uncached version pushed it from
+// comfortably passing to timing out at 5s. Bounded by construction: the keys
+// are atlas strings plus whatever one city a caller typed.
+const normalized = new Map<string, string>();
+
 function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase("ru-RU").replace(/ё/g, "е").replace(/\s+/g, " ");
+  const cached = normalized.get(value);
+  if (cached !== undefined) return cached;
+  const result = value.trim().toLocaleLowerCase("ru-RU").replace(/ё/g, "е").replace(/\s+/g, " ");
+  normalized.set(value, result);
+  return result;
 }
 
 // Whole-phrase match, not a substring: «Казань и Татарстан» contains «Казань»

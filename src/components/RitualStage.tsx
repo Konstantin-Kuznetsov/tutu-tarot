@@ -7,6 +7,8 @@ import { LumoraHero } from "./LumoraHero";
 import { RitualFog } from "./RitualFog";
 import { RitualScene, type RitualSceneSlot } from "./RitualScene";
 import { TravelResult, type RitualResultViewModel } from "./TravelResult";
+import { encodeReading } from "@/domain/share/code";
+import { remember } from "./myReadings";
 
 // "reading" is the intermediate screen's own final beat: the search has
 // answered, so all three cards — including "Путь", whose identity was
@@ -244,6 +246,43 @@ export function RitualStage() {
 
     return () => window.clearTimeout(timer);
   }, [stage]);
+
+  // Remembered the moment the reading is complete, not when it is shared:
+  // otherwise «Мои расклады» would be a list of what you sent to someone,
+  // not of what the cards actually gave you.
+  //
+  // This lives here rather than in TravelResult because TravelResult renders
+  // on both surfaces -- a fresh ritual and someone else's shared link -- and
+  // opening a link a friend sent you should not file their reading under
+  // yours. RitualStage only ever runs for a reading this browser drew.
+  useEffect(() => {
+    if (stage !== "revealed" || !result) return;
+
+    // Every one of these is optional on RitualResultViewModel -- see that
+    // type's own comments on why (hand-built fixtures predate them) -- so
+    // this checks rather than asserts. A reading missing any of them cannot
+    // produce a share code either, and one that cannot be linked to is not
+    // worth remembering: the tile would have nowhere to go.
+    const { spreadCards, destination, intent } = result;
+    if (!spreadCards || spreadCards.length !== 3 || !destination.id || !intent) return;
+
+    remember({
+      code: encodeReading({
+        cards: spreadCards.map((card) => ({ id: card.id, reversed: card.reversed })),
+        destinationId: destination.id,
+        mode: result.roadChoice.mode,
+        departureCity: intent.departureCity,
+        dateFrom: intent.dateFrom,
+        dateTo: intent.dateTo,
+        travelerCount: intent.travelerCount,
+      }),
+      destinationName: destination.name,
+      departureCity: intent.departureCity,
+      dateFrom: intent.dateFrom,
+      dateTo: intent.dateTo,
+      travelerCount: intent.travelerCount,
+    });
+  }, [stage, result]);
 
   // Same follow, same restraint, for the dealing scene: the collapsed
   // ticket strip above it (globals.css) already gives the mist/cards most

@@ -40,3 +40,68 @@ vi.mock("next/cache", () => ({
 afterEach(() => {
   nextCacheStore.clear();
 });
+
+// vitest's jsdom environment hands tests a `window.localStorage` that is a
+// bare object with no methods at all: `[object Object]`, and
+// `clear`/`getItem`/`setItem` all undefined. A jsdom window built directly
+// has a proper `[object Storage]` -- the methods live on Storage.prototype,
+// and only own properties survive the copy into the test global.
+//
+// The app is unaffected (verified in a real browser: a reading is saved and
+// the list renders), but anything that touches storage is untestable without
+// this. A minimal, correct Storage stands in: same method names, same
+// string coercion, same "missing key returns null" contract.
+class TestStorage implements Storage {
+  private values = new Map<string, string>();
+
+  get length(): number {
+    return this.values.size;
+  }
+
+  key(index: number): string | null {
+    return [...this.values.keys()][index] ?? null;
+  }
+
+  getItem(key: string): string | null {
+    return this.values.has(key) ? (this.values.get(key) as string) : null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(String(key), String(value));
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  clear(): void {
+    this.values.clear();
+  }
+}
+
+if (typeof window !== "undefined" && typeof window.localStorage?.getItem !== "function") {
+  Object.defineProperty(window, "localStorage", {
+    value: new TestStorage(),
+    configurable: true,
+    writable: true,
+  });
+}
+
+// jsdom ships the HTMLDialogElement constructor but none of its behaviour:
+// `showModal` and `close` are both undefined, so a component that opens a
+// dialog cannot be exercised at all. This stands in for the parts the
+// component actually reads -- the `open` property and the `close` event --
+// and deliberately not for the rest: focus trapping, the inert background,
+// Escape and ::backdrop are the browser's own work, verified in a real
+// browser rather than simulated here.
+if (typeof HTMLDialogElement === "function" && typeof HTMLDialogElement.prototype.showModal !== "function") {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement, returnValue?: string) {
+    if (!this.open) return;
+    this.open = false;
+    if (returnValue !== undefined) this.returnValue = returnValue;
+    this.dispatchEvent(new Event("close"));
+  };
+}

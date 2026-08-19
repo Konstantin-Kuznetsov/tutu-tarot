@@ -1039,6 +1039,208 @@ h1 {
 }
 
 /* ============================================================
+   «Мои расклады» — the history list (/my) and the way into it.
+   ============================================================ */
+
+/* Third control in the share row, and deliberately the quietest of the
+   three: the other two act on the reading in front of you, this one leaves
+   it. Same height and rhythm as .btn so the row stays one line of controls
+   rather than a button and a link that happen to sit together. */
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text-dim);
+}
+
+.btn--ghost:hover {
+  border-color: var(--gold-deep);
+  color: var(--text);
+}
+
+/* The history over the reading. A native <dialog>, so the backdrop, the
+   focus trap and Escape are the browser's job -- only the look is ours.
+   `inset: 0` plus `margin: auto` centres it without transforms, which keeps
+   it out of the way of the fixed-position ritual fog underneath. */
+.mydialog {
+  inset: 0;
+  margin: auto;
+  width: min(760px, 100% - 2 * var(--sp-4));
+  max-height: min(88vh, 100% - 2 * var(--sp-4));
+  padding: 0;
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  background: var(--cloth);
+  color: var(--text);
+  box-shadow: var(--shadow-raise);
+  overflow: hidden;
+}
+
+/* The flex column that lets the scrolling panel take the remaining height --
+   scoped to [open] deliberately. A bare `.mydialog { display: flex }`
+   overrides the browser's own `dialog:not([open]) { display: none }`,
+   because author styles beat the UA sheet whatever their specificity, and a
+   closed dialog then renders inline at the foot of the page. Caught by an
+   end-to-end test asserting the dialog is hidden after Escape. */
+.mydialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.mydialog::backdrop {
+  /* Dark enough that the reading underneath reads as set aside rather than
+     merely dimmed, with a blur so its cards don't compete with the tiles. */
+  background: rgba(8, 4, 14, .72);
+  backdrop-filter: blur(3px);
+}
+
+/* The scrolling half. Kept separate from the dialog box so the box itself
+   can stay `overflow: hidden` and keep its rounded corners clipping the
+   tiles at the top and bottom edges. */
+/* The reading behind the dialog is frozen in place by pinning the body (see
+   MyReadingsDialog): `position: fixed` with a negative `top` keeps it
+   looking exactly where it was, and closing puts the scroll back. Attempts
+   that did not work, in order: `html:has(dialog[open]) { overflow: hidden }`
+   stopped the wheel but could not undo the jump showModal itself causes,
+   because a viewport with hidden overflow cannot be scrolled programmatically
+   either; restoring on the next frame failed for the same reason. */
+.mydialog__panel {
+  /* min-height:0 is the load-bearing half: a flex item's default minimum is
+     its content, so without it the panel refuses to shrink below the full
+     height of the list and never scrolls. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-6) var(--sp-5) var(--sp-6);
+}
+
+.mydialog__close {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-s);
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+.mydialog__close:hover {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold-deep);
+}
+
+.myroot {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--sp-5) var(--sp-8);
+}
+
+.myhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-2);
+}
+
+.myhead h1 {
+  margin: 0;
+  font: 400 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--font-display);
+  color: var(--text);
+}
+
+.myhead a {
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.myhead a:hover {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold-deep);
+}
+
+.mycount,
+.myempty {
+  margin: 0 0 var(--sp-5);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.mylist {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+/* The whole tile is the link -- the same convention .offer-card and
+   .road__hero already follow -- so there is no separate "open" control
+   competing with a picture that is already asking to be tapped. */
+.reading {
+  display: block;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  background: var(--cloth);
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  overflow: hidden;
+  box-shadow: var(--shadow-raise);
+  transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.reading:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+}
+
+/* The intrinsic size of the thumbnail route's own output (600x215), so the
+   row reserves its height before the image arrives and nothing below it
+   jumps when it does. */
+.reading__shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 600 / 215;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* The two facts the picture does not carry: when the trip is, and who it is
+   for. They are what tells two readings to the same place apart. */
+.reading__facts {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+}
+
+.reading__facts b {
+  font: 400 var(--fs-m)/1.2 var(--font-display);
+  color: var(--text);
+}
+
+.reading__facts span {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .reading__facts {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .reading__facts span {
+    text-align: left;
+  }
+}
+
+/* ============================================================
    The full-screen swirl (.ritual-fog / RitualFog)
    ------------------------------------------------------------
    Distinct from .ritual-mist above, which is the close-in haze in and
