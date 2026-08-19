@@ -319,18 +319,12 @@ function SeatFares({ categories }: { categories?: SeatCategory[] }) {
 // keeps these out of its ranked variant list for exactly that reason, and
 // the third card never names one -- a plan is not a road the oracle can
 // promise, it is a way through that the product owes the traveller anyway.
-export function InterchangePlanSection({ plan, blockIndex }: { plan: InterchangePlan; blockIndex: number }) {
+function PlanCard({ plan }: { plan: InterchangePlan }) {
   const total = formatDuration(plan.durationMin);
   const departure = wallClock(plan.departureAt);
 
   return (
-    <section
-      className="road"
-      data-block="interchange"
-      aria-label="Путь с пересадкой"
-      style={blockIndexStyle(blockIndex)}
-    >
-      <h3 className="sec"><span>Но путь всё же есть</span></h3>
+    <>
       <article className="plan">
         <div className="plan__head">
           {/* "Через Москву" would need the accusative, and no Russian
@@ -385,6 +379,24 @@ export function InterchangePlanSection({ plan, blockIndex }: { plan: Interchange
           дешёвых тарифов на каждом отрезке, поэтому итог может отличаться.
         </p>
       </article>
+    </>
+  );
+}
+
+// The plan as a *second* road, shown under a road the card already named.
+// Its own section, because it is an alternative rather than the answer --
+// four times cheaper by train than by air is worth seeing, and until this
+// existed nobody ever saw it.
+export function InterchangePlanSection({ plan, blockIndex }: { plan: InterchangePlan; blockIndex: number }) {
+  return (
+    <section
+      className="road"
+      data-block="interchange"
+      aria-label="Ещё одна дорога"
+      style={blockIndexStyle(blockIndex)}
+    >
+      <h3 className="sec"><span>Ещё одна дорога</span></h3>
+      <PlanCard plan={plan} />
     </section>
   );
 }
@@ -394,6 +406,7 @@ export function RoadSection({
   transportOutcome,
   warnings,
   roadNote,
+  interchangePlan,
   blockIndex,
 }: {
   roadChoice: RoadChoice;
@@ -403,9 +416,19 @@ export function RoadSection({
   // (roadUnavailable.ts). Optional: readings that predate it, and every
   // hand-built fixture, simply render as before.
   roadNote?: string | null;
+  // When there is no single bookable offer but Tutu returned a two-train
+  // plan, the plan *is* the road: the third card named rail, and rail here
+  // means two trains. See runRitual for why the card can name it at all.
+  interchangePlan?: InterchangePlan | null;
   blockIndex: number;
 }) {
   const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
+  // A road was found. Everything below that says otherwise -- the fog line,
+  // "Tutu answered with nothing", Tutu's own reason for an empty leg -- is
+  // false here and must not render. The traveller was told the cards saw no
+  // path and then shown a path in the next breath; that is the bug this
+  // flag exists to kill.
+  const planIsTheRoad = !roadChoice.best && Boolean(interchangePlan);
 
   return (
     <section
@@ -422,6 +445,11 @@ export function RoadSection({
           <SeatFares categories={roadChoice.best.seatCategories} />
           <p className="road__reason">{roadChoice.reason}</p>
         </article>
+      ) : planIsTheRoad && interchangePlan ? (
+        <>
+          <PlanCard plan={interchangePlan} />
+          <p className="road__reason">{roadChoice.reason}</p>
+        </>
       ) : (
         <div className="road__fog">
           <div className="rule" aria-hidden="true">
@@ -447,10 +475,10 @@ export function RoadSection({
           for "empty" alone -- on "failed" Tutu never got far enough to
           have a reason, and on "served" there is a road and nothing to
           explain. */}
-      {roadNote && transportOutcome === "empty" ? (
+      {roadNote && transportOutcome === "empty" && !planIsTheRoad ? (
         <p className="road__warning road__warning--reason">{roadNote}</p>
       ) : null}
-      {transportOutcome && transportOutcome !== "served" ? (
+      {transportOutcome && transportOutcome !== "served" && !planIsTheRoad ? (
         <p className="road__warning">{LEG_OUTCOME_COPY[transportOutcome]}</p>
       ) : !transportOutcome && warnings.length > 0 ? (
         <p className="road__warning">
@@ -542,22 +570,30 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
         transportOutcome={result.transportOutcome}
         warnings={result.warnings}
         roadNote={result.roadNote}
+        interchangePlan={result.interchangePlan}
         blockIndex={BLOCK_INDEX.road}
       />
       {/* OfferList renders its own [data-block] section; --block-index is set
           on this wrapper and inherited down to it (custom properties
           inherit through the DOM by default), which staggers it without
           OfferList needing to know about the ritual's animation scheme. */}
-      {result.interchangePlan ? (
+      {/* Only as a *second* road. When it is the only one it already
+          rendered inside the road block above, and showing it twice would
+          be worse than not showing it at all. */}
+      {result.interchangePlan && result.roadChoice.best ? (
         <InterchangePlanSection plan={result.interchangePlan} blockIndex={BLOCK_INDEX.interchange} />
       ) : null}
       <div style={blockIndexStyle(BLOCK_INDEX.otherRoads)}>
         <OfferList
           title="Билеты по предсказанию"
+          /* The same silence as in the road block above: when a plan is the
+             road, «Туту ответил: ничего не нашлось» is false here too. The
+             section still renders its link into Tutu's own search -- what
+             goes is only the sentence claiming nothing was found. */
           offers={result.transportOffers}
           excludeId={roadChoice.best?.id}
           dataBlock="other-roads"
-          outcome={result.transportOutcome}
+          outcome={result.interchangePlan && !result.roadChoice.best ? undefined : result.transportOutcome}
         />
       </div>
       <div style={blockIndexStyle(BLOCK_INDEX.hotels)}>

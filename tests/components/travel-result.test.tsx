@@ -529,3 +529,108 @@ describe("TravelResult season mismatch note", () => {
     expect(screen.queryByText(/рекомендует для этой поездки другое время года/)).not.toBeInTheDocument();
   });
 });
+
+// The bug this kills: the page told the traveller «карты не увидели ни
+// одного пути» and «Туту ответил: ничего не нашлось», and then showed a
+// path in the next breath. If a way through was found, the cards found it
+// — there is nothing to apologise for and nothing that "wasn't found".
+describe("a two-train plan is the road, not a consolation", () => {
+  const plan = {
+    via: ["Москва"],
+    transferCount: 1,
+    departureAt: "2026-09-15T19:23:00+03:00",
+    arrivalAt: "2026-09-19T06:30:00+07:00",
+    durationMin: 6187,
+    priceFrom: 17936,
+    legs: [
+      { trainNumber: "010У", from: "Псков — Псков-Пасс.", to: "Москва — Ленинградский вокзал",
+        departureAt: "2026-09-15T19:23:00+03:00", arrivalAt: "2026-09-16T06:47:00+03:00",
+        durationMin: 684, priceFrom: 3146, url: "https://mtp-deeplink.tutu.ru/x", seatCategories: [] },
+      { trainNumber: "010Н", from: "Москва — Ярославский вокзал", to: "Иркутск",
+        departureAt: "2026-09-16T23:20:00+03:00", arrivalAt: "2026-09-19T06:30:00+07:00",
+        durationMin: 4750, priceFrom: 14790, url: "https://mtp-deeplink.tutu.ru/y", seatCategories: [] },
+    ],
+  };
+
+  const withPlan = {
+    ...resultWithRoad,
+    roadChoice: {
+      mode: "railway" as const,
+      reason: "«Отшельник» сажает к окну — дорога будет долгой и созерцательной. Путь ляжет с 1 пересадкой — разрыв в дороге здесь часть знака, а не помеха. Место излома: Москва.",
+      best: null,
+    },
+    warnings: [],
+    transportOutcome: "empty" as const,
+    roadNote: "Поезд сюда не дойдёт — прямого пути нет.",
+    interchangePlan: plan,
+  };
+
+  it("shows the plan inside the road block the card chose", () => {
+    render(<TravelResult result={withPlan} />);
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+
+    expect(road).toHaveTextContent("Пересадка: Москва");
+    expect(road).toHaveTextContent("010У");
+    expect(road).toHaveTextContent("Это план, а не билет");
+    // The card's own sentence, about a road that has no single ticket.
+    expect(road).toHaveTextContent("Путь ляжет с 1 пересадкой");
+  });
+
+  it("says nothing about fog, emptiness, or a missing road", () => {
+    render(<TravelResult result={withPlan} />);
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+
+    expect(road).not.toHaveTextContent("Дорога скрыта туманом");
+    expect(road).not.toHaveTextContent("ничего не нашлось");
+    expect(road).not.toHaveTextContent("прямого пути нет");
+  });
+
+  it("does not repeat the plan as a second road when it is the only one", () => {
+    render(<TravelResult result={withPlan} />);
+    expect(screen.queryByRole("region", { name: "Ещё одна дорога" })).toBeNull();
+    expect(screen.getAllByText(/Это план, а не билет/)).toHaveLength(1);
+  });
+
+  it("keeps the fog when there is neither an offer nor a plan", () => {
+    render(<TravelResult result={{ ...withPlan, interchangePlan: null }} />);
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+
+    expect(road).toHaveTextContent("ничего не нашлось");
+    expect(road).toHaveTextContent("прямого пути нет");
+  });
+
+  // A plan next to a road the card already named is an alternative, not the
+  // answer -- four times cheaper by train than by air is worth seeing.
+  it("shows the plan as a second road when a bookable one also exists", () => {
+    render(<TravelResult result={{ ...withPlan, roadChoice: resultWithRoad.roadChoice, transportOutcome: "served" }} />);
+
+    expect(screen.getByRole("region", { name: "Дорога, которую выбрала карта" }))
+      .not.toHaveTextContent("Это план, а не билет");
+    expect(screen.getByRole("region", { name: "Ещё одна дорога" }))
+      .toHaveTextContent("Пересадка: Москва");
+  });
+});
+
+it("keeps «ничего не нашлось» out of the ticket list when a plan is the road", () => {
+  const plan = {
+    via: ["Москва"], transferCount: 1, durationMin: 6187, priceFrom: 17936,
+    legs: [{ trainNumber: "010У", from: "Псков", to: "Москва", priceFrom: 3146, seatCategories: [] }],
+  };
+  render(
+    <TravelResult
+      result={{
+        ...resultWithRoad,
+        roadChoice: { mode: "railway", reason: "«Отшельник» сажает к окну.", best: null },
+        transportOffers: [{ id: "transport-fallback", title: "Открыть поиск билетов на Туту", url: "https://avia.tutu.ru/" }],
+        warnings: [],
+        transportOutcome: "empty",
+        interchangePlan: plan,
+      }}
+    />,
+  );
+
+  const tickets = screen.getByRole("heading", { name: "Билеты по предсказанию" }).closest("section")!;
+  expect(tickets).not.toHaveTextContent("ничего не нашлось");
+  // The way into Tutu's own search stays: only the false sentence goes.
+  expect(tickets).toHaveTextContent("Открыть поиск билетов на Туту");
+});

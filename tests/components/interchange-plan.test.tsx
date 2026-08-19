@@ -40,7 +40,7 @@ const plan: InterchangePlan = {
 describe("InterchangePlanSection", () => {
   it("names the change, the route and every train", () => {
     render(<InterchangePlanSection plan={plan} blockIndex={3} />);
-    const section = screen.getByRole("region", { name: "Путь с пересадкой" });
+    const section = screen.getByRole("region", { name: "Ещё одна дорога" });
 
     expect(section).toHaveTextContent("Пересадка: Москва");
     expect(section).toHaveTextContent("010У");
@@ -55,7 +55,7 @@ describe("InterchangePlanSection", () => {
   // a fact.
   it("says plainly that this is a plan and not a ticket", () => {
     render(<InterchangePlanSection plan={plan} blockIndex={3} />);
-    const section = screen.getByRole("region", { name: "Путь с пересадкой" });
+    const section = screen.getByRole("region", { name: "Ещё одна дорога" });
 
     expect(section).toHaveTextContent("Это план, а не билет");
     expect(section).toHaveTextContent("покупать нужно два раза");
@@ -77,7 +77,7 @@ describe("InterchangePlanSection", () => {
   // same reason the calendar's own test does.
   it("prints station time, not the reader's time", () => {
     render(<InterchangePlanSection plan={plan} blockIndex={3} />);
-    const section = screen.getByRole("region", { name: "Путь с пересадкой" });
+    const section = screen.getByRole("region", { name: "Ещё одна дорога" });
 
     expect(section).toHaveTextContent("14 окт 19:23");
     expect(section).toHaveTextContent("15 окт 06:47");

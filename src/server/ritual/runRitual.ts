@@ -89,19 +89,29 @@ export function buildRoadChoiceAndSources(params: {
   transportOffers: NormalizedOffer[];
   modesSummary: ModesSummary;
   destination: TravelAtlasItem;
+  // Optional: only a caller that found one passes it, and only to let the
+  // card's own sentence describe a road whose shape lives on the plan
+  // rather than on an offer.
+  interchangePlan?: InterchangePlan | null;
 }): { roadChoice: RoadChoice; sourceLinks: SourceLink[] } {
-  const { mode, pathCard, transportOffers, modesSummary, destination } = params;
+  const { mode, pathCard, transportOffers, modesSummary, destination, interchangePlan } = params;
 
   // The shape of the road, not just its mode: the third card's own reading
   // speaks about the change when there is one (roadReason). Computed here,
   // in the tail both a fresh ritual and the shared-link page share, so a
   // reopened link gets the same sentence as the reading that minted it.
   const best = bestOfferFor(mode, transportOffers, modesSummary);
+  // When the road is a two-train plan there is no single offer to read the
+  // shape from -- the plan itself carries it. Falling back to it here is
+  // what lets the card speak about the change on a road that has no ticket.
+  const shape = best?.transfers
+    ? { transfers: best.transfers, via: best.via }
+    : interchangePlan
+      ? { transfers: interchangePlan.transferCount, via: interchangePlan.via }
+      : undefined;
   const roadChoice: RoadChoice = {
     mode,
-    reason: mode
-      ? roadReason(pathCard, mode, { transfers: best?.transfers, via: best?.via })
-      : FOG_REASON,
+    reason: mode ? roadReason(pathCard, mode, shape) : FOG_REASON,
     best,
   };
 
@@ -185,7 +195,25 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
   // Phase 2: reality reports which roads exist, then the third card names one.
   const searchOffers = deps.searchOffers || searchTutuOffers;
   const offers = await searchOffers({ intent: input, destination: selection.destination });
-  const modes = usableModes(offers.modesSummary, input);
+  // A two-train plan is a road the deck can name, even though modes_summary
+  // reports the railway mode as `count: 0` -- there is no *direct* train, so
+  // Tutu counts none, but there is a way through by rail. Without this the
+  // third card would be drawn from the whole deck (the no-usable-mode
+  // fallback) and could easily be an avia-only card, and then telling the
+  // traveller that «Шут» «сажает к окну» would be a lie about the card, not
+  // just about the road. Adding railway here means the card is drawn from
+  // the cards that can actually name a train.
+  //
+  // Note what this deliberately bypasses: usableModes' own sanity filter,
+  // which drops any mode whose one-way minimum eats more than a third of the
+  // trip. A plan has no duration in modes_summary to filter on, and it is
+  // never presented as a single bookable ticket -- its length is stated
+  // plainly on the block itself and it carries its own "this is a plan, not
+  // a ticket" line. See docs/technical.md's known limitations.
+  const directModes = usableModes(offers.modesSummary, input);
+  const modes = offers.interchangePlan && !directModes.includes("railway")
+    ? [...directModes, "railway" as const]
+    : directModes;
   const pathCard = drawPathCard(draw.seed, modes, draw.cards.map((card) => card.id));
   const mode = pathCard.transport.find((candidate) => modes.includes(candidate)) ?? null;
 
@@ -195,6 +223,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     transportOffers: offers.transport,
     modesSummary: offers.modesSummary,
     destination: selection.destination,
+    interchangePlan: offers.interchangePlan,
   });
 
   const spreadCards = [...draw.cards, pathCard];
