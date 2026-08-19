@@ -7,6 +7,7 @@ import { searchTutuOffers } from "@/server/tutu/mcpClient";
 import { OfferList } from "./OfferList";
 import { RoadSection, SourcesSection, blockIndexStyle } from "./TravelResult";
 import { ShareButton } from "./ShareButton";
+import { roadUnavailableNote } from "@/domain/travel/roadUnavailable";
 
 interface SharedReadingLiveProps {
   reading: SharedReading;
@@ -72,6 +73,7 @@ export async function SharedReadingLive({ reading, destination, spreadCards, int
         roadChoice={roadChoice}
         transportOutcome={offers.transportOutcome}
         warnings={offers.warnings}
+        roadNote={roadUnavailableNote(offers.unavailable)}
         blockIndex={LIVE_BLOCK_INDEX.road}
       />
       <div style={blockIndexStyle(LIVE_BLOCK_INDEX.otherRoads)}>

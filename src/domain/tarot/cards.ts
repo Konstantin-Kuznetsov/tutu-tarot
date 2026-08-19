@@ -33,13 +33,13 @@ export const tarotCards: TarotCardDefinition[] = [
   },
   {
     id: "hierophant", number: 5, name: "Иерофант", image: "/tarot/05-hierophant.webp",
-    archetypes: ["culture", "mystery"], transport: ["bus", "railway"],
+    archetypes: ["culture", "mystery"], transport: ["bus", "railway", "etrain"],
     meaning: "дорога к старой традиции и её хранителям",
     meaningReversed: "обряд без смысла, стоит искать своё",
   },
   {
     id: "lovers", number: 6, name: "Влюблённые", image: "/tarot/06-lovers.webp",
-    archetypes: ["culture", "food", "water"], transport: ["railway", "bus"],
+    archetypes: ["culture", "food", "water"], transport: ["railway", "bus", "etrain"],
     meaning: "место для близости, прогулок и красивого выбора",
     meaningReversed: "выбор откладывается, спутник тянет в другую сторону",
   },
@@ -57,7 +57,7 @@ export const tarotCards: TarotCardDefinition[] = [
   },
   {
     id: "hermit", number: 9, name: "Отшельник", image: "/tarot/09-hermit.webp",
-    archetypes: ["solitude", "mystery", "cliffs"], transport: ["railway"],
+    archetypes: ["solitude", "mystery", "cliffs"], transport: ["railway", "etrain"],
     meaning: "дорога к тишине и высокому месту",
     meaningReversed: "одиночество тяготит, нужен попутчик",
   },
@@ -69,13 +69,13 @@ export const tarotCards: TarotCardDefinition[] = [
   },
   {
     id: "justice", number: 11, name: "Справедливость", image: "/tarot/11-justice.webp",
-    archetypes: ["culture", "north"], transport: ["bus"],
+    archetypes: ["culture", "north"], transport: ["bus", "etrain"],
     meaning: "прямая дорога и честный расчёт",
     meaningReversed: "цена и ценность не сходятся",
   },
   {
     id: "hanged", number: 12, name: "Повешенный", image: "/tarot/12-hanged.webp",
-    archetypes: ["solitude", "water", "mystery"], transport: ["railway"],
+    archetypes: ["solitude", "water", "mystery"], transport: ["railway", "etrain"],
     meaning: "время в пути замедлится, и это подарок",
     meaningReversed: "задержка без смысла, ожидание утомит",
   },

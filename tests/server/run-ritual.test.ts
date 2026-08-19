@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildRoadChoiceAndSources, runRitual } from "@/server/ritual/runRitual";
+import { tarotCards } from "@/domain/tarot/cards";
 import type { DrawnTarotCard, TripIntent } from "@/domain/types";
 
 const intent: TripIntent = {
@@ -215,5 +216,58 @@ describe("buildRoadChoiceAndSources", () => {
       // destination never shows its single Tutu page under two names.
       { label: "Путеводитель Туту", url: "https://www.tutu.ru/geo/rossiya/kurort/karelia/" },
     ]);
+  });
+});
+
+// The design rule that makes adding a fourth transport mode safe, encoded
+// so it cannot quietly rot: "etrain" is always LAST in a card's transport
+// list. `runRitual` picks the mode with
+// `pathCard.transport.find(candidate => modes.includes(candidate))` -- the
+// first entry that is actually available -- so a mode sitting last can only
+// ever be chosen when nothing ahead of it exists. That is what makes the
+// change strictly additive: no draw that resolved to avia/railway/bus
+// before suburban trains were requested resolves differently now.
+describe("etrain is a strictly additive mode", () => {
+  it("never appears before another mode in any card's transport list", () => {
+    for (const card of tarotCards) {
+      const index = card.transport.indexOf("etrain");
+      if (index === -1) continue;
+      expect(index).toBe(card.transport.length - 1);
+    }
+  });
+
+  it("is carried by enough cards that it can actually be drawn", () => {
+    const carriers = tarotCards.filter((card) => card.transport.includes("etrain"));
+    expect(carriers.length).toBeGreaterThanOrEqual(4);
+  });
+
+  // Without this, requesting etrain from Tutu would be worse than not
+  // requesting it: a search that found only suburban trains would leave the
+  // third card with no mode it could name, and the reading would show fog
+  // over a road that exists.
+  it("names a road when the suburban train is the only one that exists", async () => {
+    const result = await runRitual(intent, {
+      searchOffers: searchStub({ etrain: { count: 4, minPrice: 210, minDurationMin: 65 } }, [
+        { id: "t-0", title: "Электричка", mode: "etrain", url: "https://www.tutu.ru/prigorod/" },
+      ]),
+    });
+
+    expect(result.roadChoice.mode).toBe("etrain");
+    expect(result.roadChoice.best).not.toBeNull();
+    expect(result.roadChoice.reason).not.toContain("туман");
+    expect(result.spreadCards[2].transport).toContain("etrain");
+  });
+
+  // The other half of the same rule, from the outside: when a grander road
+  // is also available, the suburban train must not win.
+  it("loses to a long-distance train when both are available", async () => {
+    const result = await runRitual(intent, {
+      searchOffers: searchStub({
+        railway: { count: 12, minPrice: 700, minDurationMin: 104 },
+        etrain: { count: 4, minPrice: 210, minDurationMin: 65 },
+      }, [{ id: "t-0", title: "Поезд: ФПК", mode: "railway", url: "https://www.tutu.ru/poezda/" }]),
+    });
+
+    expect(result.roadChoice.mode).not.toBe("etrain");
   });
 });

@@ -1,5 +1,6 @@
+import type { ModeUnavailable } from "@/domain/travel/roadUnavailable";
 import type { LegOutcome, ModesSummary, TravelAtlasItem, TripIntent } from "@/domain/types";
-import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary, type NormalizedOffer } from "./normalize";
+import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary, readUnavailable, type NormalizedOffer } from "./normalize";
 
 const DEFAULT_MCP_URL = "https://mcp.tutu.ru/mcp";
 
@@ -271,6 +272,11 @@ export interface TutuSearchResult {
   transport: NormalizedOffer[];
   hotels: NormalizedOffer[];
   modesSummary: ModesSummary;
+  // Tutu's own explanation of every mode that came back with nothing --
+  // see roadUnavailable.ts. Carried out of the client rather than logged
+  // and dropped, because it is the difference between "no airport here"
+  // and "no route today", which the traveller deserves to be told apart.
+  unavailable: ModeUnavailable[];
   warnings: string[];
   // What actually happened on each leg, independent of the other -- see
   // LegOutcome's own comment for why "empty" and "failed" have to render
@@ -296,7 +302,13 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
         destination: input.destination.nearestTransportHub,
         departure_date: input.intent.dateFrom,
         adults: input.intent.travelerCount,
-        modes: ["avia", "railway", "bus"],
+        // etrain (пригородные электрички) is requested alongside the other
+        // three because search_multitransport runs all four in parallel for
+        // the same price in latency, and because it is the only road that
+        // exists for some short hops. Every layer that consumes a mode knows
+        // it -- see TransportMode's own comment for why adding it cannot
+        // change an existing draw.
+        modes: ["avia", "railway", "bus", "etrain"],
         optimize_for: "price",
         page_size: 20,
         view: "compact",
@@ -313,10 +325,12 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
 
     let transport: NormalizedOffer[] = [];
     let modesSummary: ModesSummary = {};
+    let unavailable: ModeUnavailable[] = [];
     let transportOutcome: LegOutcome;
     if (roads.status === "fulfilled") {
       transport = normalizeTransportOffers(roads.value);
       modesSummary = readModesSummary(roads.value);
+      unavailable = readUnavailable(roads.value);
       transportOutcome = transport.length > 0 ? "served" : "empty";
     } else {
       warnings.push(roads.reason instanceof Error ? roads.reason.message : "Tutu transport search failed");
@@ -336,7 +350,7 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
     if (transport.length === 0) transport = [transportFallback(input)];
     if (hotels.length === 0) hotels = [hotelFallback(input)];
 
-    return { transport, hotels, modesSummary, warnings, transportOutcome, hotelsOutcome };
+    return { transport, hotels, modesSummary, unavailable, warnings, transportOutcome, hotelsOutcome };
   } finally {
     clearTimeout(deadline);
   }

@@ -1,6 +1,6 @@
 import type { ModesSummary, TransportMode, TripIntent } from "@/domain/types";
 
-const MODE_ORDER: TransportMode[] = ["avia", "railway", "bus"];
+const MODE_ORDER: TransportMode[] = ["avia", "railway", "bus", "etrain"];
 const MINUTES_PER_DAY = 24 * 60;
 
 // A road may not eat more than a third of the holiday in one direction.

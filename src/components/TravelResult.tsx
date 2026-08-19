@@ -45,6 +45,9 @@ export interface RitualResultViewModel {
   // sections fall back to the old, undifferentiated `warnings`-based copy.
   transportOutcome?: LegOutcome;
   hotelsOutcome?: LegOutcome;
+  // Same story as the two outcomes above: always present on a real reading,
+  // optional here so fixtures that predate it need no updating.
+  roadNote?: string | null;
   // Same story as `destination.id`: always present on a real reading
   // (see RitualResult.intent), optional here only so hand-built test
   // fixtures don't all need updating for a feature they don't exercise.
@@ -246,11 +249,16 @@ export function RoadSection({
   roadChoice,
   transportOutcome,
   warnings,
+  roadNote,
   blockIndex,
 }: {
   roadChoice: RoadChoice;
   transportOutcome?: LegOutcome;
   warnings: string[];
+  // Tutu's own reason for the empty leg, already in the oracle's voice
+  // (roadUnavailable.ts). Optional: readings that predate it, and every
+  // hand-built fixture, simply render as before.
+  roadNote?: string | null;
   blockIndex: number;
 }) {
   const modeLabel = roadChoice.mode ? MODE_LABELS[roadChoice.mode] : null;
@@ -288,6 +296,15 @@ export function RoadSection({
           which read as very different facts to someone deciding whether
           to trust the fog above. Falls back to the old undifferentiated
           line, unchanged, for readings that predate transportOutcome. */}
+      {/* When Tutu said *why* the road is missing, that goes first: it is
+          the specific fact ("у Тосно нет своего аэропорта"), and the
+          generic line below only repeats that something was empty. Shown
+          for "empty" alone -- on "failed" Tutu never got far enough to
+          have a reason, and on "served" there is a road and nothing to
+          explain. */}
+      {roadNote && transportOutcome === "empty" ? (
+        <p className="road__warning road__warning--reason">{roadNote}</p>
+      ) : null}
       {transportOutcome && transportOutcome !== "served" ? (
         <p className="road__warning">{LEG_OUTCOME_COPY[transportOutcome]}</p>
       ) : !transportOutcome && warnings.length > 0 ? (
@@ -379,6 +396,7 @@ export function TravelResult({ result }: { result: RitualResultViewModel }) {
         roadChoice={roadChoice}
         transportOutcome={result.transportOutcome}
         warnings={result.warnings}
+        roadNote={result.roadNote}
         blockIndex={BLOCK_INDEX.road}
       />
       {/* OfferList renders its own [data-block] section; --block-index is set

@@ -1,6 +1,11 @@
 export type TarotPosition = "Зов" | "Дар" | "Путь";
 
-export type TransportMode = "avia" | "railway" | "bus";
+// "etrain" is Tutu's пригородная электричка -- the humble local train.
+// It is deliberately last in every MODE_ORDER and last in every card's
+// `transport` list (see cards.ts): a card names it only when nothing
+// grander is available, which makes adding it strictly additive -- no draw
+// that worked before this mode existed resolves differently now.
+export type TransportMode = "avia" | "railway" | "bus" | "etrain";
 
 export type TarotArchetype =
   | "solitude"
