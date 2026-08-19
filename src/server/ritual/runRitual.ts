@@ -1,5 +1,5 @@
 import { archetypeWeightsFrom, drawDestinationCards, drawPathCard } from "@/domain/tarot/engine";
-import { FOG_REASON, roadReason } from "@/domain/tarot/roadReason";
+import { FOG_REASON, ROAD_UNNAMED_REASON, roadReason } from "@/domain/tarot/roadReason";
 import { usableModes } from "@/domain/travel/roads";
 import { roadUnavailableNote } from "@/domain/travel/roadUnavailable";
 import { selectDestination } from "@/domain/travel/scoring";
@@ -111,7 +111,14 @@ export function buildRoadChoiceAndSources(params: {
       : undefined;
   const roadChoice: RoadChoice = {
     mode,
-    reason: mode ? roadReason(pathCard, mode, shape) : FOG_REASON,
+    // modes_summary is the authority on what exists (readModesSummary keeps
+    // only modes with a real count -- see its own comment), so a non-empty
+    // one means roads were found even when no card named one.
+    reason: mode
+      ? roadReason(pathCard, mode, shape)
+      : Object.keys(modesSummary).length > 0
+        ? ROAD_UNNAMED_REASON
+        : FOG_REASON,
     best,
   };
 
