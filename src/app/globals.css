@@ -907,6 +907,135 @@ h1 {
 }
 
 /* ============================================================
+   «Мои расклады» — the history list (/my) and the way into it.
+   ============================================================ */
+
+/* Third control in the share row, and deliberately the quietest of the
+   three: the other two act on the reading in front of you, this one leaves
+   it. Same height and rhythm as .btn so the row stays one line of controls
+   rather than a button and a link that happen to sit together. */
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text-dim);
+}
+
+.btn--ghost:hover {
+  border-color: var(--gold-deep);
+  color: var(--text);
+}
+
+.myroot {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--sp-5) var(--sp-8);
+}
+
+.myhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-2);
+}
+
+.myhead h1 {
+  margin: 0;
+  font: 400 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--font-display);
+  color: var(--text);
+}
+
+.myhead a {
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.myhead a:hover {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold-deep);
+}
+
+.mycount,
+.myempty {
+  margin: 0 0 var(--sp-5);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.mylist {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+/* The whole tile is the link -- the same convention .offer-card and
+   .road__hero already follow -- so there is no separate "open" control
+   competing with a picture that is already asking to be tapped. */
+.reading {
+  display: block;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  background: var(--cloth);
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  overflow: hidden;
+  box-shadow: var(--shadow-raise);
+  transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.reading:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+}
+
+/* The intrinsic size of the thumbnail route's own output (600x215), so the
+   row reserves its height before the image arrives and nothing below it
+   jumps when it does. */
+.reading__shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 600 / 215;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* The two facts the picture does not carry: when the trip is, and who it is
+   for. They are what tells two readings to the same place apart. */
+.reading__facts {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+}
+
+.reading__facts b {
+  font: 400 var(--fs-m)/1.2 var(--font-display);
+  color: var(--text);
+}
+
+.reading__facts span {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .reading__facts {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .reading__facts span {
+    text-align: left;
+  }
+}
+
+/* ============================================================
    The full-screen swirl (.ritual-fog / RitualFog)
    ------------------------------------------------------------
    Distinct from .ritual-mist above, which is the close-in haze in and
