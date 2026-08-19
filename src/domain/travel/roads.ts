@@ -1,6 +1,11 @@
+import { TRANSPORT_MODES } from "@/domain/types";
 import type { ModesSummary, TransportMode, TripIntent } from "@/domain/types";
 
-const MODE_ORDER: TransportMode[] = ["avia", "railway", "bus", "etrain"];
+// Both a validity list and a priority order, and deliberately the same one:
+// TRANSPORT_MODES is declared grandest-first with etrain last, which is
+// exactly the precedence this file wants. Deriving it means a mode added to
+// the type can never be silently absent from the usable set.
+const MODE_ORDER = TRANSPORT_MODES;
 const MINUTES_PER_DAY = 24 * 60;
 
 // A road may not eat more than a third of the holiday in one direction.

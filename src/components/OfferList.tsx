@@ -1,4 +1,5 @@
 import type { NormalizedOffer } from "@/server/tutu/normalize";
+import { TRANSPORT_MODES } from "@/domain/types";
 import type { LegOutcome, TransportMode } from "@/domain/types";
 
 export const MODE_LABELS: Record<TransportMode, string> = {
@@ -8,7 +9,9 @@ export const MODE_LABELS: Record<TransportMode, string> = {
   etrain: "Электричка",
 };
 
-const MODE_ORDER: TransportMode[] = ["avia", "railway", "bus", "etrain"];
+// Display order, derived from the same list for the same reason as
+// roads.ts: a new mode must not be able to go unrendered.
+const MODE_ORDER = TRANSPORT_MODES;
 
 // Shared with TravelResult's road block (the transport leg's hero/fog
 // section), so "Tutu refused" and "Tutu answered with nothing" read the

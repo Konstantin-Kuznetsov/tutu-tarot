@@ -21,7 +21,7 @@ export const tarotCards: TarotCardDefinition[] = [
   },
   {
     id: "empress", number: 3, name: "Императрица", image: "/tarot/03-empress.webp",
-    archetypes: ["food", "sun", "renewal"], transport: ["bus"],
+    archetypes: ["food", "sun", "renewal"], transport: ["bus", "etrain"],
     meaning: "земля щедра: вкус, тепло и полные руки",
     meaningReversed: "изобилие обманчиво, брать придётся понемногу",
   },

@@ -1,4 +1,5 @@
 import type { ModeUnavailable } from "@/domain/travel/roadUnavailable";
+import { TRANSPORT_MODES } from "@/domain/types";
 import type { ModesSummary, TransportMode } from "@/domain/types";
 
 export interface NormalizedOffer {
@@ -10,7 +11,9 @@ export interface NormalizedOffer {
   mode?: TransportMode;
 }
 
-const MODES: TransportMode[] = ["avia", "railway", "bus", "etrain"];
+// Derived, never re-typed: see TRANSPORT_MODES on why a second hand-written
+// list of modes is how "etrain" once slipped past the deck invariant.
+const MODES = TRANSPORT_MODES;
 
 function readMode(value: unknown): TransportMode | undefined {
   return MODES.find((mode) => mode === value);
@@ -131,7 +134,7 @@ function readSegments(record: Record<string, unknown>): Record<string, unknown>[
 // The name a train actually travels under -- "Ласточка", "АВРОРА" -- which
 // only ever arrives inside a segment, never on the variant itself. This is
 // the most evocative fact the whole search returns and it was being thrown
-// away: a road hero that says «Поезд „АВРОРА“ №739У» is the oracle naming
+// away: a road hero that says «Поезд «АВРОРА» №739У» is the oracle naming
 // the road, while «Поезд: ФПК» names a legal entity.
 function vehicleName(segment: Record<string, unknown> | undefined): string | undefined {
   if (!segment) return undefined;

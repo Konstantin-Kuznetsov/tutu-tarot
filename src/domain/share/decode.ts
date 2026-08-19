@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isCalendarDate } from "@/domain/validation/dates";
 import { tarotCards } from "@/domain/tarot/cards";
 import { travelAtlas } from "@/domain/travel/atlas";
+import { TRANSPORT_MODES } from "@/domain/types";
 import type { TransportMode } from "@/domain/types";
 import type { Payload, SharedReading } from "./code";
 
@@ -10,10 +11,11 @@ import type { Payload, SharedReading } from "./code";
 // below -- never has to ship to the client. See code.ts's own top-of-file
 // comment for the measured cost of the two living together in one module.
 
-// Appending to this enum is backward compatible: the share code stores the
-// mode as a plain string, so every link minted before "etrain" existed still
-// decodes to exactly the mode it always did.
-const TRANSPORT_MODES: [TransportMode, ...TransportMode[]] = ["avia", "railway", "bus", "etrain"];
+// Appending to the shared list is backward compatible: the share code stores
+// the mode as a plain string, so every link minted before "etrain" existed
+// still decodes to exactly the mode it always did. z.enum needs a non-empty
+// tuple, hence the cast -- the list itself lives in one place.
+const MODE_ENUM = TRANSPORT_MODES as unknown as [TransportMode, ...TransportMode[]];
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const REVERSED_FLAG = z.union([z.literal(0), z.literal(1)]);
@@ -30,7 +32,7 @@ const payloadSchema = z.tuple([
   z.string().min(1), REVERSED_FLAG,
   z.string().min(1), REVERSED_FLAG,
   z.string().min(1),
-  z.enum(TRANSPORT_MODES).nullable(),
+  z.enum(MODE_ENUM).nullable(),
   z.string().min(1),
   z.string().regex(datePattern),
   z.string().regex(datePattern),

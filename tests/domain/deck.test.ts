@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { tarotCards } from "@/domain/tarot/cards";
-import type { TarotArchetype, TransportMode } from "@/domain/types";
+import { TRANSPORT_MODES } from "@/domain/types";
+import type { TarotArchetype } from "@/domain/types";
 
 const VOCABULARY: TarotArchetype[] = [
   "solitude", "road", "cliffs", "water", "north", "culture",
   "food", "sun", "renewal", "mystery", "star",
 ];
-const MODES: TransportMode[] = ["avia", "railway", "bus"];
 
 describe("tarot deck", () => {
   it("holds all 22 Major Arcana with unique ids and numbers", () => {
@@ -27,7 +27,9 @@ describe("tarot deck", () => {
   });
 
   it("carries every transport mode on at least six cards", () => {
-    for (const mode of MODES) {
+    // Every mode, derived from the type's own list -- see TRANSPORT_MODES.
+    // A hardcoded array here is what let "etrain" slip in unchecked.
+    for (const mode of TRANSPORT_MODES) {
       const carriers = tarotCards.filter((card) => card.transport.includes(mode));
       expect(carriers.length, `mode ${mode}`).toBeGreaterThanOrEqual(6);
     }
