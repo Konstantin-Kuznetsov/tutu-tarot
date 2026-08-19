@@ -19,6 +19,14 @@ export interface NormalizedOffer {
   // The rail fare ladder, when this offer's mode has one. Empty for every
   // mode that does not.
   seatCategories?: SeatCategory[];
+  // True when the ladder is known to be incomplete, so the interface must
+  // not let it read as "these are the classes on sale". Two causes, both
+  // real: Tutu's own `uncategorized_fares`, which says some fare rows could
+  // not be classified at all, and a category code we have no Russian label
+  // for. LUX was exactly the second case -- it exists in live responses and
+  // is absent from the playbook's own list of four -- so the next unknown
+  // code is a question of when, not whether.
+  seatLadderPartial?: boolean;
 }
 
 // Derived, never re-typed: see TRANSPORT_MODES on why a second hand-written
@@ -119,10 +127,30 @@ function readAmount(value: unknown): number | undefined {
   return undefined;
 }
 
-function readSeatCategories(value: unknown): SeatCategory[] {
-  if (!value || typeof value !== "object") return [];
+export interface SeatLadder {
+  categories: SeatCategory[];
+  // See NormalizedOffer.seatLadderPartial. Never a guess: false means we
+  // read every category the response offered and understood all of them.
+  partial: boolean;
+}
+
+// `uncategorized` is Tutu's own `fares.uncategorized_fares`, present only on
+// a rail variant's fares summary and only when some rows resisted
+// classification. The playbook is explicit that a category missing from the
+// list means "not on sale" -- *unless* this field says otherwise, in which
+// case the absence proves nothing and the interface must say so rather than
+// imply a complete ladder.
+function readSeatLadder(value: unknown, uncategorized?: unknown): SeatLadder {
+  if (!value || typeof value !== "object") return { categories: [], partial: false };
   const source = value as Record<string, unknown>;
   const found: SeatCategory[] = [];
+  const known = new Set<string>(SEAT_ORDER);
+  // Any key Tutu sent that we have no label for. Dropping it is right --
+  // «SOFT» on screen is worse than one fewer chip -- but dropping it
+  // *silently* is what would turn a shortened ladder into a complete-looking
+  // one.
+  const unknownCodes = Object.keys(source).filter((key) => !known.has(key));
+
   for (const code of SEAT_ORDER) {
     const entry = source[code];
     if (!entry || typeof entry !== "object") continue;
@@ -141,7 +169,13 @@ function readSeatCategories(value: unknown): SeatCategory[] {
       seatsLeft: typeof record.seats_left === "number" ? record.seats_left : undefined,
     });
   }
-  return found;
+
+  const hasUncategorized =
+    (typeof uncategorized === "number" && uncategorized > 0) ||
+    (Array.isArray(uncategorized) && uncategorized.length > 0) ||
+    uncategorized === true;
+
+  return { categories: found, partial: unknownCodes.length > 0 || hasUncategorized };
 }
 
 // Read straight off `meta.modes_summary.railway`, NOT through
@@ -162,7 +196,9 @@ export function readInterchangePlan(raw: unknown): InterchangePlan | null {
 
   const legs: InterchangeLeg[] = (Array.isArray(plan.legs) ? plan.legs : [])
     .filter((leg): leg is Record<string, unknown> => Boolean(leg) && typeof leg === "object")
-    .map((leg) => ({
+    .map((leg) => {
+      const ladder = readSeatLadder(leg.seat_categories);
+      return {
       trainNumber: readString(leg.train_number),
       from: readString(leg.from) ?? "",
       to: readString(leg.to) ?? "",
@@ -173,8 +209,10 @@ export function readInterchangePlan(raw: unknown): InterchangePlan | null {
         ? ((leg.price_from as { amount?: unknown }).amount as number | undefined)
         : undefined,
       url: readString(leg.checkout_url),
-      seatCategories: readSeatCategories(leg.seat_categories),
-    }));
+      seatCategories: ladder.categories,
+      seatLadderPartial: ladder.partial || undefined,
+      };
+    });
 
   // A plan with no legs is not a plan -- nothing to link to and nothing to
   // show. Better to render no block than an empty one.
@@ -369,11 +407,10 @@ export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
       .slice(0, -1)
       .map((segment) => stationCity(readString(segment.to) ?? ""))
       .filter(Boolean);
-    const seatCategories = readSeatCategories(
-      record.fares && typeof record.fares === "object"
-        ? (record.fares as { seat_categories?: unknown }).seat_categories
-        : undefined,
-    );
+    const fares = record.fares && typeof record.fares === "object"
+      ? (record.fares as { seat_categories?: unknown; uncategorized_fares?: unknown })
+      : undefined;
+    const ladder = readSeatLadder(fares?.seat_categories, fares?.uncategorized_fares);
     return {
       id: `transport-${index}`,
       title: transportTitle(record),
@@ -386,7 +423,8 @@ export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
       // and the page payload for every one of up to five offers.
       ...(transfers > 0 ? { transfers } : {}),
       ...(via.length > 0 ? { via } : {}),
-      ...(seatCategories.length > 0 ? { seatCategories } : {}),
+      ...(ladder.categories.length > 0 ? { seatCategories: ladder.categories } : {}),
+      ...(ladder.categories.length > 0 && ladder.partial ? { seatLadderPartial: true } : {}),
       url:
         readString(record.search_results_url) ||
         readString(record.checkout_url) ||

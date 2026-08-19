@@ -125,3 +125,21 @@ describe("seat counts decline", () => {
     expect(screen.getByRole("list", { name: "Классы вагонов" })).toHaveTextContent(expected);
   });
 });
+
+describe("an incomplete ladder says so", () => {
+  it("adds the caveat when the list is not the whole picture", () => {
+    const partial: InterchangePlan = {
+      ...plan,
+      legs: [{ ...plan.legs[0], seatLadderPartial: true }],
+    };
+    render(<InterchangePlanSection plan={partial} blockIndex={3} />);
+    expect(screen.getByRole("region", { name: "Ещё одна дорога" }))
+      .toHaveTextContent("Это не полный список классов.");
+  });
+
+  it("stays quiet when the ladder is complete", () => {
+    render(<InterchangePlanSection plan={plan} blockIndex={3} />);
+    expect(screen.getByRole("region", { name: "Ещё одна дорога" }))
+      .not.toHaveTextContent("не полный список");
+  });
+});

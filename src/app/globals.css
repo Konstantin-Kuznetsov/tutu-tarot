@@ -1769,6 +1769,13 @@ h1 {
   color: var(--text-dim);
 }
 
+.fares-note {
+  margin: 6px 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-style: italic;
+}
+
 .fare span {
   font-size: var(--fs-xs);
   color: var(--gold-bright);
