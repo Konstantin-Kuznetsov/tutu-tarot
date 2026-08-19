@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { encodeReading, type SharedReading } from "@/domain/share/code";
 
@@ -142,6 +143,14 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
           Telegram
         </a>
       ) : null}
+      {/* Quieter than the two beside it, and last: sharing acts on the
+          reading in front of you, while this leaves it for the pile of
+          earlier ones. Rendered here rather than in a global header because
+          this row is the only place in the app where a traveller is done
+          reading and looking for what to do next. */}
+      <Link href="/my" className="btn btn--ghost">
+        Мои расклады
+      </Link>
       {status === "copied" ? (
         <p className="share-row__status" role="status">
           Ссылка скопирована
