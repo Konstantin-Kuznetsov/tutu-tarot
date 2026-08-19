@@ -64,7 +64,7 @@ function fillAndSubmit() {
   fireEvent.click(screen.getByRole("button", { name: "Следующий месяц" }));
   fireEvent.click(screen.getAllByRole("button", { name: "10" })[0]);
   fireEvent.click(screen.getAllByRole("button", { name: "17" })[0]);
-  fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
+  fireEvent.click(screen.getByRole("button", { name: "Разложить карты" }));
 }
 
 describe("continuous ritual flow", () => {
@@ -135,7 +135,7 @@ describe("continuous ritual flow", () => {
     // Still "dealing" (well short of both the 1800ms floor and the 3000ms
     // consult threshold) — activate the still-mounted submit button again.
     await act(async () => { vi.advanceTimersByTime(500); });
-    fireEvent.click(screen.getByRole("button", { name: "Начать расклад" }));
+    fireEvent.click(screen.getByRole("button", { name: "Разложить карты" }));
 
     // The guard rejects the re-entrant call before it ever builds a
     // request: exactly one fetch went out, not two competing ones.
@@ -145,7 +145,12 @@ describe("continuous ritual flow", () => {
     // request resolve successfully.
     await act(async () => { vi.advanceTimersByTime(2_000); });
     pending.resolve?.(okResponse(spreadRitualResponse));
+    // Flush the promise continuation, then sit out READING_HOLD_MS — the
+    // resolved search now lands on the intermediate screen's "reading" beat
+    // rather than straight on the result, so the reading is not on screen
+    // the microtask after the fetch settles any more.
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_500); });
 
     // No false failure, and the search that was about to succeed actually
     // does.
@@ -161,7 +166,12 @@ describe("continuous ritual flow", () => {
   // would still pass the whole suite. This is the one case the brief names
   // by name: "do not flip the third card early, even when the search
   // returns almost instantly."
-  it("does not flip the third card early even when the search resolves almost instantly", async () => {
+  //
+  // It now also covers the intermediate screen the flow gained afterwards:
+  // the run goes dealing -> all three cards face-up on that screen -> only
+  // then the reading. The middle assertion block is the one that would fail
+  // if "reading" were ever collapsed back into "revealed".
+  it("opens every card on the intermediate screen before the reading takes over", async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse(spreadRitualResponse));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -180,15 +190,25 @@ describe("continuous ritual flow", () => {
     expect(dealingCards[2]).toHaveAttribute("data-revealed", "false");
     expect(screen.queryByTestId("spread-card")).not.toBeInTheDocument();
 
-    // Cross the floor.
+    // Cross the floor. Every card is now face-up — including "Путь", whose
+    // identity only the answered search could supply — and this is still
+    // the intermediate screen: the reading has not replaced it.
     await act(async () => { await vi.advanceTimersByTimeAsync(1_800); });
 
-    // Now revealed: the dealing scene is gone and TravelResult's own
-    // spread-panel shows all three cards, third included.
+    const openedCards = screen.getAllByTestId("tarot-card");
+    expect(openedCards).toHaveLength(3);
+    openedCards.forEach((card) => expect(card).toHaveAttribute("data-revealed", "true"));
+    expect(screen.queryByTestId("spread-card")).not.toBeInTheDocument();
+    expect(screen.queryByText("Карты указывают на Усьвинские Столбы")).not.toBeInTheDocument();
+
+    // Only once the hold elapses does the reading itself take the screen.
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_500); });
+
     expect(screen.queryByTestId("tarot-card")).not.toBeInTheDocument();
     const revealedCards = screen.getAllByTestId("spread-card");
     expect(revealedCards).toHaveLength(3);
     revealedCards.forEach((card) => expect(card).toHaveAttribute("data-revealed", "true"));
+    expect(screen.getByText("Карты указывают на Усьвинские Столбы")).toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });

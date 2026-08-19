@@ -2,6 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+// See TripSearchForm's own comment on PinIcon/PeopleIcon — same reasoning
+// applies here (one glyph, no icon-library dependency).
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="5.5" width="17" height="15" rx="2.5" />
+      <path d="M3.5 10h17M8 3.5v3M16 3.5v3" />
+    </svg>
+  );
+}
+
 export interface DateRange {
   from: string | null;
   to: string | null;
@@ -116,6 +127,7 @@ export function DateRangeCalendar({ value, onChange }: DateRangeCalendarProps) {
         aria-haspopup="dialog"
         onClick={() => setOpen((current) => !current)}
       >
+        <CalendarIcon />
         {label(value)}
       </button>
 

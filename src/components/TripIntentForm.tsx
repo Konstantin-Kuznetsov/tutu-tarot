@@ -1,84 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { DateRangeCalendar, type DateRange } from "@/components/DateRangeCalendar";
+import { TripSearchForm } from "@/components/TripSearchForm";
 import type { TripIntent } from "@/domain/types";
 
-// The entire entry screen ("01 Вход.dc.html" in the Claude Design project),
-// not just the form: the fan, the service line, the h1, the promise, the
-// ticket, and the fine print. RitualStage mounts this alone at the idle
-// stage (see its own comment) so there is exactly one <h1> in the document.
+// The tarot entry screen: the logo, the h1, the promise, the ticket and the
+// fine print. RitualStage mounts this alone at the idle stage (see its own
+// comment) so there is exactly one <h1> in the document.
 //
-// The mockup's ticket has 4 columns (city / "when" link / travelers /
-// button) because its date range is a single field linking out to a
-// calendar screen ("04 Календарь.dc.html"). Task 10 folds that separate
-// screen into a single popover field here instead — same one-field-not-two
-// idea, without a page navigation — so the ticket now matches the mockup's
-// column count.
+// The ticket itself now lives in TripSearchForm — see that file for why. This
+// component is the screen *around* it, and is what `.table`'s light-palette
+// override in globals.css is anchored on.
+//
+// NOTE: nothing renders this any more. RitualStage's idle stage is now
+// LumoraHero, which hosts the same TripSearchForm on its own white panel, so
+// this screen is superseded rather than merely unrouted — and the CSS that
+// used to collapse it mid-ritual (the old `.intent-form .table/.enter` rules)
+// has been retargeted at the hero and no longer applies here.
+//
+// Kept on disk, not deleted, only because it is the one remaining record of
+// the original tarot entry screen. If that stops being worth its weight,
+// this file and its now-dead CSS (`.enter`, `.fan`, `.caps`, `.rule`,
+// `.fine`, `.hero-logo`, and `.table`'s layout rule) can all go together.
 export function TripIntentForm({ onSubmit }: { onSubmit(intent: TripIntent): void }) {
-  const [departureCity, setDepartureCity] = useState("");
-  const [range, setRange] = useState<DateRange>({ from: null, to: null });
-  const [travelerCount, setTravelerCount] = useState(2);
-
   return (
     <div className="table">
       <main className="enter">
-        <div className="fan" data-testid="deck-fan" aria-hidden="true">
-          <div className="back" />
-          <div className="back" />
-          <div className="back" />
-        </div>
-        <p className="caps">Туту · сервис путешествий</p>
-        <h1>Таро-турагент</h1>
-        <p className="sub">Колода выбирает маршрут по России, а Туту проверяет дорогу и ночлег.</p>
-        <form
-          className="ticket"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!range.from || !range.to) return;
-            onSubmit({
-              departureCity: departureCity.trim(),
-              dateFrom: range.from,
-              dateTo: range.to,
-              travelerCount,
-            });
-          }}
-        >
-          <div className="field">
-            <label className="lab" htmlFor="departureCity">
-              Откуда
-            </label>
-            <input
-              id="departureCity"
-              type="text"
-              placeholder="Москва"
-              autoComplete="off"
-              value={departureCity}
-              onChange={(event) => setDepartureCity(event.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <DateRangeCalendar value={range} onChange={setRange} />
-          </div>
-          <div className="field">
-            <label className="lab" htmlFor="travelerCount">
-              Путешественники
-            </label>
-            <input
-              id="travelerCount"
-              type="number"
-              min={1}
-              max={8}
-              value={travelerCount}
-              onChange={(event) => setTravelerCount(Number(event.target.value))}
-              required
-            />
-          </div>
-          <button type="submit" className="btn" disabled={!range.from || !range.to}>
-            Начать расклад
-          </button>
-        </form>
+        {/* eslint-disable-next-line @next/next/no-img-element -- small,
+            fixed-size brand mark; not worth next/image's overhead here. */}
+        <img src="/hero/tutu-logo.svg" alt="Туту" className="hero-logo" />
+        <h1>Куда зовёт дорога?</h1>
+        <p className="sub">
+          Узнайте маршрут своей судьбы — колода выбирает маршрут по России, а Туту проверяет дорогу
+          и ночлег.
+        </p>
+        <TripSearchForm onSubmit={onSubmit} />
         <div className="rule" aria-hidden="true">
           <span className="diamond" />
         </div>

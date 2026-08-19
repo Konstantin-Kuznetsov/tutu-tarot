@@ -98,9 +98,72 @@ h1 {
    `.back` is NOT here: it already lives further down this file (see its own
    comment), unmodified since Task 7's fix round. It is the same shared
    card-back the entry screen's fan below reuses. */
+/* The light Tutu palette, shared by both hosts of the search ticket: the
+   tarot entry screen (`.table`) and the Lumora hero's white panel
+   (`.lumora__search`). TripSearchForm reads every colour it draws through
+   these properties, so whichever element wraps it has to supply them —
+   listing both selectors here is what keeps the ticket from silently
+   falling back to :root's dark tarot palette on the hero. `.table`'s own
+   full-page layout stays in its separate rule just below. */
+.table,
+.lumora__search {
+  /* Dreamcore light override.
+   * Every rule below (fan, ticket, calendar, fine print…) already reads
+   * color through custom properties (var(--gold), var(--cloth), var(--text)…)
+   * instead of literal hex, so redefining those properties here — on the
+   * element that actually starts using them, rather than at :root — is
+   * enough to relight the whole idle screen and its calendar popover
+   * without touching any other screen. RitualScene, TravelResult, the
+   * retry button and everything else outside `.intent-form .table` stay on
+   * the original dark palette, because custom properties only cascade to
+   * descendants, never sideways or up. `color: var(--text)` is repeated
+   * explicitly here (not just declared as a custom property) because h1
+   * has no color rule of its own — it inherits the property's *resolved*
+   * value from the nearest ancestor that sets it, so without this line it
+   * would keep inheriting :root's dark near-white straight through the
+   * override. `color-scheme: light` does the same job for native control
+   * chrome (the traveler-count spinner) — :root sets `dark` for every
+   * other screen.
+   */
+  /* Values from here down match the Tutu "Куда зовёт дорога?" search-form
+   * reference exactly (Figma file 13KZjJvhsKl3Sy7SzjO7Xd, node 32:3104 —
+   * get_variable_defs): input/background/default #fff, input/border/default
+   * #abadc7, input/content/enabled/label #7d82a0, button/general/background
+   * #7028eb, button text #fff, both border-radius tokens 16px. Reused the
+   * existing --gold/--gold-deep/--on-gold custom-property *names* rather
+   * than renaming every rule that reads them (`.btn`, `.diamond`, the
+   * calendar's picked-range circle, …) — only the values changed, gold to
+   * violet, so this stays a values-only skin like the rest of `.table`. */
+  --bg: linear-gradient(170deg, #4f6df0 0%, #b48ce6 42%, #f3c9e0 75%, #fbe3ea 100%);
+  --cloth: #ffffff;
+  --cloth-2: #f1eef9;
+  --line: rgba(171, 173, 199, .55);
+  --line-soft: rgba(171, 173, 199, .28);
+
+  --gold: #7028eb;
+  --gold-bright: #8445f2;
+  --gold-deep: #5420b0;
+
+  --text: #232132;
+  --text-dim: #7d82a0;
+  --on-gold: #ffffff;
+
+  --shadow-card: 0 16px 34px rgba(70, 40, 120, .16), 0 3px 10px rgba(70, 40, 120, .10);
+  --shadow-raise: 0 28px 56px rgba(70, 40, 120, .20);
+
+  color: var(--text);
+  color-scheme: light;
+}
+
+/* Entry-screen-only layout. Split from the token block above so the hero's
+   white panel can inherit the palette without also inheriting a
+   full-viewport height and the dreamcore sky. */
 .table {
   min-height: 100vh;
-  background: var(--bg) repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .012) 3px 4px);
+  background:
+    radial-gradient(60% 45% at 20% 85%, rgba(243, 201, 224, .6), transparent 70%),
+    radial-gradient(50% 40% at 85% 90%, rgba(251, 227, 234, .7), transparent 70%),
+    var(--bg);
 }
 
 .caps {
@@ -189,6 +252,10 @@ h1 {
   margin-bottom: var(--sp-2);
 }
 
+/* `.fan` itself is unused since the hero re-skin (TripIntentForm now
+   renders `.hero-logo` instead of the card fan) — its rules are left as
+   dead weight rather than deleted, in case a later screen wants the same
+   three-card fan treatment `.back` already provides. */
 .fan .back {
   width: 86px;
   box-shadow: var(--shadow-card);
@@ -205,6 +272,16 @@ h1 {
 
 .fan .back:nth-child(3) {
   transform: rotate(10deg) translate(-20px, 12px);
+}
+
+/* Tutu logo — replaces the tarot fan/`.caps` service line at the top of the
+   hero (see TripIntentForm's own comment). Falls back cleanly if
+   /hero/tutu-logo.svg isn't present yet: a broken <img> just collapses to
+   its alt text, it doesn't break layout. */
+.hero-logo {
+  height: 32px;
+  width: auto;
+  margin-bottom: var(--sp-2);
 }
 
 .sub {
@@ -226,7 +303,7 @@ h1 {
   text-align: left;
   background: var(--cloth);
   border: 1px solid var(--line);
-  border-radius: var(--r-m);
+  border-radius: 16px; /* input/layout/700/border-radius in the reference */
   box-shadow: var(--shadow-card);
   margin-top: var(--sp-3);
 }
@@ -241,10 +318,20 @@ h1 {
 }
 
 .field .lab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font: 700 11px/1 var(--font-ui);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--text-dim);
+}
+
+.field .lab svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--gold-deep);
 }
 
 .field input {
@@ -259,7 +346,7 @@ h1 {
 }
 
 .field input::placeholder {
-  color: #8d7fa0;
+  color: #b3a0ac;
 }
 
 .field input:focus {
@@ -269,6 +356,15 @@ h1 {
 .ticket .btn {
   margin: 12px;
   align-self: center;
+  border-radius: 16px; /* button/layout/700/border-radius in the reference */
+  text-transform: none; /* the reference's button label is sentence case, not the base .btn's caps treatment */
+  letter-spacing: normal;
+  box-shadow: 0 10px 24px rgba(112, 40, 235, .32);
+}
+
+.ticket .btn:hover {
+  box-shadow: 0 14px 30px rgba(112, 40, 235, .4);
+  transform: translateY(-1px);
 }
 
 .ticket .btn:disabled {
@@ -277,7 +373,8 @@ h1 {
 }
 
 .ticket .btn:disabled:hover {
-  background: var(--gold);
+  box-shadow: 0 10px 24px rgba(112, 40, 235, .32);
+  transform: none;
 }
 
 /* ── Date range calendar — adapted from "04 Календарь.dc.html" ──
@@ -298,8 +395,50 @@ h1 {
   width: 100%;
 }
 
+/* ── City suggest field — CitySuggestField.tsx, matching the reference's
+   "🪁 Suggest Field" (node 32:3124) behaviour: type, get a dropdown of
+   matching cities below the input. Panel styling intentionally mirrors
+   `.calendar__panel` right above (same floating-card language across every
+   ticket popover) rather than introducing a fourth visual pattern. */
+.city-suggest {
+  position: relative;
+  width: 100%;
+}
+
+.city-suggest__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--sp-2));
+  left: -22px;
+  width: calc(100% + 44px);
+  margin: 0;
+  padding: var(--sp-2);
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  background: var(--cloth);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-raise);
+}
+
+.city-suggest__panel li {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-s);
+  font: 500 var(--fs-s)/1.3 var(--font-ui);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.city-suggest__panel li[data-active="true"] {
+  background: var(--cloth-2);
+  color: var(--gold-deep);
+}
+
 .calendar__trigger {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   background: none;
   border: 0;
@@ -309,6 +448,13 @@ h1 {
   font: 500 var(--fs-m)/1.3 var(--font-ui);
   text-align: left;
   cursor: pointer;
+}
+
+.calendar__trigger svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--gold-deep);
 }
 
 .calendar__trigger:hover,
@@ -327,7 +473,12 @@ h1 {
   top: calc(100% + var(--sp-3));
   left: 0;
   width: max-content;
-  max-width: min(640px, calc(100vw - 2 * var(--sp-4)));
+  /* Sized so both months fit at the 46px day column the circles below
+     need: 2 x (7 x 46) + 48px inter-month gap + 48px padding + 2px border
+     = 742px, plus a little slack. It was 640px, which forced the columns
+     down to roughly 39px and clipped the hover ring and the picked-day
+     circle. The vw term still clamps it on a narrow window. */
+  max-width: min(780px, calc(100vw - 2 * var(--sp-4)));
   display: grid;
   gap: var(--sp-4);
   padding: var(--sp-5);
@@ -397,6 +548,14 @@ h1 {
   position: relative;
   z-index: 0;
   width: 100%;
+  /* The floor that actually keeps the decorations intact. Both the hover
+     ring (40px) and the picked-day circle (42px) are absolutely centred in
+     this button and take no part in its layout, so a column narrower than
+     they are does not grow to fit — it just lets them spill over the
+     neighbours and get trimmed. 46px leaves 2px of air around the larger
+     of the two. Paired with min-height it also makes each day a square
+     44-46px hit target. */
+  min-width: 46px;
   min-height: 44px;
   display: grid;
   place-items: center;
@@ -461,7 +620,10 @@ h1 {
   cursor: default;
 }
 
-@media (max-width: 720px) {
+/* Raised from 720px along with the widths above: two months side by side
+   now need ~742px, so between 720 and 800 they would have overflowed the
+   panel rather than merely looking tight. Below this they stack. */
+@media (max-width: 800px) {
   .calendar__months {
     grid-template-columns: 1fr;
     gap: var(--sp-5);
@@ -480,74 +642,42 @@ h1 {
 }
 
 /* ── Ritual stage — one continuous surface ──
-   TripIntentForm stays mounted for the whole flow; RitualStage wraps it in
-   .intent-form (rather than editing that component) so it can be receded
-   without unmounting it. The scene and the result are later siblings in
-   document order, not a screen swap. */
+   The entry screen (LumoraHero) stays mounted for the whole flow;
+   RitualStage wraps it in .hero-slot (rather than editing that component)
+   so it can be receded without unmounting it. The scene and the result are
+   later siblings in document order, not a screen swap. */
 .ritual-layout {
   display: flex;
   flex-direction: column;
 }
 
-.intent-form {
-  transition: transform var(--t-med) var(--ease), opacity var(--t-med) var(--ease);
-}
+/* Three screens, one at a time — not one scrolling surface any more.
+   Submitting leaves the hero entirely: the dealing/reading screen takes the
+   whole viewport, then the result does. Because each screen starts at the
+   top of the layout and the hero reserves no height once hidden, the
+   handover needs no scrolling at all; the scroll effects in RitualStage are
+   left in place only for the case where the traveller has scrolled down
+   inside a long result and then retries.
 
-/* Recede, don't vanish: covers every post-submit stage, including "error"
-   (which has no dedicated case in the brief's 4-value stage machine but
-   should stay receded too — a transient network failure is no reason to
-   snap the ticket back to full size before the traveler even reads why). */
-.ritual-layout:not([data-stage="idle"]) .intent-form {
-  transform: scale(.92);
-  opacity: .55;
-  pointer-events: none;
-}
-
-/* TripIntentForm's own .table/.enter reserve a full viewport height — the
-   entry screen's centering trick, correct when it IS the whole page
-   (idle), wrong once receded, where it would push the dealing scene a
-   screen down for no reason. Overridden from here instead of edited on the
-   component so its own full-page layout stays intact for idle. */
-.ritual-layout:not([data-stage="idle"]) .intent-form .table {
-  min-height: 0;
-}
-
-.ritual-layout:not([data-stage="idle"]) .intent-form .enter {
-  min-height: 0;
-  padding: var(--sp-6) var(--sp-5) var(--sp-5);
-}
-
-/* Recede to an actual strip, not just a shrunk copy of the idle screen.
-   `transform: scale(.92)` above is visual only — transforms never affect
-   layout, so the fan/caps/subtitle/rule/fine-print below kept reserving
-   their full idle-screen height (~625px, measured) even while scaled down,
-   pushing the whole ritual mostly below the fold. These five are pure
-   decoration for the idle entry screen; once a ritual is running the
-   traveler only needs what they asked for, which the still-visible .ticket
-   already carries in full (city, dates, party size, the receded button).
-   display:none (not opacity/visibility:hidden, which the entry-screen
-   .intent-form transition above already animates) is deliberate: only
-   removing these from layout actually reclaims the height for the scene
-   below — the whole point of this rule. h1 is kept (see its own rule
-   directly below) rather than hidden here: at a shrunk size it still reads
-   fine as a strip heading, unlike these five which have no small form that
-   still makes sense mid-ritual. */
-.ritual-layout:not([data-stage="idle"]) .intent-form .fan,
-.ritual-layout:not([data-stage="idle"]) .intent-form .caps,
-.ritual-layout:not([data-stage="idle"]) .intent-form .sub,
-.ritual-layout:not([data-stage="idle"]) .intent-form .rule,
-.ritual-layout:not([data-stage="idle"]) .intent-form .fine {
+   `display: none` rather than a receded band: the hero is a full-bleed
+   film with an opaque white ticket on it, and no amount of shrinking makes
+   that read as a quiet header above a table of cards. Hidden, not
+   unmounted, so the ticket keeps everything the traveller typed — a retry
+   after a failed search comes back to a filled-in form, not an empty one.
+   Covers "error" too: a transient network failure is no reason to throw
+   the whole entry screen back up behind the message. */
+.ritual-layout:not([data-stage="idle"]) .hero-slot {
   display: none;
 }
 
-/* h1 survives the collapse above but not at its idle hero size (--fs-hero,
-   clamp(34px, 5vw, 54px) — sized to anchor a whole empty screen, not a
-   strip next to a ticket). Shrunk to --fs-l (22px, the same size the
-   scene's own "Карты ложатся на стол…" status line uses just below it) so
-   it still reads as a small caption over the ticket rather than competing
-   with the ticket or the scene for the traveler's attention. */
-.ritual-layout:not([data-stage="idle"]) .intent-form h1 {
-  font-size: var(--fs-l);
+/* Each post-submit screen owns the viewport and centres its content in it,
+   instead of being a block that follows something else down the page. */
+.ritual-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-6) var(--sp-4);
 }
 
 /* Shared status line — the scene's own "cards are landing"/"still
@@ -569,21 +699,23 @@ h1 {
   text-align: center;
 }
 
+/* The top gap used to be zero here and added back only for shared links,
+   because on "/" the result followed a receded ticket that already supplied
+   the spacing. Now the result is its own screen and is the first thing on
+   the page in both cases, so it needs the gap in both — without it the
+   title sits flush against the top edge of the phone that opened it. */
 .result {
   max-width: 960px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 var(--sp-5) var(--sp-8);
+  padding: var(--sp-7) var(--sp-5) var(--sp-8);
 }
 
-/* On "/" the result follows the receded ticket, so a top gap would just push
-   it down. On a shared link it is the first thing on the page, and without
-   this the title sits flush against the top edge of the phone that opened it
-   from a messenger — which is most of the traffic this page will ever see.
-
-   Doubled class on purpose: the narrow-width media query further down
+/* Now the same value as the base rule above rather than an override of it.
+   Kept as its own rule because the narrow-width media query further down
    re-declares `.result`'s padding with the shorthand, which resets
-   padding-top and would win on source order at equal specificity. */
+   padding-top and would win on source order at equal specificity — the
+   doubled class is what keeps shared links spaced on a phone. */
 .result.result--shared {
   padding-top: var(--sp-7);
 }
@@ -998,8 +1130,14 @@ h1 {
    search budget -- thick enough to still read as weather, thin enough to
    read the artwork and the status line through. The scale is the fog
    rushing inward rather than fading up on the spot. */
+/* "reading" is in the list for a reason that is easy to miss: fog-roll is
+   `forwards`, so it holds the fog at .42 — but only while the selector
+   still matches. Leaving "reading" out would drop the rule the moment the
+   search answered, snapping the fog back to the base opacity: 0 in the
+   middle of the flow instead of clearing gently at "revealed" below. */
 .ritual-layout[data-stage="dealing"] .ritual-fog,
-.ritual-layout[data-stage="consulting"] .ritual-fog {
+.ritual-layout[data-stage="consulting"] .ritual-fog,
+.ritual-layout[data-stage="reading"] .ritual-fog {
   animation: fog-roll 2600ms cubic-bezier(.22, .61, .36, 1) forwards;
 }
 
@@ -2334,11 +2472,300 @@ h1 {
    docs/design/tokens.css. Coexists with the block above: that one sets
    explicit resting values for the ritual-deal/card-reveal animations
    specifically, this one is the blanket fallback for anything else
-   (currently .btn's hover/active transitions) that later tasks add. */
+   (currently .btn's hover/active transitions) that later tasks add.
+
+   It also already covers the Lumora block at the end of this file — the
+   train-bob loop, the 1000ms video crossfade and the mobile-menu stagger
+   are all plain animation/transition declarations, so none of them need a
+   reduce case of their own. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+/* ============================================================
+   Lumora — full-screen cinematic hero (LumoraHero.tsx)
+   ------------------------------------------------------------
+   A hand translation of a Tailwind spec into this project's plain-CSS
+   system; see LumoraHero.tsx's own comment for why the stack differs.
+   Every value here is the literal Tailwind equivalent the spec named:
+   the breakpoints are Tailwind's (sm 640px / md 768px / lg 1024px), the
+   type scale is Tailwind's (text-xs .75rem, text-sm .875rem,
+   text-xl 1.25rem, text-2xl 1.5rem, text-3xl 1.875rem, text-4xl 2.25rem,
+   text-5xl 3rem, text-7xl 4.5rem), and max-w-4xl/max-w-xl/max-w-sm are
+   56rem/36rem/24rem.
+
+   Everything is scoped under `.lumora` so this section cannot leak into
+   the tarot screens (which are still mounted from their own components,
+   just not currently routed — see app/page.tsx). `.liquid-glass` is the
+   one deliberate exception: the spec defines it as a shared utility and
+   nothing else in this file uses that name.
+   ============================================================ */
+.lumora {
+  --lumora-ui: system-ui, sans-serif;
+  --lumora-ink: #182C41;
+
+  position: relative;
+  width: 100%;
+  /* dvh over the spec's h-screen so mobile browser chrome can't push the
+     bottom stats out of view; vh first as the fallback for anything
+     without dvh support. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: #000; /* prevents a flash before the videos decode */
+  font-family: var(--font-lumora), 'Instrument Serif', serif;
+  /* Contains the z-indexes below (videos 0, overlay 1, content 2) inside
+     this section instead of letting them compete in the root stacking
+     context. Without it `.lumora__content` — position:relative, z-index 2 —
+     would tie with RitualFog's fixed z-index 2 and win on document order,
+     so the fog would roll in *behind* the hero band it is supposed to
+     cover. `.lumora` itself carries no z-index, so the fog still sits above
+     the section as a whole. */
+  isolation: isolate;
+}
+
+/* Pass-through wrapper: the <main> landmark has to exist somewhere, and it
+   must not disturb the column .lumora__content sets up. */
+.lumora__main {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+}
+
+/* ── Background video layer (z 0) ── */
+.lumora__videos {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.lumora__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 1000ms ease-in-out;
+}
+
+.lumora__video[data-active="true"] {
+  opacity: 1;
+}
+
+/* ── Transparent PNG overlay (z 1) ──
+   The constant scale(1.03) is what keeps the ±6px bob from ever revealing
+   an edge: the image is always drawn 3% larger than the viewport, so the
+   travel stays inside the overscan. */
+.lumora__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  animation: lumora-train-bob 3s ease-in-out infinite;
+}
+
+@keyframes lumora-train-bob {
+  0%, 100% { transform: translateY(0) scale(1.03); }
+  50% { transform: translateY(-6px) scale(1.03); }
+}
+
+/* ── Liquid glass ── verbatim from the spec.
+   Currently applied to nothing: every element that carried it (the nav
+   pill, the badge, the hamburger, the email field) has been removed. Kept
+   rather than deleted because it is the signature surface treatment of this
+   design and the search form is due to come back onto this screen — at
+   which point this is what it should be wearing. Delete it if that stops
+   being true. */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
+    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
+    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Content layer (z 2) ── */
+.lumora__content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+@media (min-width: 768px) {
+  .lumora__content { padding: 32px 40px; }
+}
+
+/* ── Navigation ── */
+.lumora__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+}
+
+.lumora__logo {
+  color: #fff;
+  font-style: italic;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+@media (min-width: 640px) {
+  .lumora__logo { font-size: 1.5rem; }
+}
+
+/* The navigation (desktop pill, hamburger and mobile overlay), the badge,
+   the email form and the manual video switcher were all removed on request
+   — their rules are deleted rather than left dead. `.lumora__nav` survives
+   because the logo still lives in it. */
+
+/* ── Hero content ──
+   `color` is set once here and everything inside inherits it, so the
+   700ms swap to dark ink over "Deep Woods" is a single transition rather
+   than one per element. The navbar and the stats sit outside this
+   subtree, which is exactly why they stay white at all times. */
+.lumora__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 24px;
+  /* Tuned against the reference screenshot: roughly 14vh of air between the
+     logo row and the cap-height of the heading, floored so it stays sane on
+     a short window and capped so it doesn't drift on a tall one. */
+  margin-top: clamp(48px, 14vh, 165px);
+  color: #fff;
+  transition: color 700ms ease;
+}
+
+.lumora__content[data-dark="true"] .lumora__hero {
+  color: var(--lumora-ink);
+}
+
+/* Class selector, so it outranks this file's bare `h1` rule (which sets
+   the tarot screens' Prata hero via the `font` shorthand). */
+.lumora__heading {
+  margin: 0;
+  max-width: 56rem;
+  font-family: inherit;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  color: inherit;
+}
+
+@media (min-width: 640px) { .lumora__heading { font-size: 3rem; } }
+@media (min-width: 768px) { .lumora__heading { font-size: 4.5rem; } }
+@media (min-width: 1024px) { .lumora__heading { font-size: 5.5rem; } }
+
+.lumora__sub {
+  margin: 0;
+  max-width: 44rem;
+  color: inherit;
+  opacity: .85;
+  font: 400 1rem/1.625 var(--lumora-ui);
+}
+
+/* The reference's forced break belongs to the wide layout only — on a phone
+   it would split the sentence a third of the way across the screen and leave
+   a ragged short line. Below sm the text just reflows. */
+@media (max-width: 639px) {
+  .lumora__sub br { display: none; }
+}
+
+/* ── Search panel ──
+   The white backing the ticket sits on. It carries the light Tutu palette
+   (see the shared token rule further up this file) rather than inheriting
+   the hero's white-or-dark-ink text colour, which is also why it is a
+   sibling of .lumora__hero in the markup and not a child. */
+.lumora__search {
+  flex: none;
+  width: 100%;
+  max-width: 1100px;
+  margin: clamp(28px, 4vh, 52px) auto 0;
+  padding: clamp(14px, 2.2vw, 28px);
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 24px 60px rgba(24, 20, 46, .16);
+}
+
+/* The ticket's own top margin is for the entry screen, where it follows a
+   paragraph; inside the panel the padding already does that job. */
+.lumora__search .ticket {
+  margin-top: 0;
+}
+
+/* Both popovers open upward in here. `.lumora` is `overflow: hidden` (the
+   spec's single non-scrolling viewport, and required anyway because the
+   overlay is drawn at scale 1.03), and the panel sits low enough that a
+   two-month calendar dropping downward would be clipped by the section's
+   bottom edge. There is far more room above it than below. */
+.lumora__search .calendar__panel,
+.lumora__search .city-suggest__panel {
+  top: auto;
+  bottom: calc(100% + var(--sp-3));
+}
+
+/* The dates field is the middle column of the ticket and is narrower than
+   the now-780px calendar, so anchoring the panel at the field's left edge
+   would hang it off the right side of the white backing. Centring on the
+   field spreads the overhang evenly, where there is room on both sides. */
+.lumora__search .calendar__panel {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ── Bottom line ──
+   Replaces the spec's four-stat row. Deliberately keeps that row's quiet
+   treatment (white/70, small, system-ui) rather than promoting it: it is
+   still the same understated footer slot, only the words changed. Sits
+   outside `.lumora__hero`, so — like the logo — it stays white through the
+   dark-ink swap. */
+.lumora__spacer {
+  flex: 1;
+}
+
+.lumora__tagline {
+  margin: 0;
+  flex: none;
+  text-align: center;
+  color: rgba(255, 255, 255, .7);
+  font: 400 .75rem/1.4 var(--lumora-ui);
+}
+
+@media (min-width: 640px) {
+  .lumora__tagline { font-size: .875rem; }
 }

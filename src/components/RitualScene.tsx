@@ -7,21 +7,21 @@ import { TarotCardView } from "./TarotCardView";
 
 // "idle" is kept only so a standalone render (see ritual-scene.test.tsx,
 // which predates this task's card mechanics) still has a valid stage to
-// pass; RitualStage itself only ever mounts this component for "dealing"
-// and "consulting" — it unmounts once the reading is fully "revealed" and
-// TravelResult's own spread-panel takes over as the permanent home for the
-// three cards, so nothing here needs to render twice.
-export type RitualVisualStage = "idle" | "dealing" | "consulting";
+// pass; RitualStage itself only ever mounts this component for "dealing",
+// "consulting" and "reading" — it unmounts once the reading is fully
+// "revealed" and TravelResult's own spread-panel takes over as the
+// permanent home for the three cards, so nothing here needs to render
+// twice.
+export type RitualVisualStage = "idle" | "dealing" | "consulting" | "reading";
 
 export interface RitualSceneSlot {
   position: TarotPosition;
   // null before the card's identity is known. For "Зов"/"Дар" that's only
   // ever true for an instant (drawDestinationCards is pure and synchronous
-  // once the intent is submitted); for "Путь" it stays null for this
-  // component's entire lifetime, because that card's identity depends on
-  // which roads Tutu MCP actually reports and is only known once the
-  // request resolves — by which point RitualStage has already moved on to
-  // "revealed" and this component is gone.
+  // once the intent is submitted); for "Путь" it stays null right up until
+  // the request resolves, because that card's identity depends on which
+  // roads Tutu MCP actually reports. At "reading" RitualStage swaps in the
+  // server's own three cards, so by then no slot is null.
   card: DrawnTarotCard | null;
   // Independent of `card`: even once a card's identity is known, RitualStage
   // holds `revealed` false until its deal timer elapses, so the two seed
@@ -95,7 +95,9 @@ export function RitualScene({ stage, slots = DEFAULT_SLOTS }: RitualSceneProps) 
         </div>
       </div>
       <p className="ritual-status" role="status">
-        {stage === "consulting" ? (
+        {stage === "reading" ? (
+          "Оракул читает расклад…"
+        ) : stage === "consulting" ? (
           "Оракул сверяется с дорогами…"
         ) : (
           <>

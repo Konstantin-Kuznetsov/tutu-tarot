@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { drawDestinationCards } from "@/domain/tarot/engine";
 import type { DrawnTarotCard, TripIntent } from "@/domain/types";
-import { TripIntentForm } from "./TripIntentForm";
+import { LumoraHero } from "./LumoraHero";
 import { RitualFog } from "./RitualFog";
 import { RitualScene, type RitualSceneSlot } from "./RitualScene";
 import { TravelResult, type RitualResultViewModel } from "./TravelResult";
 
-type Stage = "idle" | "dealing" | "consulting" | "revealed" | "error";
+// "reading" is the intermediate screen's own final beat: the search has
+// answered, so all three cards — including "Путь", whose identity was
+// unknowable until then — are face-up together, and the traveller gets to
+// see the spread as a spread before the result page replaces it.
+type Stage = "idle" | "dealing" | "consulting" | "reading" | "revealed" | "error";
 
 // --t-deal in globals.css: how long one card takes to land. Two cards land
 // on this timer because they only need the seed — drawDestinationCards is a
@@ -22,6 +26,13 @@ const DEAL_STEP_MS = 900;
 // while. Below this the wait reads as part of the dealing choreography;
 // past it, staying silent would read as broken rather than deliberate.
 const CONSULT_AFTER_MS = 3_000;
+
+// How long the full spread holds on the intermediate screen once the search
+// has answered, before the result takes over. It has to outlast the third
+// card's own flip (--t-deal, 900ms in globals.css) by enough to actually
+// look at it — a hold that ends while the card is still turning would make
+// the whole beat pointless. This is the one number to change to re-pace it.
+const READING_HOLD_MS = 2_200;
 
 async function postRitualIntent(intent: TripIntent): Promise<RitualResultViewModel> {
   const body = JSON.stringify(intent);
@@ -160,8 +171,20 @@ export function RitualStage() {
       const [data] = await Promise.all([postRitualIntent(intent), dealtFloor]);
       clearTimers();
       setResult(data);
-      stageRef.current = "revealed";
-      setStage("revealed");
+      // Land on the intermediate screen's "reading" beat first, not straight
+      // on the result. The data is already in hand — this is deliberately a
+      // held moment, not a load: it is the only point in the flow where all
+      // three cards are face-up together on the table before the reading
+      // itself takes the screen. Pushed after clearTimers() above, or it
+      // would be cleared the instant it was set.
+      stageRef.current = "reading";
+      setStage("reading");
+      timersRef.current.push(
+        window.setTimeout(() => {
+          stageRef.current = "revealed";
+          setStage("revealed");
+        }, READING_HOLD_MS),
+      );
     } catch {
       clearTimers();
       stageRef.current = "error";
@@ -249,20 +272,47 @@ export function RitualStage() {
     return () => window.clearTimeout(timer);
   }, [stage]);
 
-  const showScene = stage === "dealing" || stage === "consulting";
-  const slots: RitualSceneSlot[] = [
-    { position: "Зов", card: localCards?.[0] ?? null, revealed: revealCount >= 1 },
-    { position: "Дар", card: localCards?.[1] ?? null, revealed: revealCount >= 2 },
-    { position: "Путь", card: null, revealed: false },
-  ];
+  const showScene = stage === "dealing" || stage === "consulting" || stage === "reading";
 
-  // One surface, one stage machine: TripIntentForm stays mounted for the
-  // whole flow (wrapped in .intent-form, which globals.css shrinks and
-  // dims once data-stage leaves "idle") instead of unmounting once the
+  // Up to "reading" only the two seed-drawn cards can be shown at all, and
+  // each waits for its own deal timer; at "reading" the server's own three
+  // cards are known, so the scene switches to those and turns them all
+  // face-up. Same three positions either way — this is the same table, not a
+  // different one.
+  //
+  // Guarded on exactly three, not merely on `result` being present:
+  // spreadCards is optional on the view model, and the same length check is
+  // what TravelResult's own share button makes. A response that arrives
+  // without them (or a hand-built fixture) falls back to the dealing slots
+  // and simply holds with "Путь" still face-down, rather than rendering a
+  // short table or crashing on a missing array.
+  const readingCards = stage === "reading" ? result?.spreadCards : undefined;
+
+  const slots: RitualSceneSlot[] =
+    readingCards && readingCards.length === 3
+      ? readingCards.map((card) => ({ position: card.position, card, revealed: true }))
+      : [
+          { position: "Зов", card: localCards?.[0] ?? null, revealed: revealCount >= 1 },
+          { position: "Дар", card: localCards?.[1] ?? null, revealed: revealCount >= 2 },
+          { position: "Путь", card: null, revealed: false },
+        ];
+
+  const visualStage =
+    stage === "consulting" ? "consulting" : stage === "reading" ? "reading" : "dealing";
+
+  // One surface, one stage machine: the entry screen stays mounted for the
+  // whole flow (wrapped in .hero-slot, which globals.css collapses to a
+  // band once data-stage leaves "idle") instead of unmounting once the
   // ritual starts. The scene and the result are siblings that appear below
   // it in document order as the stage advances — there is no separate
   // screen to navigate to and nothing here ever renders a link or a nav
   // landmark for "the result".
+  //
+  // That entry screen is now LumoraHero, not TripIntentForm. It hosts the
+  // very same TripSearchForm and hands back the very same TripIntent, so
+  // startRitual below is unchanged; only the surface around the ticket is
+  // different. TripIntentForm still exists but nothing renders it — see its
+  // own note.
   return (
     <div className="ritual-layout" data-stage={stage}>
       {/* The full-screen swirl the whole ritual happens inside. A sibling
@@ -272,22 +322,24 @@ export function RitualStage() {
           visible (see RitualFog's own comment on why it is not mounted
           conditionally). */}
       <RitualFog />
-      {/* Recede in globals.css only sets pointer-events: none, which blocks
-          clicks but not keyboard focus/activation — a Tab to the submit
-          button (or refocusing the still-mounted city input and pressing
-          Enter) could still fire onSubmit while a ritual is already
-          running. `inert` makes the whole subtree genuinely unreachable
-          (unfocusable, not hit-tested, skipped by assistive tech) without
-          unmounting or hiding it — the receded ticket stays visible, it's
-          just no longer part of the interaction surface. Kept in sync with
-          the CSS recede selector's own condition (`:not([data-stage=
-          "idle"])`) so "receded" and "inert" always agree. */}
-      <div className="intent-form" inert={stage !== "idle"}>
-        <TripIntentForm onSubmit={startRitual} />
+      {/* `inert` makes the whole subtree genuinely unreachable (unfocusable,
+          not hit-tested, skipped by assistive tech) while a ritual runs, so
+          a Tab to the submit button — or refocusing the city input and
+          pressing Enter — cannot fire a second onSubmit mid-deal. The CSS
+          recede does hide the ticket outright now, which covers the same
+          ground, but this stays as the belt to that pair of braces and, more
+          importantly, as the thing that does not depend on a stylesheet
+          having loaded. Kept in sync with the CSS recede selector's own
+          condition (`:not([data-stage="idle"])`) so the two always agree.
+          Note that neither is the real re-entrancy defence: jsdom does not
+          enforce `inert` at all, so startRitual's own guard is what actually
+          rejects a second call (see its comment, and the test named for it). */}
+      <div className="hero-slot" inert={stage !== "idle"}>
+        <LumoraHero onSubmit={startRitual} />
       </div>
       {showScene ? (
-        <div ref={sceneRef}>
-          <RitualScene stage={stage === "consulting" ? "consulting" : "dealing"} slots={slots} />
+        <div className="ritual-screen" ref={sceneRef}>
+          <RitualScene stage={visualStage} slots={slots} />
         </div>
       ) : null}
       {stage === "revealed" && result ? (

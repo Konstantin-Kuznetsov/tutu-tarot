@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Prata } from "next/font/google";
+import { Instrument_Serif, Manrope, Prata } from "next/font/google";
 import type { CSSProperties } from "react";
 import "./globals.css";
 
@@ -19,6 +19,19 @@ const uiFont = Manrope({
   display: "swap",
 });
 
+// Instrument Serif, for the Lumora hero (LumoraHero.tsx). Loaded through
+// next/font/google for exactly the reason the two above are — the spec asked
+// for <link rel="stylesheet"> tags to fonts.googleapis.com, which would be
+// the only runtime font request in an app that self-hosts everything else.
+// Latin only: it ships no cyrillic subset, and the hero's copy is English.
+// Both styles, because the logo is the italic and the heading is upright.
+const lumoraFont = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
 // globals.css's ported `:root` block already declares --font-display and
 // --font-ui with the mockup's literal Google Font names ('Prata', serif /
 // 'Manrope', sans-serif) — kept byte-identical to the token source, per
@@ -32,6 +45,7 @@ const uiFont = Manrope({
 const fontVariableStyle = {
   "--font-display": displayFont.style.fontFamily,
   "--font-ui": uiFont.style.fontFamily,
+  "--font-lumora": lumoraFont.style.fontFamily,
 } as CSSProperties;
 
 export const metadata: Metadata = {
