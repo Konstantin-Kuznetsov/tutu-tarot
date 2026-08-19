@@ -74,6 +74,12 @@ function write(entries: RememberedReading[]): void {
 const CHANGED = "tutu-tarot/readings-changed";
 const listeners = new Set<() => void>();
 
+// useSyncExternalStore compares snapshots by identity, so `snapshot` must
+// return the very same array until something actually changes -- rebuilding
+// it on every call would loop forever. Dropped only by `invalidate`, which
+// every write and every event goes through.
+let cache: RememberedReading[] | null = null;
+
 // Every change goes through here, including this tab's own: the cache is
 // dropped first, then listeners are told. Notifying without dropping it was
 // a real bug -- useSyncExternalStore answers a notification by calling
@@ -85,26 +91,25 @@ function invalidate(): void {
   for (const listener of listeners) listener();
 }
 
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  const onStorage = (event: StorageEvent) => {
+// Attached once, at module scope, rather than per subscription. Hanging them
+// off `subscribe` looked tidier and was wrong: with no component mounted
+// there is no listener, so a change made while the list is closed would
+// leave the cache holding a stale array for the next time it opens. The
+// cache belongs to the module, so what invalidates it has to as well.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event: StorageEvent) => {
     // `key === null` is a whole-storage clear, which is also our business.
     if (event.key === null || event.key === KEY) invalidate();
-  };
-  window.addEventListener("storage", onStorage);
+  });
   window.addEventListener(CHANGED, invalidate);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-    window.removeEventListener(CHANGED, invalidate);
-  };
 }
 
-// useSyncExternalStore compares snapshots by identity, so this must return
-// the very same array until something actually changes -- rebuilding it on
-// every call would loop forever. Dropped only by `invalidate`, which every
-// write and every event goes through.
-let cache: RememberedReading[] | null = null;
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
 function snapshot(): RememberedReading[] {
   if (cache === null) cache = read();
