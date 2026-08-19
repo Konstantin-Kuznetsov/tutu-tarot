@@ -116,10 +116,10 @@ export type ModesSummary = Partial<Record<TransportMode, ModeSummary>>;
 export type LegOutcome = "served" | "empty" | "failed";
 
 // Rail fare ladder. Tutu returns these as codes on a rail entry's `fares`
-// summary and on every leg of an interchange plan; the four below are the
+// summary and on every leg of an interchange plan; the five below are the
 // ones observed live. An unknown code is dropped rather than shown raw --
 // «SOFT» on screen would be worse than one fewer chip.
-export type SeatCategoryCode = "SEDENTARY" | "RESERVED_SEAT" | "COMPARTMENT" | "SOFT";
+export type SeatCategoryCode = "SEDENTARY" | "RESERVED_SEAT" | "COMPARTMENT" | "SOFT" | "LUX";
 
 export interface SeatCategory {
   code: SeatCategoryCode;

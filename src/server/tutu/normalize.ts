@@ -94,13 +94,30 @@ const SEAT_LABELS: Record<SeatCategoryCode, string> = {
   RESERVED_SEAT: "плацкарт",
   COMPARTMENT: "купе",
   SOFT: "СВ",
+  LUX: "люкс",
 };
 
 // Cheapest first, which is also the ladder a traveller reads. Fixed order
 // rather than sorting by price: the rungs mean something (сидячий is always
 // humbler than СВ), and a day when купе happens to undercut плацкарт should
 // not reshuffle the ladder.
-const SEAT_ORDER: SeatCategoryCode[] = ["SEDENTARY", "RESERVED_SEAT", "COMPARTMENT", "SOFT"];
+const SEAT_ORDER: SeatCategoryCode[] = ["SEDENTARY", "RESERVED_SEAT", "COMPARTMENT", "SOFT", "LUX"];
+
+// `price_from` arrives in two different shapes under the same name, which is
+// how the ladder came to render as nothing on every ordinary train. On an
+// interchange plan's leg it is an object -- `{ amount: 2501.26, currency:
+// "RUB" }` -- while on a rail variant's own `fares.seat_categories` it is a
+// bare number, `3997.31`. Reading only the object form silently produced an
+// empty ladder for the far more common case, with nothing to show for it and
+// nothing to warn about it.
+function readAmount(value: unknown): number | undefined {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object") {
+    const amount = (value as { amount?: unknown }).amount;
+    if (typeof amount === "number") return amount;
+  }
+  return undefined;
+}
 
 function readSeatCategories(value: unknown): SeatCategory[] {
   if (!value || typeof value !== "object") return [];
@@ -110,14 +127,17 @@ function readSeatCategories(value: unknown): SeatCategory[] {
     const entry = source[code];
     if (!entry || typeof entry !== "object") continue;
     const record = entry as { price_from?: unknown; seats_left?: unknown };
-    const price = record.price_from && typeof record.price_from === "object"
-      ? (record.price_from as { amount?: unknown }).amount
-      : undefined;
-    if (typeof price !== "number") continue;
+    const price = readAmount(record.price_from);
+    if (price === undefined) continue;
     found.push({
       code,
       label: SEAT_LABELS[code],
       priceFrom: price,
+      // Only `seats_left`, never the sibling `count` that a rail variant's
+      // fares summary carries: `count` is how many fare rows are on sale in
+      // that category, not how many seats are left. Rendering 16 fares as
+      // «16 мест» would be a made-up fact of exactly the kind this app
+      // refuses -- so an entry without seats_left simply shows no count.
       seatsLeft: typeof record.seats_left === "number" ? record.seats_left : undefined,
     });
   }
