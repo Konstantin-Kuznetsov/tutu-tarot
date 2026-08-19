@@ -1,64 +1,123 @@
 # Таро-турагент
 
-Next.js prototype for Tutu AI Hackathon 2026.
+Проект для Tutu AI Hackathon 2026.
 
-The app performs a tarot ritual, chooses a Russian destination from a curated Tutu-inspired atlas, narrates the result with optional AI, and searches real transport and hotel options through Tutu MCP.
+**Живое приложение: https://tutu-tarot.vercel.app/**
 
-## Local Development
+Три карты Таро выбирают настоящее направление по России, а Tutu MCP
+подтверждает дорогу настоящими билетами и отелями. Граница между гаданием и
+фактом проведена в самом продукте: предсказание — на удачу, билеты — живые.
+
+## Документация
+
+| Документ | О чём |
+| --- | --- |
+| [docs/product.md](docs/product.md) | Продуктовая часть: что это, путь пользователя, принятые решения и почему именно они, чего продукт намеренно не делает. |
+| [docs/technical.md](docs/technical.md) | Техническая часть: архитектура, интеграция с Tutu MCP и находки при её измерении, устойчивость, граница ИИ, детерминизм, бюджеты, тестирование и известные ограничения. |
+
+Ниже — короткая выжимка; подробности в этих двух файлах.
+
+## Стек
+
+Next.js 16.3 (App Router, Turbopack), React 19, TypeScript, zod.
+Runtime-зависимостей ровно четыре: `next`, `react`, `react-dom`, `zod`.
+Стили — обычный CSS без фреймворков. Развёртывание на Vercel, своего сервера
+нет. Базы данных нет тоже.
+
+## Архитектура в двух словах
+
+**Три слоя с односторонними зависимостями:** компоненты → сервер → домен.
+Домен (`src/domain/**`) — чистые функции без единого сетевого вызова: колода
+из 22 Старших Арканов, атлас из 31 направления, выбор направления,
+пригодность видов транспорта, кодек ссылки. Сервер (`src/server/**`) —
+единственное место, которое ходит в Tutu MCP и в языковую модель. Компоненты
+и маршруты только рисуют; браузер не обращается ни к MCP, ни к модели.
+
+**Ритуал двухфазный,** потому что зависимость замкнута: карту дороги нельзя
+вытянуть, пока дороги неизвестны, а дороги нельзя искать, пока не выбрано
+направление. Сначала две карты выбирают место, затем Tutu MCP сообщает, какие
+дороги существуют, и только потом третья карта называет одну из них — она
+физически не может назвать рейс, которого нет.
+
+**Расклад целиком живёт в ссылке.** Три карты, их положение, направление и
+поездка кодируются в URL (~140 символов), поэтому «поделиться» и «мои
+расклады» работают без базы, аккаунтов и сессий. Карты и направление
+заморожены навсегда, а цены ищутся заново при каждом открытии.
+
+**ИИ пишет, но не решает.** Модель отвечает за вступление, три чтения карт и
+завершающую строку — и ни за что больше. Направление, транспорт, цены и
+ссылки рендерятся из результата поиска независимо от того, что она ответила.
+Без ключа приложение работает полностью, на написанных вручную текстах.
+
+## Ключ ИИ живёт на Vercel
+
+`AI_API_KEY` хранится в переменных окружения проекта на Vercel с пометкой
+Sensitive и **в репозитории его нет** — `.env*` в `.gitignore`, отслеживается
+только `.env.example` как шаблон.
+
+Что это значит, если вы собираете проект у себя: без своего ключа тексты
+предсказаний будут не от модели, а написанные вручную. Это **штатный режим**,
+а не поломка — приложение работает целиком, расклад, дороги, отели и ссылки
+на месте, отличается только голос. Как подключить свой ключ — в разделе «Тексты от ИИ» ниже.
+
+## Запуск локально
 
 ```bash
 npm install
 PORT=3100 npm run dev
 ```
 
-Open `http://localhost:3100`.
+Откройте `http://localhost:3100`.
 
-## Environment
+Порт 3100, а не 3000, — он задан в `.claude/launch.json`, и на 3000 у автора
+проекта живёт другое приложение.
 
-Copy `.env.example` to `.env.local` when AI narration is needed.
+## Переменные окружения
 
-`TUTU_MCP_URL` defaults to `https://mcp.tutu.ru/mcp`.
+Скопируйте `.env.example` в `.env.local`, если нужны тексты от ИИ.
 
-## AI narration
+`TUTU_MCP_URL` по умолчанию — `https://mcp.tutu.ru/mcp`.
 
-AI narration is optional. With no `AI_API_KEY` (or legacy `OPENAI_API_KEY`)
-configured, the app degrades to written-in template copy — the same
-headline, opening and card text every time, deterministic and free.
+## Тексты от ИИ
 
-When a key is configured, the model writes the three card readings (one per
-drawn card, aware of the card's name, its position in the spread and whether
-it fell reversed) and one closing line, in Russian. That is the entire
-surface it controls.
+Работа без модели — штатный режим, а не аварийный. Без `AI_API_KEY` (или
+устаревшего `OPENAI_API_KEY`) приложение показывает написанные вручную
+тексты: одни и те же заголовок, вступление и описания карт, детерминированно
+и бесплатно.
 
-It cannot touch the destination, its region, the road choice (transport
-mode, price, links) or the Tutu source attribution. Those are rendered
-straight from `RitualResult` — deterministic tarot-atlas scoring plus a real
-Tutu MCP search — regardless of what the model returns; there is no code
-path from the model's output to any of those fields.
+С ключом модель пишет три чтения карт — по одному на карту, с учётом её
+названия, позиции в раскладе и того, легла ли она перевёрнутой, — и одну
+завершающую строку, по-русски. Это весь объём, которым она управляет.
 
-Free-text output from a model can't be proven safe by pattern-matching
-alone: a lexical check catches known place names, not ones we've never
-curated. `validateNarration` (`src/server/oracle/validate.ts`) rejects known
-`travelAtlas` names other than the chosen one, URLs, non-Cyrillic text and
-out-of-range length — it reduces bad copy, it does not eliminate it. The
-real guarantee is structural: the route itself is never asked of the model
-and is never read from its reply, so nothing a validation gap lets through
-can redirect the trip. Any failure at any stage — no key, network error,
-timeout (8s, so a slow gateway can't eat the route's 30s budget), invalid
-JSON, or a validation rejection — falls back to the template unchanged.
+Она не может тронуть направление, регион, выбор дороги (вид транспорта, цену,
+ссылки) и указание на источник Туту. Всё это рендерится прямо из
+`RitualResult` — детерминированный подбор по атласу плюс настоящий поиск в
+Tutu MCP — независимо от того, что вернула модель; пути от её ответа к этим
+полям в коде просто нет.
 
-Point this at a different provider or a corporate gateway purely through
-environment variables — no code change required:
+Свободный текст модели нельзя признать безопасным одной лексической
+проверкой: она ловит известные названия, а не те, о которых мы никогда не
+слышали. `validateNarration` (`src/server/oracle/validate.ts`) отклоняет
+названия других направлений атласа, ссылки, нелатиницу вне ожиданий и выход
+за границы длины — это снижает долю плохих текстов, но не исключает её.
+Настоящая гарантия структурная: маршрут у модели не спрашивают и из её ответа
+не читают, поэтому ничто, пропущенное валидацией, не может перенаправить
+поездку. Любой сбой на любом шаге — нет ключа, ошибка сети, таймаут (8 с,
+чтобы медленный шлюз не съел 30-секундный бюджет маршрута), невалидный JSON
+или отказ валидации — возвращает те же написанные вручную тексты.
 
-| Variable | Meaning | Default |
+Переезд на другого провайдера или корпоративный шлюз делается только
+переменными окружения, без правки кода:
+
+| Переменная | Смысл | По умолчанию |
 | --- | --- | --- |
-| `AI_BASE_URL` | Chat-completions endpoint | `https://api.openai.com/v1/chat/completions` |
-| `AI_API_KEY` | Credential (falls back to `OPENAI_API_KEY`) | — |
-| `AI_MODEL` | Model identifier | `gpt-4.1-mini` |
-| `AI_AUTH_HEADER` | Header carrying the credential | `Authorization` |
-| `AI_AUTH_PREFIX` | Value prefix before the credential | `Bearer ` |
+| `AI_BASE_URL` | Эндпоинт chat-completions | `https://api.openai.com/v1/chat/completions` |
+| `AI_API_KEY` | Ключ (запасной вариант — `OPENAI_API_KEY`) | — |
+| `AI_MODEL` | Идентификатор модели | `gpt-4.1-mini` |
+| `AI_AUTH_HEADER` | Заголовок, несущий ключ | `Authorization` |
+| `AI_AUTH_PREFIX` | Префикс перед ключом | `Bearer ` |
 
-## Verification
+## Проверка
 
 ```bash
 npm run test
@@ -66,36 +125,49 @@ npm run build
 npm run test:e2e
 ```
 
-### Live smoke against real Tutu MCP
+На момент сдачи два модульных теста в `tests/components/ritual-stage.test.tsx`
+красные — про тайминг видимости сцены и запасной путь через
+`XMLHttpRequest`. Они появились вместе с переработкой первого экрана и не
+разобраны; сказано здесь прямо, потому что «всё зелёное» было бы неправдой.
+`npm run lint`, `npx tsc --noEmit`, `npm run build` и сквозные тесты зелёные.
+
+### Живой смоук против настоящего Tutu MCP
 
 ```bash
-PORT=3100 npm run dev   # in one terminal
-npm run smoke           # in another
+PORT=3100 npm run dev   # в одном терминале
+npm run smoke           # в другом
 ```
 
-`npm run smoke` runs `scripts/smoke-ritual.mjs`, which posts two ritual
-requests (a short haul and a long haul) to a running dev server and checks
-that each response has 3 cards, a destination, and — when `roadChoice.mode`
-is set — that the third card actually serves that mode and the hero offer
-links to `tutu.ru`. It needs a running dev server (`SMOKE_BASE_URL` overrides
-the default `http://127.0.0.1:3100`) and live network access to Tutu MCP. It
-is the only check in this repo that would catch a drift in the MCP contract
-(wrong tool name, a renamed field, an invalid mode literal) — every other
-test runs against a mock. If MCP is unreachable, `/api/ritual` still returns
-HTTP 200 with `roadChoice.mode: null` and a fog reason; the smoke script
-treats that as a reportable outcome, not a crash, but it is not the same as
-a verified contract.
+`npm run smoke` запускает `scripts/smoke-ritual.mjs`: он отправляет два
+запроса на расклад (короткое и дальнее плечо) на запущенный dev-сервер и
+проверяет, что в каждом ответе три карты, есть направление и — когда
+`roadChoice.mode` задан — что третья карта действительно обслуживает этот вид
+транспорта, а герой-предложение ведёт на `tutu.ru`. Нужны запущенный
+dev-сервер (`SMOKE_BASE_URL` перекрывает адрес по умолчанию
+`http://127.0.0.1:3100`) и живая сеть до Tutu MCP.
 
-## Card artwork
+Это **единственная** проверка в репозитории, способная поймать дрейф
+контракта MCP — переименованный инструмент, переименованное поле, невалидный
+литерал режима; все остальные тесты работают против моков. Если MCP
+недоступен, `/api/ritual` всё равно отвечает HTTP 200 с `roadChoice.mode:
+null` и причиной-туманом: смоук считает это результатом, о котором надо
+сообщить, а не падением — но это и не подтверждённый контракт.
 
-The 22 Major Arcana are scans of the Rider-Waite-Smith deck (published 1909,
-artwork by Pamela Colman Smith, died 1951), obtained from Wikimedia Commons and
-in the public domain. `npm run tarot:images` downloads the originals, applies a
-single duotone treatment, and writes the committed WebP files under
-`public/tarot/`. The script is run by hand; nothing is fetched at runtime.
+## Иллюстрации карт
 
-## Deployment
+22 Старших Аркана — сканы колоды Райдера — Уэйта — Смит (издана в 1909,
+художница Памела Колман Смит умерла в 1951), взятые с Wikimedia Commons и
+находящиеся в общественном достоянии. `npm run tarot:images` скачивает
+оригиналы, применяет единый дуотон и пишет закоммиченные WebP в
+`public/tarot/`. Скрипт запускается руками; в рантайме не скачивается ничего.
 
-Deploy as a standard Next.js app on Vercel. Configure `AI_API_KEY` (and, if
-pointing at a non-default gateway, `AI_BASE_URL`/`AI_MODEL`/`AI_AUTH_HEADER`/
-`AI_AUTH_PREFIX`) only if live AI narration is required for the demo.
+## Развёртывание
+
+Обычное приложение Next.js на Vercel: своего сервера нет, кастомного
+`server.js` нет. Пуш в `main` собирает и выкатывает продакшен автоматически
+через связку с GitHub — отдельный `vercel --prod` не нужен.
+
+`AI_API_KEY` (и, если шлюз не стандартный, `AI_BASE_URL` / `AI_MODEL` /
+`AI_AUTH_HEADER` / `AI_AUTH_PREFIX`) настраивается только если для показа
+нужны живые тексты от ИИ. Без него приложение работает целиком — см. раздел
+«Ключ ИИ живёт на Vercel» выше.
