@@ -86,3 +86,22 @@ if (typeof window !== "undefined" && typeof window.localStorage?.getItem !== "fu
     writable: true,
   });
 }
+
+// jsdom ships the HTMLDialogElement constructor but none of its behaviour:
+// `showModal` and `close` are both undefined, so a component that opens a
+// dialog cannot be exercised at all. This stands in for the parts the
+// component actually reads -- the `open` property and the `close` event --
+// and deliberately not for the rest: focus trapping, the inert background,
+// Escape and ::backdrop are the browser's own work, verified in a real
+// browser rather than simulated here.
+if (typeof HTMLDialogElement === "function" && typeof HTMLDialogElement.prototype.showModal !== "function") {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement, returnValue?: string) {
+    if (!this.open) return;
+    this.open = false;
+    if (returnValue !== undefined) this.returnValue = returnValue;
+    this.dispatchEvent(new Event("close"));
+  };
+}

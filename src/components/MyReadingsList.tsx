@@ -66,15 +66,14 @@ function ReadingTile({ entry }: { entry: RememberedReading }) {
   );
 }
 
-export function MyReadingsList() {
+// The list itself, without the page or the dialog around it. Both shells
+// show the same thing; only the frame and the way out differ.
+export function MyReadingsBody({ heading }: { heading?: React.ReactNode }) {
   const readings = useRememberedReadings();
 
   return (
-    <main className="myroot">
-      <div className="myhead">
-        <h1>Мои расклады</h1>
-        <Link href="/">Разложить новый</Link>
-      </div>
+    <>
+      {heading}
       {readings.length === 0 ? (
         // Also what the server renders, and what the first client commit
         // renders before storage is read -- see myReadings' serverSnapshot.
@@ -89,6 +88,24 @@ export function MyReadingsList() {
           </div>
         </>
       )}
+    </>
+  );
+}
+
+// The standalone page at /my: reachable directly, bookmarkable, and what a
+// visitor with no reading on screen gets. The dialog (MyReadingsDialog) is
+// the path from a reading you are still looking at.
+export function MyReadingsList() {
+  return (
+    <main className="myroot">
+      <MyReadingsBody
+        heading={
+          <div className="myhead">
+            <h1>Мои расклады</h1>
+            <Link href="/">Разложить новый</Link>
+          </div>
+        }
+      />
     </main>
   );
 }

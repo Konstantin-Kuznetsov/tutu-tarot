@@ -925,6 +925,57 @@ h1 {
   color: var(--text);
 }
 
+/* The history over the reading. A native <dialog>, so the backdrop, the
+   focus trap and Escape are the browser's job -- only the look is ours.
+   `inset: 0` plus `margin: auto` centres it without transforms, which keeps
+   it out of the way of the fixed-position ritual fog underneath. */
+.mydialog {
+  inset: 0;
+  margin: auto;
+  width: min(760px, 100% - 2 * var(--sp-4));
+  max-height: min(88vh, 100% - 2 * var(--sp-4));
+  padding: 0;
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  background: var(--cloth);
+  color: var(--text);
+  box-shadow: var(--shadow-raise);
+  overflow: hidden;
+}
+
+.mydialog::backdrop {
+  /* Dark enough that the reading underneath reads as set aside rather than
+     merely dimmed, with a blur so its cards don't compete with the tiles. */
+  background: rgba(8, 4, 14, .72);
+  backdrop-filter: blur(3px);
+}
+
+/* The scrolling half. Kept separate from the dialog box so the box itself
+   can stay `overflow: hidden` and keep its rounded corners clipping the
+   tiles at the top and bottom edges. */
+.mydialog__panel {
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-6) var(--sp-5) var(--sp-6);
+}
+
+.mydialog__close {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-s);
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+.mydialog__close:hover {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold-deep);
+}
+
 .myroot {
   max-width: 720px;
   margin: 0 auto;
