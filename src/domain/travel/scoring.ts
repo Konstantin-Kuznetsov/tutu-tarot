@@ -1,6 +1,7 @@
 import { hash, type ArchetypeWeights } from "@/domain/tarot/engine";
 import type { DestinationSelection, TripIntent } from "@/domain/types";
 import { travelAtlas } from "./atlas";
+import { withoutHomeCity } from "@/domain/travel/homeCity";
 
 export interface DestinationSelectionInput extends TripIntent {
   archetypeWeights: ArchetypeWeights;
@@ -40,7 +41,13 @@ function monthToSeason(month: number): string {
 export function selectDestination(input: DestinationSelectionInput): DestinationSelection {
   const month = Number(input.dateFrom.slice(5, 7));
   const season = monthToSeason(month);
-  const scored = travelAtlas.map((destination) => {
+  // Wherever the traveller already is drops out of the running before
+  // anything is scored, rather than being scored and then discarded: a
+  // destination that cannot win should not be competing for the tie-break
+  // either. See homeCity.ts for why this matches a destination's own name
+  // and anchor but never its transport hub.
+  const candidates = withoutHomeCity(travelAtlas, input.departureCity);
+  const scored = candidates.map((destination) => {
     const archetypeHits = destination.tarotArchetypes.filter(
       (tag) => (input.archetypeWeights[tag] ?? 0) > 0,
     );
