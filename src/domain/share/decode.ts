@@ -10,7 +10,10 @@ import type { Payload, SharedReading } from "./code";
 // below -- never has to ship to the client. See code.ts's own top-of-file
 // comment for the measured cost of the two living together in one module.
 
-const TRANSPORT_MODES: [TransportMode, ...TransportMode[]] = ["avia", "railway", "bus"];
+// Appending to this enum is backward compatible: the share code stores the
+// mode as a plain string, so every link minted before "etrain" existed still
+// decodes to exactly the mode it always did.
+const TRANSPORT_MODES: [TransportMode, ...TransportMode[]] = ["avia", "railway", "bus", "etrain"];
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const REVERSED_FLAG = z.union([z.literal(0), z.literal(1)]);

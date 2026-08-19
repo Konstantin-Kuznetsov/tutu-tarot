@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { callToolWithRetry, searchTutuOffers } from "@/server/tutu/mcpClient";
-import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary } from "@/server/tutu/normalize";
+import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary, readUnavailable } from "@/server/tutu/normalize";
 import type { TravelAtlasItem, TripIntent } from "@/domain/types";
 
 const intent: TripIntent = {
@@ -218,7 +218,11 @@ describe("Tutu offer normalization", () => {
         destination: "Пермь",
         departure_date: "2026-09-10",
         adults: 2,
-        modes: ["avia", "railway", "bus"],
+        // etrain joined the request when suburban trains became a real
+        // road the deck can name (see TransportMode). search_multitransport
+        // runs all four modes in parallel, so asking for the fourth costs
+        // nothing in latency.
+        modes: ["avia", "railway", "bus", "etrain"],
         optimize_for: "price",
         page_size: 20,
         view: "compact",
@@ -702,5 +706,125 @@ describe("leg outcome", () => {
 
     expect(result.transportOutcome).toBe("failed");
     expect(result.transportOutcome).not.toBe("empty");
+  });
+});
+
+// A real search_multitransport variant, copied verbatim from a live
+// Тосно -> Тверь response on 2026-08-18. The interesting part is where the
+// facts live: the train's name and number are not on the variant at all,
+// they are two levels down in legs[].segments[], which is why they used to
+// be discarded and the road hero said "Поезд: ФПК" -- the operating company
+// -- instead of naming the АВРОРА.
+const tosnoTverResponse = {
+  variants: [
+    {
+      transport: "railway",
+      price: { amount: 1984.47, currency: "RUB" },
+      duration_min: 206,
+      carriers: ["ФПК"],
+      legs: [
+        {
+          label: "outbound",
+          from: "Тосно, 2004148",
+          to: "Тверь, 2004600",
+          duration_min: 206,
+          segments: [
+            {
+              from: "Тосно, 2004148",
+              to: "Тверь, 2004600",
+              duration_min: 206,
+              carrier: "ФПК",
+              voyage_no: "739У",
+              vehicle_meta: { name: "АВРОРА", is_premium: true, is_double_decker: true },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  meta: {
+    modes_summary: { railway: { count: 1, min_price: 1984.47, min_duration_min: 206 } },
+    unavailable: [
+      {
+        mode: "avia",
+        reason: "no_route",
+        detail: "avia requires avia_id for origin, but the geo lookup did not return one — try passing a more specific city name.",
+      },
+    ],
+  },
+};
+
+describe("segment facts", () => {
+  it("names the train rather than the operating company", () => {
+    const [offer] = normalizeTransportOffers(tosnoTverResponse);
+    expect(offer.title).toBe("Поезд «АВРОРА» №739У");
+  });
+
+  it("falls back to the carrier when a segment carries no vehicle name", () => {
+    const noName = {
+      variants: [{
+        transport: "bus",
+        carriers: ["Питеравто"],
+        legs: [{ label: "outbound", segments: [{ from: "a", to: "b" }] }],
+      }],
+    };
+    expect(normalizeTransportOffers(noName)[0].title).toBe("Автобус: Питеравто");
+  });
+
+  it("stays on the old shape for a variant with no legs at all", () => {
+    const legless = { variants: [{ transport: "avia", carriers: ["Победа"] }] };
+    expect(normalizeTransportOffers(legless)[0].title).toBe("Авиабилеты: Победа");
+  });
+
+  // Transfers live inside a leg, not across legs: `legs` is labelled
+  // outbound/return, so counting legs measures the wrong axis entirely (an
+  // earlier probe did exactly that and reported a 20-variant response as
+  // having no composite routes).
+  it("counts transfers from segments within the outbound leg", () => {
+    const withChange = {
+      variants: [{
+        transport: "railway",
+        duration_min: 600,
+        legs: [{
+          label: "outbound",
+          segments: [
+            { from: "Тосно", to: "Москва", voyage_no: "1" },
+            { from: "Москва", to: "Казань", voyage_no: "2" },
+          ],
+        }],
+      }],
+    };
+    expect(normalizeTransportOffers(withChange)[0].subtitle).toBe("В пути 10 ч · 1 пересадка");
+  });
+
+  it("says nothing about transfers on a direct road", () => {
+    expect(normalizeTransportOffers(tosnoTverResponse)[0].subtitle).toBe("В пути 3 ч 26 мин");
+  });
+});
+
+describe("readUnavailable", () => {
+  it("reads Tutu's own reason for a mode that found nothing", () => {
+    expect(readUnavailable(tosnoTverResponse)).toEqual([
+      {
+        mode: "avia",
+        reason: "no_route",
+        detail: "avia requires avia_id for origin, but the geo lookup did not return one — try passing a more specific city name.",
+      },
+    ]);
+  });
+
+  it("skips entries that are not a known mode with a reason", () => {
+    const messy = { meta: { unavailable: [
+      { mode: "teleport", reason: "no_route" },
+      { mode: "bus" },
+      null,
+      { mode: "etrain", reason: "no_route" },
+    ] } };
+    expect(readUnavailable(messy)).toEqual([{ mode: "etrain", reason: "no_route", detail: undefined }]);
+  });
+
+  it("is empty when the response carries no meta at all", () => {
+    expect(readUnavailable({ variants: [] })).toEqual([]);
+    expect(readUnavailable(null)).toEqual([]);
   });
 });

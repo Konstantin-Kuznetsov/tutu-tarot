@@ -1,6 +1,7 @@
 import { archetypeWeightsFrom, drawDestinationCards, drawPathCard } from "@/domain/tarot/engine";
 import { FOG_REASON, roadReason } from "@/domain/tarot/roadReason";
 import { usableModes } from "@/domain/travel/roads";
+import { roadUnavailableNote } from "@/domain/travel/roadUnavailable";
 import { selectDestination } from "@/domain/travel/scoring";
 import type { DrawnTarotCard, LegOutcome, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
 import { createPrediction, type PredictionText } from "@/server/oracle/narrator";
@@ -22,6 +23,7 @@ const MODE_NAMES: Record<TransportMode, string> = {
   avia: "Самолёт",
   railway: "Поезд",
   bus: "Автобус",
+  etrain: "Электричка",
 };
 
 // Generic Tutu search entry points, one per mode -- not a checkout URL for
@@ -31,6 +33,7 @@ const MODE_SEARCH_URL: Record<TransportMode, string> = {
   avia: "https://avia.tutu.ru/",
   railway: "https://www.tutu.ru/poezda/",
   bus: "https://bus.tutu.ru/",
+  etrain: "https://www.tutu.ru/prigorod/",
 };
 
 // `offers.transport` (normalizeTransportOffers) is only the first page of
@@ -144,6 +147,11 @@ export interface RitualResult {
   transportOffers: NormalizedOffer[];
   hotelOffers: NormalizedOffer[];
   sourceLinks: SourceLink[];
+  // Tutu's own reason for an empty transport leg, rendered in the oracle's
+  // voice (roadUnavailable.ts), or null when the response said nothing
+  // worth repeating. Never a substitute for the fog line -- it sits under
+  // it and makes it specific.
+  roadNote: string | null;
   warnings: string[];
   transportOutcome: LegOutcome;
   hotelsOutcome: LegOutcome;
@@ -198,6 +206,7 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     transportOffers: offers.transport,
     hotelOffers: offers.hotels,
     sourceLinks,
+    roadNote: roadUnavailableNote(offers.unavailable),
     warnings: offers.warnings,
     transportOutcome: offers.transportOutcome,
     hotelsOutcome: offers.hotelsOutcome,

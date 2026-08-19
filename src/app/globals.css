@@ -1685,6 +1685,16 @@ h1 {
   text-align: center;
 }
 
+/* Tutu's own reason for the empty road, sitting directly above the generic
+   line (see RoadSection). Slightly brighter than .road__warning because it
+   is the specific, useful half of the pair -- "у Тосно нет своего
+   аэропорта" is what a traveller can act on, while the line below it only
+   says that something came back empty. */
+.road__warning--reason {
+  color: var(--text);
+  font-style: italic;
+}
+
 .proof-links {
   display: flex;
   flex-wrap: wrap;

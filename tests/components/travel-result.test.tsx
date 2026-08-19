@@ -190,6 +190,46 @@ describe("TravelResult", () => {
     expect(road).not.toHaveTextContent("Туту сейчас не отвечает");
   });
 
+  // The specific half of the pair. The generic "ничего не нашлось" line
+  // above is true but useless; Tutu's own reason ("no airport at the
+  // departure end") is the fact a traveller can act on, so it renders
+  // above it rather than instead of it.
+  it("shows Tutu's own reason above the generic empty line", () => {
+    render(
+      <TravelResult
+        result={{
+          ...resultWithRoad,
+          roadChoice: { mode: null, reason: FOG_REASON, best: null },
+          warnings: [],
+          transportOutcome: "empty",
+          roadNote: "Самолёт эту дорогу не возьмёт: у города отправления нет своего аэропорта.",
+        }}
+      />,
+    );
+
+    const road = screen.getByRole("region", { name: "Дорога, которую выбрала карта" });
+    expect(road).toHaveTextContent("у города отправления нет своего аэропорта");
+    expect(road).toHaveTextContent("Туту ответил: на эти даты здесь ничего не нашлось.");
+  });
+
+  // On "failed" Tutu never got far enough to have a reason, and on "served"
+  // there is a road and nothing to explain -- a leftover note in either
+  // position would contradict what the rest of the block is saying.
+  it("keeps the reason out of the way when the leg failed or was served", () => {
+    const note = "Самолёт эту дорогу не возьмёт: у города отправления нет своего аэропорта.";
+
+    const { unmount } = render(
+      <TravelResult result={{ ...resultWithRoad, roadChoice: { mode: null, reason: FOG_REASON, best: null }, warnings: [], transportOutcome: "failed", roadNote: note }} />,
+    );
+    expect(screen.getByRole("region", { name: "Дорога, которую выбрала карта" }))
+      .not.toHaveTextContent("нет своего аэропорта");
+    unmount();
+
+    render(<TravelResult result={{ ...resultWithRoad, transportOutcome: "served", roadNote: note }} />);
+    expect(screen.getByRole("region", { name: "Дорога, которую выбрала карта" }))
+      .not.toHaveTextContent("нет своего аэропорта");
+  });
+
   it("passes the hotel leg's own outcome to the hotels section, independent of the transport leg's", () => {
     render(
       <TravelResult

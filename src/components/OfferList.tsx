@@ -5,9 +5,10 @@ export const MODE_LABELS: Record<TransportMode, string> = {
   avia: "Самолёт",
   railway: "Поезд",
   bus: "Автобус",
+  etrain: "Электричка",
 };
 
-const MODE_ORDER: TransportMode[] = ["avia", "railway", "bus"];
+const MODE_ORDER: TransportMode[] = ["avia", "railway", "bus", "etrain"];
 
 // Shared with TravelResult's road block (the transport leg's hero/fog
 // section), so "Tutu refused" and "Tutu answered with nothing" read the
