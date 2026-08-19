@@ -84,7 +84,7 @@ describe("runRitual", () => {
     expect(result.roadChoice.best?.mode).toBe("bus");
     // Honest "from" price/duration, not a specific ticket: no checkout URL,
     // just the general Tutu bus search.
-    expect(result.roadChoice.best?.price).toBe("от 3220 ₽");
+    expect(result.roadChoice.best?.price).toBe(`от 3\u00A0220\u00A0₽`);
     expect(result.roadChoice.best?.url).toBe("https://bus.tutu.ru/");
   });
 });
@@ -141,7 +141,7 @@ describe("buildRoadChoiceAndSources", () => {
     expect(roadChoice.best).not.toBeNull();
     expect(roadChoice.best).toMatchObject({
       mode: "bus",
-      price: "от 3220 ₽",
+      price: `от 3\u00A0220\u00A0₽`,
       url: "https://bus.tutu.ru/",
     });
     expect(roadChoice.best?.subtitle).toContain("2 ч 30 мин");

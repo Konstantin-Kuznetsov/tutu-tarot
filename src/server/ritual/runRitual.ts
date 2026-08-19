@@ -6,7 +6,7 @@ import { selectDestination } from "@/domain/travel/scoring";
 import type { DrawnTarotCard, InterchangePlan, LegOutcome, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
 import { createPrediction, type PredictionText } from "@/server/oracle/narrator";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
-import { formatDuration, type NormalizedOffer } from "@/server/tutu/normalize";
+import { formatDuration, formatPrice, type NormalizedOffer } from "@/server/tutu/normalize";
 
 export interface RoadChoice {
   mode: TransportMode | null;
@@ -60,7 +60,7 @@ function offerFromSummary(mode: TransportMode, summary: ModesSummary): Normalize
     id: `summary-${mode}`,
     title: `${MODE_NAMES[mode]}: билеты на Туту`,
     subtitle: duration ? `В пути от ${duration}` : undefined,
-    price: entry.minPrice !== null ? `от ${Math.round(entry.minPrice)} ₽` : undefined,
+    price: entry.minPrice !== null ? `от ${formatPrice(entry.minPrice)}` : undefined,
     url: MODE_SEARCH_URL[mode],
     mode,
   };
