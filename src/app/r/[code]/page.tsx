@@ -84,7 +84,7 @@ export default async function SharedReadingPage({ params }: PageProps) {
 
   if (!reading || !resolved) {
     return (
-      <div className="table">
+      <div className="reading-table">
         <main className="result share-fallback">
           <h1>Таро-турагент</h1>
           <p className="ritual-status" role="alert">
@@ -106,7 +106,7 @@ export default async function SharedReadingPage({ params }: PageProps) {
   const destinationVm = destinationViewModel(destination);
 
   return (
-    <div className="table">
+    <div className="reading-table">
       <main className="result result--shared">
         <h1>Таро-турагент</h1>
         <p className="caps share-note">

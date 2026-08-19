@@ -23,7 +23,7 @@ export default function SharedReadingError({
   }, [error]);
 
   return (
-    <div className="table">
+    <div className="reading-table">
       <main className="result share-fallback">
         <h1>Таро-турагент</h1>
         <p className="ritual-status" role="alert">

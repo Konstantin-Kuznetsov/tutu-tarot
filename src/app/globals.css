@@ -166,6 +166,23 @@ h1 {
     var(--bg);
 }
 
+/* The full-height dark table a reading is read on -- and, until dcc8fcb,
+   exactly what `.table` itself meant: var(--bg) plus a fine scanline. The
+   shared-link page has worn that class since the feature was written
+   (96c2209), so when `.table` was repurposed into the entry screen's
+   dreamcore light panel the shared reading silently changed underneath it:
+   the same reading sat on the dark table on "/" and on a pink sky when
+   opened from a link. One name had come to mean two screens; this rule
+   gives the reading back the one it was written for, and `.table` keeps
+   the entry screen it now belongs to.
+
+   No palette override of its own on purpose -- :root's dark tarot tokens
+   are the default, so a page that wants them only has to not opt out. */
+.reading-table {
+  min-height: 100vh;
+  background: var(--bg) repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .012) 3px 4px);
+}
+
 .caps {
   font: 700 11px/1 var(--font-ui);
   letter-spacing: var(--track-caps);

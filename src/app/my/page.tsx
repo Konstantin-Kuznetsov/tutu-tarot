@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // see myReadings' serverSnapshot for why both sides must agree.
 export default function MyReadingsPage() {
   return (
-    <div className="table">
+    <div className="reading-table">
       <MyReadingsList />
     </div>
   );
