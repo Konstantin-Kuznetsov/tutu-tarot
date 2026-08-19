@@ -1,6 +1,6 @@
 import type { ModeUnavailable } from "@/domain/travel/roadUnavailable";
 import { TRANSPORT_MODES } from "@/domain/types";
-import type { ModesSummary, TransportMode } from "@/domain/types";
+import type { InterchangeLeg, InterchangePlan, ModesSummary, SeatCategory, SeatCategoryCode, TransportMode } from "@/domain/types";
 
 export interface NormalizedOffer {
   id: string;
@@ -9,6 +9,16 @@ export interface NormalizedOffer {
   subtitle?: string;
   url?: string;
   mode?: TransportMode;
+  // Number of changes on the outbound leg (segments - 1), and the places
+  // they happen. Carried on the offer rather than derived at render time
+  // because the third card's own reading now speaks about the change (see
+  // roadReason) -- the prophecy has to know the shape of the road, not just
+  // its mode.
+  transfers?: number;
+  via?: string[];
+  // The rail fare ladder, when this offer's mode has one. Empty for every
+  // mode that does not.
+  seatCategories?: SeatCategory[];
 }
 
 // Derived, never re-typed: see TRANSPORT_MODES on why a second hand-written
@@ -68,6 +78,101 @@ export function readUnavailable(raw: unknown): ModeUnavailable[] {
   return entries;
 }
 
+// "Москва — Шереметьево (SVO), терм. B" -> "Москва";
+// "Абакан, 2038230" -> "Абакан"; "Псков — Псков-Пасс. (2004500)" -> "Псков".
+// Station strings carry the city first and the platform/terminal/geo id
+// after a dash or a comma, and only the city is fit to put in a sentence.
+// Left in the nominative on purpose -- see roadReason for why no Russian
+// place name is ever declined by this codebase.
+export function stationCity(value: string): string {
+  const beforeDash = value.split(" — ")[0];
+  return beforeDash.split(",")[0].trim();
+}
+
+const SEAT_LABELS: Record<SeatCategoryCode, string> = {
+  SEDENTARY: "сидячий",
+  RESERVED_SEAT: "плацкарт",
+  COMPARTMENT: "купе",
+  SOFT: "СВ",
+};
+
+// Cheapest first, which is also the ladder a traveller reads. Fixed order
+// rather than sorting by price: the rungs mean something (сидячий is always
+// humbler than СВ), and a day when купе happens to undercut плацкарт should
+// not reshuffle the ladder.
+const SEAT_ORDER: SeatCategoryCode[] = ["SEDENTARY", "RESERVED_SEAT", "COMPARTMENT", "SOFT"];
+
+function readSeatCategories(value: unknown): SeatCategory[] {
+  if (!value || typeof value !== "object") return [];
+  const source = value as Record<string, unknown>;
+  const found: SeatCategory[] = [];
+  for (const code of SEAT_ORDER) {
+    const entry = source[code];
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as { price_from?: unknown; seats_left?: unknown };
+    const price = record.price_from && typeof record.price_from === "object"
+      ? (record.price_from as { amount?: unknown }).amount
+      : undefined;
+    if (typeof price !== "number") continue;
+    found.push({
+      code,
+      label: SEAT_LABELS[code],
+      priceFrom: price,
+      seatsLeft: typeof record.seats_left === "number" ? record.seats_left : undefined,
+    });
+  }
+  return found;
+}
+
+// Read straight off `meta.modes_summary.railway`, NOT through
+// readModesSummary: that function drops any mode whose `count` is 0, and a
+// route with no direct train but a two-train plan is reported as exactly
+// `railway: { count: 0, ..., interchange_routes: [...] }`. Reusing it here
+// would have discarded every plan there is.
+export function readInterchangePlan(raw: unknown): InterchangePlan | null {
+  const meta = raw && typeof raw === "object" ? (raw as { meta?: unknown }).meta : undefined;
+  const summary = meta && typeof meta === "object" ? (meta as { modes_summary?: unknown }).modes_summary : undefined;
+  const railway = summary && typeof summary === "object" ? (summary as { railway?: unknown }).railway : undefined;
+  const routes = railway && typeof railway === "object" ? (railway as { interchange_routes?: unknown }).interchange_routes : undefined;
+  if (!Array.isArray(routes) || routes.length === 0) return null;
+
+  const first = routes[0];
+  if (!first || typeof first !== "object") return null;
+  const plan = first as Record<string, unknown>;
+
+  const legs: InterchangeLeg[] = (Array.isArray(plan.legs) ? plan.legs : [])
+    .filter((leg): leg is Record<string, unknown> => Boolean(leg) && typeof leg === "object")
+    .map((leg) => ({
+      trainNumber: readString(leg.train_number),
+      from: readString(leg.from) ?? "",
+      to: readString(leg.to) ?? "",
+      departureAt: readString(leg.departure_at),
+      arrivalAt: readString(leg.arrival_at),
+      durationMin: typeof leg.duration_min === "number" ? leg.duration_min : undefined,
+      priceFrom: leg.price_from && typeof leg.price_from === "object"
+        ? ((leg.price_from as { amount?: unknown }).amount as number | undefined)
+        : undefined,
+      url: readString(leg.checkout_url),
+      seatCategories: readSeatCategories(leg.seat_categories),
+    }));
+
+  // A plan with no legs is not a plan -- nothing to link to and nothing to
+  // show. Better to render no block than an empty one.
+  if (legs.length === 0) return null;
+
+  return {
+    via: (Array.isArray(plan.via) ? plan.via : []).filter((v): v is string => typeof v === "string"),
+    transferCount: typeof plan.transfer_count === "number" ? plan.transfer_count : Math.max(0, legs.length - 1),
+    departureAt: readString(plan.departure_at),
+    arrivalAt: readString(plan.arrival_at),
+    durationMin: typeof plan.duration_min === "number" ? plan.duration_min : undefined,
+    priceFrom: plan.price_from && typeof plan.price_from === "object"
+      ? ((plan.price_from as { amount?: unknown }).amount as number | undefined)
+      : undefined,
+    legs,
+  };
+}
+
 function readItems(raw: unknown): unknown[] {
   if (raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)) {
     return (raw as { items: unknown[] }).items;
@@ -99,13 +204,26 @@ function readPrice(value: unknown): string | undefined {
 // Exported so the road hero can format modes_summary's min_duration_min the
 // same way an actual offer's duration is formatted (see runRitual's
 // offerFromSummary) — one formatting rule, not two that could drift apart.
-export function formatDuration(minutes: unknown): string | undefined {
-  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) return undefined;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  if (hours > 0 && remainder > 0) return `${hours} ч ${remainder} мин`;
-  if (hours > 0) return `${hours} ч`;
-  return `${remainder} мин`;
+export function formatDuration(value: unknown): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  const total = Math.round(value);
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+
+  // Past a day, hours stop being readable: a two-train plan to Абакан is
+  // 6187 minutes, and "103 ч 7 мин" is a number to decode rather than a
+  // duration to feel. Days first, then the remaining hours; minutes are
+  // dropped at that scale because nobody plans a four-day journey to the
+  // minute.
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const restHours = hours % 24;
+    const dayWord = days % 10 === 1 && days % 100 !== 11 ? "день" : days % 10 >= 2 && days % 10 <= 4 && !(days % 100 >= 12 && days % 100 <= 14) ? "дня" : "дней";
+    return restHours > 0 ? `${days} ${dayWord} ${restHours} ч` : `${days} ${dayWord}`;
+  }
+
+  if (hours === 0) return `${minutes} мин`;
+  return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`;
 }
 
 function readStringList(value: unknown): string[] {
@@ -197,11 +315,30 @@ function transportSubtitle(record: Record<string, unknown>): string | undefined 
 export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
   return readItems(raw).slice(0, 5).map((item, index) => {
     const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const segments = readSegments(record);
+    const transfers = Math.max(0, segments.length - 1);
+    const via = segments
+      .slice(0, -1)
+      .map((segment) => stationCity(readString(segment.to) ?? ""))
+      .filter(Boolean);
+    const seatCategories = readSeatCategories(
+      record.fares && typeof record.fares === "object"
+        ? (record.fares as { seat_categories?: unknown }).seat_categories
+        : undefined,
+    );
     return {
       id: `transport-${index}`,
       title: transportTitle(record),
       price: readPrice(record.price),
       subtitle: transportSubtitle(record),
+      // Set only when there is something to say. A direct offer with no fare
+      // ladder -- which is most of them -- serialises byte-identically to
+      // what it did before these fields existed, rather than carrying
+      // `transfers: 0, via: [], seatCategories: []` into the API response
+      // and the page payload for every one of up to five offers.
+      ...(transfers > 0 ? { transfers } : {}),
+      ...(via.length > 0 ? { via } : {}),
+      ...(seatCategories.length > 0 ? { seatCategories } : {}),
       url:
         readString(record.search_results_url) ||
         readString(record.checkout_url) ||

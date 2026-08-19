@@ -114,3 +114,50 @@ export type ModesSummary = Partial<Record<TransportMode, ModeSummary>>;
 // src/components/OfferList.tsx) because they mean different things to a
 // reader: "empty" is safe to trust, "failed" is not.
 export type LegOutcome = "served" | "empty" | "failed";
+
+// Rail fare ladder. Tutu returns these as codes on a rail entry's `fares`
+// summary and on every leg of an interchange plan; the four below are the
+// ones observed live. An unknown code is dropped rather than shown raw --
+// «SOFT» on screen would be worse than one fewer chip.
+export type SeatCategoryCode = "SEDENTARY" | "RESERVED_SEAT" | "COMPARTMENT" | "SOFT";
+
+export interface SeatCategory {
+  code: SeatCategoryCode;
+  label: string;
+  priceFrom: number;
+  seatsLeft?: number;
+}
+
+// One train of a two-train plan. Each leg is separately bookable -- it
+// carries its own checkout_url -- which is what makes a plan showable at
+// all, even though the plan as a whole has no single ticket.
+export interface InterchangeLeg {
+  trainNumber?: string;
+  from: string;
+  to: string;
+  departureAt?: string;
+  arrivalAt?: string;
+  durationMin?: number;
+  priceFrom?: number;
+  url?: string;
+  seatCategories: SeatCategory[];
+}
+
+// `meta.modes_summary.railway.interchange_routes`: what Tutu offers when no
+// direct train runs the route. Deliberately kept out of the ranked variant
+// list by Tutu itself, because a plan is two purchases rather than one
+// ticket -- so it is never the road the third card names, and the product
+// has to say plainly that it is a plan.
+//
+// `priceFrom` is a *sum of the cheapest fare on each leg* (Tutu labels this
+// itself, in `price_basis`), not a quoted price for the journey. Presenting
+// it as one would be the exact kind of invented fact this app refuses.
+export interface InterchangePlan {
+  via: string[];
+  transferCount: number;
+  departureAt?: string;
+  arrivalAt?: string;
+  durationMin?: number;
+  priceFrom?: number;
+  legs: InterchangeLeg[];
+}

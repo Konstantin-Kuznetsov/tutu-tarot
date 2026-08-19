@@ -1627,6 +1627,180 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================
+   Two-train plan (.plan / InterchangePlanSection) and the rail fare
+   ladder (.fares).
+   ------------------------------------------------------------
+   The dashed border is load-bearing, not decoration: every other card in
+   this file is one purchase behind one link, and this one is two. Tutu keeps
+   these plans out of its own ranked variant list for exactly that reason,
+   so the block has to look adjacent to the road rather than like another
+   offer for it.
+   ============================================================ */
+.plan {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--cloth);
+  border: 1px dashed var(--gold-deep);
+  border-radius: var(--r-m);
+}
+
+.plan__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--sp-5);
+  row-gap: 4px;
+}
+
+.plan__title {
+  margin: 0;
+  min-width: 0;
+  font: 400 var(--fs-l)/var(--lh-tight) var(--font-display);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.plan__total {
+  font: 400 1.5rem/1 var(--font-display);
+  color: var(--gold-bright);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan__meta {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+}
+
+.plan__legs {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leg {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: var(--sp-4);
+  align-items: baseline;
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* Train numbers are the one place a monospace face earns its keep here:
+   "010У" and "068Ы" line up as identifiers rather than reading as prose. */
+.leg__no {
+  font: 700 var(--fs-xs)/1.4 var(--font-mono);
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.leg__where {
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--fs-s);
+  overflow-wrap: anywhere;
+}
+
+.leg__where a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.leg__where a:hover {
+  text-decoration: underline;
+}
+
+.leg__when {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.leg__price {
+  color: var(--gold-bright);
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan__honesty {
+  margin: 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-style: italic;
+}
+
+/* The fare ladder. Wraps rather than scrolls: four chips fit one line on a
+   desktop and two on a phone, and a horizontally scrolling strip would hide
+   the most expensive rung exactly where a reader stops looking. */
+.fares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fare {
+  display: inline-grid;
+  gap: 1px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--cloth-2);
+}
+
+.fare b {
+  font: 700 10px/1.2 var(--font-ui);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.fare span {
+  font-size: var(--fs-xs);
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Below this width the two-column heads stop working: the price column is
+   `auto` and never wraps, so at 390px it squeezed the title down to about
+   four characters and «Пересадка: Москва» broke one letter per line
+   (caught in a screenshot, not by a test -- overflow-wrap made it "fit"
+   rather than overflow, so nothing measured it as broken). Stacking is the
+   fix: the price keeps its own line and the title gets the full width. */
+@media (max-width: 560px) {
+  .plan__head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan__total {
+    justify-self: start;
+  }
+
+  .leg {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 4px;
+  }
+
+  .leg__price {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 .road__reason {
   display: flex;
   align-items: center;

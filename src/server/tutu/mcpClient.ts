@@ -1,6 +1,7 @@
+import type { InterchangePlan } from "@/domain/types";
 import type { ModeUnavailable } from "@/domain/travel/roadUnavailable";
 import type { LegOutcome, ModesSummary, TravelAtlasItem, TripIntent } from "@/domain/types";
-import { normalizeHotelOffers, normalizeTransportOffers, readModesSummary, readUnavailable, type NormalizedOffer } from "./normalize";
+import { normalizeHotelOffers, normalizeTransportOffers, readInterchangePlan, readModesSummary, readUnavailable, type NormalizedOffer } from "./normalize";
 
 const DEFAULT_MCP_URL = "https://mcp.tutu.ru/mcp";
 
@@ -277,6 +278,9 @@ export interface TutuSearchResult {
   // and dropped, because it is the difference between "no airport here"
   // and "no route today", which the traveller deserves to be told apart.
   unavailable: ModeUnavailable[];
+  // Two-train plan for a route with no direct train, when Tutu offers one.
+  // Read separately from modesSummary on purpose -- see readInterchangePlan.
+  interchangePlan: InterchangePlan | null;
   warnings: string[];
   // What actually happened on each leg, independent of the other -- see
   // LegOutcome's own comment for why "empty" and "failed" have to render
@@ -326,11 +330,13 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
     let transport: NormalizedOffer[] = [];
     let modesSummary: ModesSummary = {};
     let unavailable: ModeUnavailable[] = [];
+    let interchangePlan: InterchangePlan | null = null;
     let transportOutcome: LegOutcome;
     if (roads.status === "fulfilled") {
       transport = normalizeTransportOffers(roads.value);
       modesSummary = readModesSummary(roads.value);
       unavailable = readUnavailable(roads.value);
+      interchangePlan = readInterchangePlan(roads.value);
       transportOutcome = transport.length > 0 ? "served" : "empty";
     } else {
       warnings.push(roads.reason instanceof Error ? roads.reason.message : "Tutu transport search failed");
@@ -350,7 +356,7 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
     if (transport.length === 0) transport = [transportFallback(input)];
     if (hotels.length === 0) hotels = [hotelFallback(input)];
 
-    return { transport, hotels, modesSummary, unavailable, warnings, transportOutcome, hotelsOutcome };
+    return { transport, hotels, modesSummary, unavailable, interchangePlan, warnings, transportOutcome, hotelsOutcome };
   } finally {
     clearTimeout(deadline);
   }
