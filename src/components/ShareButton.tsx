@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MyReadingsDialog } from "./MyReadingsDialog";
 import { encodeReading, type SharedReading } from "@/domain/share/code";
 
@@ -50,6 +50,21 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
   // (react-hooks/set-state-in-effect) to produce it.
 
 
+  // «Ссылка скопирована» is an acknowledgement, not a state: it answers the
+  // click and then has no business staying on screen. Three seconds is long
+  // enough to be read and short enough that it never becomes furniture.
+  //
+  // Only the success clears itself. The error keeps the link in its own
+  // text so it can be copied by hand -- taking that away on a timer would
+  // remove the only way out of the failure it is reporting.
+  useEffect(() => {
+    if (status !== "copied") return;
+    const timer = window.setTimeout(() => setStatus("idle"), 3000);
+    // Cleared on a re-click too, not just on unmount: a second copy restarts
+    // the three seconds instead of inheriting whatever was left of the first.
+    return () => window.clearTimeout(timer);
+  }, [status]);
+
   function handleClick() {
     // Reads window.location.origin directly here rather than reusing the
     // `origin` state above: a click can only ever happen in the browser, so
@@ -60,6 +75,12 @@ export function ShareButton({ reading, destinationName }: ShareButtonProps) {
     // that click somehow lands before the effect has run.
     const shareUrl = shareUrlFor(window.location.origin, reading);
     setUrl(shareUrl);
+    // Back to idle first, so a second copy is a real state transition and
+    // the effect above restarts its three seconds. Without this, setting
+    // "copied" while already "copied" changes nothing, React does not
+    // re-render, and the message would still vanish on the first click's
+    // timer.
+    setStatus("idle");
 
     // Everything below must run with no `await` ahead of the clipboard
     // call. Safari revokes the click's user-activation the instant
