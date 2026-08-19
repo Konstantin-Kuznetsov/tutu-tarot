@@ -194,11 +194,39 @@ function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+// One money format for the whole product: "13 320 ₽".
+//
+// Before this there were two, on the same screen: a real offer printed
+// `691.77 RUB` straight from the payload, while a hero built from
+// modes_summary printed `от 3220 ₽` -- so a reading could show both styles
+// at once depending on which path produced its road.
+//
+// Rounded to whole roubles, the way Tutu's own listings show them: kopecks
+// on a ticket are noise, and «691,77 ₽» reads as a utility bill rather than
+// a fare. Grouped with a non-breaking space so a price never wraps across
+// lines mid-number.
+//
+// The thousands separator is inserted by hand rather than through
+// Intl.NumberFormat("ru-RU") deliberately: Intl's grouping depends on the
+// ICU data the runtime was built with, and a Node without full ICU silently
+// falls back to "13,320". This produces the same bytes on every machine,
+// which matters when the same string is asserted in tests and rendered on a
+// server and a client.
+//
+// A currency that is not RUB keeps its own code instead of being stamped
+// with ₽ -- the app has only ever seen RUB, and inventing a symbol for
+// something else would be exactly the kind of confident wrong detail this
+// codebase refuses.
+export function formatPrice(amount: number, currency = "RUB"): string {
+  const grouped = String(Math.round(amount)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+  return currency === "RUB" ? `${grouped}\u00A0₽` : `${grouped}\u00A0${currency}`;
+}
+
 function readPrice(value: unknown): string | undefined {
   if (!value || typeof value !== "object") return undefined;
   const price = value as { amount?: unknown; currency?: unknown };
   if (typeof price.amount !== "number") return undefined;
-  return `${price.amount} ${typeof price.currency === "string" ? price.currency : "RUB"}`;
+  return formatPrice(price.amount, typeof price.currency === "string" ? price.currency : "RUB");
 }
 
 // Exported so the road hero can format modes_summary's min_duration_min the

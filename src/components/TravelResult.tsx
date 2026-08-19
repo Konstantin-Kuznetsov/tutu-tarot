@@ -5,7 +5,7 @@ import type { RoadChoice, SourceLink } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
 import { isOutsideSeasonWindow, seasonWindowCaption } from "@/domain/travel/seasonWindow";
-import { formatDuration, stationCity } from "@/server/tutu/normalize";
+import { formatDuration, formatPrice, stationCity } from "@/server/tutu/normalize";
 import { LEG_OUTCOME_COPY, MODE_LABELS, OfferList } from "./OfferList";
 import { RitualMist } from "./RitualMist";
 import { ShareButton } from "./ShareButton";
@@ -306,7 +306,7 @@ function SeatFares({ categories }: { categories?: SeatCategory[] }) {
               ? ` · ${pluralSeats(category.seatsLeft)}`
               : null}
           </b>
-          <span>от {Math.round(category.priceFrom)} RUB</span>
+          <span>от {formatPrice(category.priceFrom)}</span>
         </li>
       ))}
     </ul>
@@ -343,7 +343,7 @@ export function InterchangePlanSection({ plan, blockIndex }: { plan: Interchange
               : `${plan.transferCount > 1 ? "Пересадки" : "Пересадка"} в пути`}
           </p>
           {typeof plan.priceFrom === "number" ? (
-            <b className="plan__total">от {Math.round(plan.priceFrom)} RUB</b>
+            <b className="plan__total">от {formatPrice(plan.priceFrom)}</b>
           ) : null}
           <p className="plan__meta">
             {[total ? `В пути ${total}` : null, departure ? `отправление ${departure}` : null]
@@ -373,7 +373,7 @@ export function InterchangePlanSection({ plan, blockIndex }: { plan: Interchange
                   <SeatFares categories={leg.seatCategories} />
                 </span>
                 {typeof leg.priceFrom === "number" ? (
-                  <span className="leg__price">от {Math.round(leg.priceFrom)} RUB</span>
+                  <span className="leg__price">от {formatPrice(leg.priceFrom)}</span>
                 ) : null}
               </li>
             );

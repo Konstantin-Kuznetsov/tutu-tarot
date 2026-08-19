@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { callToolWithRetry, searchTutuOffers } from "@/server/tutu/mcpClient";
-import { normalizeHotelOffers, normalizeTransportOffers, readInterchangePlan, readModesSummary, readUnavailable, stationCity } from "@/server/tutu/normalize";
+import { formatPrice, normalizeHotelOffers, normalizeTransportOffers, readInterchangePlan, readModesSummary, readUnavailable, stationCity } from "@/server/tutu/normalize";
 import type { TravelAtlasItem, TripIntent } from "@/domain/types";
 
 const intent: TripIntent = {
@@ -133,7 +133,7 @@ describe("Tutu offer normalization", () => {
     expect(offers[0]).toEqual({
       id: "transport-0",
       title: "Москва - Пермь",
-      price: "4200 RUB",
+      price: `4\u00A0200\u00A0₽`,
       subtitle: "10:00 - 18:30",
       url: "https://www.tutu.ru/checkout/example",
     });
@@ -157,7 +157,7 @@ describe("Tutu offer normalization", () => {
     expect(offers[0]).toEqual({
       id: "transport-0",
       title: "Авиабилеты: Аэрофлот",
-      price: "46624 RUB",
+      price: `46\u00A0624\u00A0₽`,
       subtitle: "В пути 9 ч 50 мин",
       url: "https://avia.tutu.ru/f/Sankt-peterburg/Vladivostok/?start=2026-09-10",
       mode: "avia",
@@ -183,7 +183,7 @@ describe("Tutu offer normalization", () => {
     expect(offers[0]).toEqual({
       id: "hotel-0",
       title: "Deep Hotel (Владивосток)",
-      price: "27279.98 RUB",
+      price: `27\u00A0280\u00A0₽`,
       subtitle: "4.3 км от центра",
       url: "https://hotel.tutu.ru/offers/details/best",
     });
@@ -481,7 +481,8 @@ describe("multitransport normalization", () => {
     const offers = normalizeTransportOffers(vladimirResponse);
     expect(offers).toHaveLength(1);
     expect(offers[0].mode).toBe("railway");
-    expect(offers[0].price).toBe("691.77 RUB");
+    // Rounded to whole roubles by formatPrice: kopecks on a fare are noise.
+    expect(offers[0].price).toBe(`692\u00A0₽`);
     expect(offers[0].url).toContain("tutu.ru");
   });
 
@@ -938,5 +939,43 @@ describe("stationCity", () => {
     expect(stationCity("Москва — Шереметьево (SVO), терм. B")).toBe("Москва");
     expect(stationCity("Абакан, 2038230")).toBe("Абакан");
     expect(stationCity("Тверь")).toBe("Тверь");
+  });
+});
+
+describe("formatPrice", () => {
+  it("groups thousands with a non-breaking space", () => {
+    // The exact bytes matter: a regular space would let a price wrap across
+    // two lines mid-number.
+    expect(formatPrice(13320)).toBe("13 320 ₽");
+    expect(formatPrice(1000)).toBe("1 000 ₽");
+    expect(formatPrice(1234567)).toBe("1 234 567 ₽");
+  });
+
+  it("leaves small amounts ungrouped", () => {
+    expect(formatPrice(100)).toBe("100 ₽");
+    expect(formatPrice(999)).toBe("999 ₽");
+  });
+
+  it("rounds kopecks away", () => {
+    expect(formatPrice(691.77)).toBe("692 ₽");
+    expect(formatPrice(2501.26)).toBe("2 501 ₽");
+    expect(formatPrice(28028.76)).toBe("28 029 ₽");
+  });
+
+  // The app has only ever been quoted in roubles. Stamping ₽ on something
+  // else would be a confident wrong detail, so an unfamiliar currency keeps
+  // its own code.
+  it("keeps a foreign currency's own code instead of inventing a symbol", () => {
+    expect(formatPrice(4200, "EUR")).toBe("4 200 EUR");
+    expect(formatPrice(50, "USD")).toBe("50 USD");
+  });
+
+  // Guards against a runtime whose Intl data would have grouped differently:
+  // this formatter does the grouping itself precisely so the same string is
+  // produced on every machine, in tests and in production alike.
+  it("never produces a comma or a plain space as a separator", () => {
+    const formatted = formatPrice(13320);
+    expect(formatted).not.toContain(",");
+    expect(formatted).not.toMatch(/\d \d/);
   });
 });

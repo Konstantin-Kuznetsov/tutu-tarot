@@ -88,7 +88,12 @@ describe("InterchangePlanSection", () => {
     const ladder = screen.getAllByRole("list", { name: "Классы вагонов" })[0];
 
     expect(ladder).toHaveTextContent("сидячий");
-    expect(ladder).toHaveTextContent("от 2501 RUB");
+    // A plain space, not the non-breaking one formatPrice actually emits:
+    // toHaveTextContent normalizes whitespace before matching, and \s in the
+    // regex it uses covers U+00A0 -- so the element's text arrives here with
+    // ordinary spaces. The exact bytes are asserted where it matters, on
+    // formatPrice's own output in tutu-normalize.test.ts.
+    expect(ladder).toHaveTextContent("от 2 501 ₽");
     expect(ladder).toHaveTextContent("купе · 2 места");
     // 52 seats left is not news; 2 is. Only the scarce one carries a count.
     expect(ladder).not.toHaveTextContent("сидячий · 52");
