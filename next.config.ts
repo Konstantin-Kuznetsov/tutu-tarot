@@ -37,8 +37,14 @@ const nextConfig: NextConfig = {
         // document until the search finished -- the two-phase ritual would
         // silently become one long blank wait, which is exactly the experience
         // the design exists to avoid. This header is nginx's own opt-out.
-        // Harmless everywhere else, so it is not conditioned on the host.
-        source: "/:path*",
+        //
+        // Scoped to this one route rather than "/:path*", and that is not
+        // tidiness: a proxy cannot cache a response it is not buffering, so
+        // sending this everywhere silently disabled nginx's cache for the
+        // share images too -- caught by watching X-Cache-Status stay MISS on
+        // a third identical request. The images are the one thing that most
+        // needs caching, and the one thing that never streams.
+        source: "/r/:code",
         headers: [{ key: "X-Accel-Buffering", value: "no" }],
       },
     ];
