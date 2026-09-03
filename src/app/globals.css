@@ -1065,208 +1065,6 @@ h1 {
 }
 
 /* ============================================================
-   «Мои расклады» — the history list (/my) and the way into it.
-   ============================================================ */
-
-/* Third control in the share row, and deliberately the quietest of the
-   three: the other two act on the reading in front of you, this one leaves
-   it. Same height and rhythm as .btn so the row stays one line of controls
-   rather than a button and a link that happen to sit together. */
-.btn--ghost {
-  background: transparent;
-  border-color: var(--line);
-  color: var(--text-dim);
-}
-
-.btn--ghost:hover {
-  border-color: var(--gold-deep);
-  color: var(--text);
-}
-
-/* The history over the reading. A native <dialog>, so the backdrop, the
-   focus trap and Escape are the browser's job -- only the look is ours.
-   `inset: 0` plus `margin: auto` centres it without transforms, which keeps
-   it out of the way of the fixed-position ritual fog underneath. */
-.mydialog {
-  inset: 0;
-  margin: auto;
-  width: min(760px, 100% - 2 * var(--sp-4));
-  max-height: min(88vh, 100% - 2 * var(--sp-4));
-  padding: 0;
-  border: 1px solid var(--gold-deep);
-  border-radius: var(--r-m);
-  background: var(--cloth);
-  color: var(--text);
-  box-shadow: var(--shadow-raise);
-  overflow: hidden;
-}
-
-/* The flex column that lets the scrolling panel take the remaining height --
-   scoped to [open] deliberately. A bare `.mydialog { display: flex }`
-   overrides the browser's own `dialog:not([open]) { display: none }`,
-   because author styles beat the UA sheet whatever their specificity, and a
-   closed dialog then renders inline at the foot of the page. Caught by an
-   end-to-end test asserting the dialog is hidden after Escape. */
-.mydialog[open] {
-  display: flex;
-  flex-direction: column;
-}
-
-.mydialog::backdrop {
-  /* Dark enough that the reading underneath reads as set aside rather than
-     merely dimmed, with a blur so its cards don't compete with the tiles. */
-  background: rgba(8, 4, 14, .72);
-  backdrop-filter: blur(3px);
-}
-
-/* The scrolling half. Kept separate from the dialog box so the box itself
-   can stay `overflow: hidden` and keep its rounded corners clipping the
-   tiles at the top and bottom edges. */
-/* The reading behind the dialog is frozen in place by pinning the body (see
-   MyReadingsDialog): `position: fixed` with a negative `top` keeps it
-   looking exactly where it was, and closing puts the scroll back. Attempts
-   that did not work, in order: `html:has(dialog[open]) { overflow: hidden }`
-   stopped the wheel but could not undo the jump showModal itself causes,
-   because a viewport with hidden overflow cannot be scrolled programmatically
-   either; restoring on the next frame failed for the same reason. */
-.mydialog__panel {
-  /* min-height:0 is the load-bearing half: a flex item's default minimum is
-     its content, so without it the panel refuses to shrink below the full
-     height of the list and never scrolls. */
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: var(--sp-6) var(--sp-5) var(--sp-6);
-}
-
-.mydialog__close {
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--fs-s);
-  color: var(--text-dim);
-  border-bottom: 1px solid var(--line);
-}
-
-.mydialog__close:hover {
-  color: var(--gold-bright);
-  border-bottom-color: var(--gold-deep);
-}
-
-.myroot {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--sp-7) var(--sp-5) var(--sp-8);
-}
-
-.myhead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-2);
-}
-
-.myhead h1 {
-  margin: 0;
-  font: 400 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--font-display);
-  color: var(--text);
-}
-
-.myhead a {
-  color: var(--text-dim);
-  font-size: var(--fs-s);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-}
-
-.myhead a:hover {
-  color: var(--gold-bright);
-  border-bottom-color: var(--gold-deep);
-}
-
-.mycount,
-.myempty {
-  margin: 0 0 var(--sp-5);
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-}
-
-.mylist {
-  display: grid;
-  gap: var(--sp-5);
-}
-
-/* The whole tile is the link -- the same convention .offer-card and
-   .road__hero already follow -- so there is no separate "open" control
-   competing with a picture that is already asking to be tapped. */
-.reading {
-  display: block;
-  min-width: 0;
-  text-decoration: none;
-  color: inherit;
-  background: var(--cloth);
-  border: 1px solid var(--gold-deep);
-  border-radius: var(--r-m);
-  overflow: hidden;
-  box-shadow: var(--shadow-raise);
-  transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.reading:hover {
-  transform: translateY(-2px);
-  border-color: var(--gold);
-}
-
-/* The intrinsic size of the thumbnail route's own output (600x215), so the
-   row reserves its height before the image arrives and nothing below it
-   jumps when it does. */
-.reading__shot {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 600 / 215;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-/* The two facts the picture does not carry: when the trip is, and who it is
-   for. They are what tells two readings to the same place apart. */
-.reading__facts {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-5);
-}
-
-.reading__facts b {
-  font: 400 var(--fs-m)/1.2 var(--font-display);
-  color: var(--text);
-}
-
-.reading__facts span {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  text-align: right;
-}
-
-@media (max-width: 480px) {
-  .reading__facts {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-  }
-
-  .reading__facts span {
-    text-align: left;
-  }
-}
-
-/* ============================================================
    The full-screen swirl (.ritual-fog / RitualFog)
    ------------------------------------------------------------
    Distinct from .ritual-mist above, which is the close-in haze in and
@@ -1459,6 +1257,43 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* Keep the card names on one line across the spread, whether or not a card
+   is reversed.
+   .tarot-card__face is `grid-template-rows: auto 1fr auto` — position, art,
+   caption — so the caption row is sized to its own content and the art row
+   absorbs whatever is left. A reversed card's caption carries a second line
+   («перевёрнутая»), which makes that row taller and starts its name higher
+   up the card than an unreversed neighbour's. That is the stagger: the names
+   are not misaligned within their rows, the rows themselves are different
+   heights.
+   Fixed by giving the caption its own three explicit rows and holding the
+   flag's row open at the flag's exact height even when there is no flag to
+   put in it, so every caption in the spread is the same height and every
+   name therefore starts at the same y. `minmax(…, auto)` rather than a fixed
+   height so a flag that wraps on a narrow screen can still grow.
+   The rows are assigned explicitly because the meaning paragraph (rendered
+   only when no written reading was supplied — see TarotCardView) must stay
+   below the flag rather than being auto-placed into the reserved row. */
+.tarot-card__face figcaption {
+  /* The flag's own box: 12px x 1.3 line-height, plus its 2px margin-top. */
+  --flag-line: calc(12px * 1.3 + 2px);
+  display: grid;
+  justify-items: center;
+  grid-template-rows: auto minmax(var(--flag-line), auto) auto;
+}
+
+.tarot-card__face figcaption > strong {
+  grid-row: 1;
+}
+
+.tarot-card__face figcaption > .tarot-card__flag {
+  grid-row: 2;
+}
+
+.tarot-card__face figcaption > p {
+  grid-row: 3;
+}
+
 .tarot-card__face p {
   margin: 0;
   color: rgba(21, 16, 22, 0.74);
@@ -1582,27 +1417,64 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* Surface tokens for the reading's panels. Declared on `.result` rather
+   than on `.travel-result` on purpose: the shared-reading page renders
+   .prediction-panel / .spread-panel / the road / the offer sections as
+   direct children of `.result`, without TravelResult's own wrapper around
+   them, so anything set on the wrapper would simply never reach that page.
+   `.result` is the one ancestor both routes share. */
+.result {
+  --panel-bg: linear-gradient(158deg, rgba(244, 237, 222, .075), rgba(244, 237, 222, .022) 55%, rgba(244, 237, 222, .05));
+  --panel-border: rgba(217, 164, 65, .22);
+  --panel-radius: 20px;
+  --panel-pad: clamp(18px, 3.2vw, 30px);
+}
+
 .travel-result {
   grid-column: 1 / -1;
   display: grid;
-  gap: 18px;
+  gap: clamp(16px, 2.4vw, 26px);
 }
 
+/* Was a bare 780px text column. Now the panel itself runs the full width of
+   the reading and the prose inside it is what stays measured — the block
+   reads as a surface the reading sits on rather than a paragraph floating on
+   the page, and it gives the fact tiles below the headline somewhere to
+   live. backdrop-filter is spent here (and on the spread and the road card)
+   but deliberately NOT on the many small offer cards further down: eight
+   blurred surfaces on one page is a real cost for an effect nobody can see
+   through a card that small. */
 .prediction-panel {
-  max-width: 780px;
   min-width: 0;
   overflow-wrap: anywhere;
+  padding: var(--panel-pad);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.prediction-panel > p {
+  max-width: 68ch;
 }
 
 .result-kicker {
   margin: 0 0 8px;
   color: var(--gold);
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 .prediction-panel h2 {
-  margin: 0 0 12px;
-  font-size: 32px;
-  letter-spacing: 0;
+  margin: 0 0 16px;
+  /* Was a flat 32px. The headline is the one line of this page a traveller
+     is guaranteed to read, so it scales with the viewport instead of
+     staying phone-sized on a desktop. */
+  font-size: clamp(1.9rem, 4.2vw, 3.1rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
 }
 
 /* Guide-strip — the compact, clickable strip of concrete guide facts near
@@ -1617,11 +1489,23 @@ h1 {
    overflow bug .prediction-panel/.road__hero already carry a fix for — a
    season-window string (e.g. "с середины июля по середину сентября") can
    run long. */
+/* The attribution link and the fact tiles share one row on a wide screen and
+   stack on a narrow one. `align-items: center` rather than stretch so a
+   one-line chip never grows to the height of the tiles beside it. */
+.guide-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 18px;
+}
+
 .guide-strip {
   display: inline-flex;
+  align-items: center;
+  gap: 8px;
   max-width: 100%;
-  margin: 0 0 14px;
-  padding: 6px 14px;
+  padding: 8px 14px;
   border: 1px solid var(--gold-deep);
   border-radius: var(--r-pill);
   color: var(--gold-bright);
@@ -1629,7 +1513,14 @@ h1 {
   letter-spacing: 0.02em;
   text-decoration: none;
   overflow-wrap: anywhere;
-  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.guide-strip__go {
+  transition: transform var(--t-fast) var(--ease);
 }
 
 .guide-strip:hover,
@@ -1638,9 +1529,53 @@ h1 {
   background: rgba(217, 164, 65, 0.1);
 }
 
+/* The arrow travels, the chip does not — a 2px nudge on the glyph reads as
+   "this goes somewhere" without the whole control moving under the cursor. */
+.guide-strip:hover .guide-strip__go {
+  transform: translateX(3px);
+}
+
 .guide-strip:focus-visible {
-  outline: 1px solid var(--gold);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+/* Fact tiles — the concrete numbers, previously punctuation inside the
+   strip's own sentence. Value large in the display face, unit/label small
+   and dimmed underneath: the hierarchy the brief asked for, from exactly the
+   data that was already on screen. */
+.fact-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.fact-tile {
+  display: grid;
+  gap: 2px;
+  padding: 8px 14px;
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: rgba(244, 237, 222, .04);
+}
+
+/* <dd> carries a UA margin-inline-start of 40px that would otherwise indent
+   every value away from its own label. */
+.fact-tile__value {
+  margin: 0;
+  font: 400 var(--fs-l)/1.15 var(--font-display);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.fact-tile__label {
+  font: 700 10px/1.2 var(--font-ui);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
 /* One quiet line under the guide strip -- same muted, product voice as
@@ -1660,7 +1595,12 @@ h1 {
 .spread-panel {
   display: grid;
   gap: 14px;
-  padding-block: 8px;
+  padding: var(--panel-pad);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .spread-panel__header h3 {
@@ -1944,15 +1884,32 @@ h1 {
   gap: var(--sp-4);
 }
 
+/* The one card on the page that is a decision rather than an option, so it
+   keeps the solid gold border and the raised shadow — the glass treatment
+   the other panels wear would flatten it into the list it is meant to sit
+   above. The gradient is added over the solid fill, not instead of it. */
 .road__card {
   display: grid;
   gap: var(--sp-2);
   min-width: 0;
-  padding: var(--sp-5) var(--sp-6);
-  background: var(--cloth);
+  padding: var(--panel-pad);
+  background:
+    linear-gradient(158deg, rgba(217, 164, 65, .10), transparent 55%),
+    var(--cloth);
   border: 1px solid var(--gold-deep);
-  border-radius: var(--r-m);
+  border-radius: var(--panel-radius);
   box-shadow: var(--shadow-raise);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+.road__card:hover {
+  border-color: var(--gold);
+}
+
+.road__hero:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
+  border-radius: 8px;
 }
 
 .road__hero {
@@ -1987,7 +1944,9 @@ h1 {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
-  font: 400 1.75rem/1 var(--font-display);
+  /* The price is the number this whole block exists to deliver, so it scales
+     with the viewport like the headline does instead of holding at 1.75rem. */
+  font: 400 clamp(1.6rem, 3.4vw, 2.4rem)/1 var(--font-display);
   color: var(--gold-bright);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -2248,10 +2207,31 @@ h1 {
   gap: 10px;
 }
 
+/* Chips rather than underlined words in a row: the trust footer is a set of
+   destinations, and a bordered target is both easier to hit on a phone and
+   easier to tell apart from the body copy above it. */
 .proof-links a {
-  color: var(--text);
-  border-bottom: 1px solid rgba(197, 155, 77, 0.7);
+  padding: 7px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  color: var(--text-dim);
+  font-size: var(--fs-s);
   text-decoration: none;
+  transition:
+    color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.proof-links a:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold-deep);
+  background: rgba(217, 164, 65, .08);
+}
+
+.proof-links a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 /* Task 13 — sharing. Sits right after .proof-links, undelayed (see
@@ -2320,11 +2300,37 @@ h1 {
   font-size: var(--fs-s);
 }
 
+/* Bento rather than a uniform strip: the first offer in each grid is the
+   one Tutu ranked first, so it takes two columns and reads as the lead while
+   the rest stay equal beside it. auto-fit keeps the whole thing collapsing
+   to one column on a phone by itself, at which point the span is capped to
+   whatever columns exist and the lead simply becomes a full-width card. */
 .offer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
+}
+
+/* Two explicit columns from 760px up, not auto-fit, and that is the whole
+   trick: with auto-fit the track count follows the container width, so a lead
+   spanning 2 of 3 tracks strands the third card alone on the next row at a
+   third of the width — which is exactly what the first pass produced for
+   three hotels. Pinning two columns makes the shape predictable at any
+   count: lead full width, everything after it in pairs. */
+@media (min-width: 760px) {
+  .offer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .offer-grid > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .offer-grid > :first-child span,
+  .offer-grid > :first-child strong {
+    font-size: var(--fs-l);
+  }
 }
 
 .offer-card {
@@ -2332,12 +2338,30 @@ h1 {
   min-width: 0;
   display: grid;
   gap: 6px;
-  padding: 14px;
-  border: 1px solid rgba(244, 237, 247, 0.18);
-  border-radius: 8px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid rgba(244, 237, 247, 0.16);
+  border-radius: 14px;
   color: var(--text);
   text-decoration: none;
-  background: rgba(244, 237, 247, 0.06);
+  background: linear-gradient(158deg, rgba(244, 237, 247, .08), rgba(244, 237, 247, .035));
+  transition:
+    transform var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+/* Only the linked cards lift — a .offer-card that rendered as a <div>
+   (no url on the offer) must not pretend to be pressable. */
+a.offer-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-deep);
+  background: linear-gradient(158deg, rgba(217, 164, 65, .12), rgba(244, 237, 247, .04));
+}
+
+a.offer-card:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .offer-card span,
@@ -2347,30 +2371,53 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.offer-card span {
+  font: 600 var(--fs-m)/1.3 var(--font-ui);
+}
+
 .offer-card small {
   color: var(--text-dim);
+}
+
+/* The price, last in the card and pushed to the bottom of it, in the display
+   face and gold — the same treatment the road hero's own price gets, so a
+   number means the same thing wherever it appears on this page. */
+.offer-card strong {
+  margin-top: auto;
+  font: 400 var(--fs-m)/1.2 var(--font-display);
+  color: var(--gold-bright);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Collapsed alternative-transport groups — ported from the mockup's
    `.alt`/`details`/`summary`. Kept collapsed by default so the road hero
    card above stays the visual payoff; these are the supporting cast. */
+/* Was a stack of hairline-separated rows that read as a table of contents.
+   Each mode is now its own card, so a collapsed group still looks like
+   something you can open rather than a divider you might scroll past. */
 .offer-groups {
   display: grid;
+  gap: 10px;
 }
 
 .offer-group {
-  border-top: 1px solid var(--line-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: rgba(244, 237, 247, .03);
+  overflow: hidden;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 
-.offer-group:last-of-type {
-  border-bottom: 1px solid var(--line-soft);
+.offer-group:hover,
+.offer-group[open] {
+  border-color: var(--gold-deep);
 }
 
 .offer-group summary {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-4);
-  padding: var(--sp-4) 0;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
   cursor: pointer;
   list-style: none;
 }
@@ -2379,10 +2426,18 @@ h1 {
   display: none;
 }
 
+.offer-group summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+  border-radius: 12px;
+}
+
 .offer-group__chevron {
   color: var(--gold);
   transition: transform var(--t-med) var(--ease);
   flex: none;
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .offer-group[open] .offer-group__chevron {
@@ -2393,16 +2448,24 @@ h1 {
   font: 600 var(--fs-m)/1.3 var(--font-ui);
 }
 
+/* The count was a dim number lost at the far edge of the row; as a badge it
+   becomes the scannable part of a collapsed group. */
 .offer-group__count {
   margin-left: auto;
-  color: var(--text-dim);
-  font-size: var(--fs-s);
+  min-width: 26px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gold-deep);
+  background: rgba(217, 164, 65, .12);
+  color: var(--gold-bright);
+  font: 700 var(--fs-xs)/1.4 var(--font-ui);
+  text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .offer-group .offer-grid {
-  padding-bottom: var(--sp-4);
+  padding: 0 var(--sp-5) var(--sp-5);
 }
 
 @media (max-width: 760px) {
@@ -2997,4 +3060,309 @@ h1 {
 
 @media (min-width: 640px) {
   .lumora__tagline { font-size: .875rem; }
+}
+
+/* ============================================================
+   Reading — reveal on scroll
+   ------------------------------------------------------------
+   `.result [data-block]` further up animates each block in on a delay
+   measured from mount (--block-index * 150ms). That is right for the two
+   blocks the traveller can actually see when the reading arrives, and wrong
+   for every one below them: on a ~2100px page the hotels and the trust
+   footer play their entrance while several screens off-view, so by the time
+   anyone scrolls down they have already finished and simply sit there.
+
+   This replaces the timer with the scroll position itself, natively:
+   `animation-timeline: view()` drives the animation from the block's own
+   progress through the viewport, so each one arrives exactly as it is
+   reached. No JavaScript, no IntersectionObserver, no animation library —
+   which also means nothing to install, nothing shipped to the client, and
+   no main-thread work (these run on the compositor like any other
+   transform/opacity animation).
+
+   Wrapped in @supports because scroll-driven timelines are not everywhere
+   yet: where they are missing this whole block is skipped and the
+   mount-delay stagger above stays in force, which is the current behaviour
+   rather than a broken one. Blocks already inside the viewport when the
+   reading lands resolve to the animation's end state immediately, so the
+   first screen is never held back waiting to be scrolled to.
+
+   animation-delay is reset to 0s deliberately: --block-index is still set on
+   every block for the fallback path, and a leftover delay on a scroll
+   timeline offsets the range rather than postponing anything. */
+@keyframes block-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .result [data-block] {
+      animation: block-reveal linear both;
+      animation-delay: 0s;
+      animation-timeline: view();
+      animation-range: entry 0% entry 42%;
+    }
+  }
+}
+
+/* The blanket reduce rule near the top of this file collapses animation
+   durations to ~0, which is the right answer for a time-driven animation
+   and a meaningless one for a scroll-driven timeline (duration is ignored
+   there — progress comes from the scroll position). Stated explicitly so a
+   traveller who asked for less motion gets the reading laid out plainly,
+   not a block stuck at 0 opacity waiting for a scroll that resolves it. */
+@media (prefers-reduced-motion: reduce) {
+  .result [data-block] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Printing never scrolls, so a scroll-driven reveal would commit every block
+   below the first screen to paper at opacity 0 — the reading would print
+   half blank. Same reasoning as the reduce rule above: the animation is an
+   enhancement of how the content arrives, and must never be the reason it is
+   missing. */
+@media print {
+  .result [data-block] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* The spread is three columns at every width, so on a narrow phone each card
+   is only ~110px wide and a long position name breaks mid-syllable
+   («Колесни/ца»). That predates the panel treatment, but wrapping the spread
+   in padding made the cards narrower still, so it is this change's to fix:
+   give the columns their width back where it is scarcest, and let the
+   captions hyphenate properly rather than snapping at an arbitrary letter.
+   `hyphens: auto` resolves against the document language, which <html> sets
+   to ru. */
+@media (max-width: 560px) {
+  .spread-panel {
+    padding-inline: 12px;
+  }
+
+  .spread-card-shell .tarot-card__face figcaption > strong,
+  .spread-card-shell .tarot-card__flag {
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
+}
+
+/* Restored verbatim from origin/main. These rules were lost when a stale
+   copy of this file was written back over the merge that brought the
+   «Мои расклады» feature in — the markup and the logic survived, only the
+   styling was dropped, which is why the dialog rendered unstyled. Kept
+   byte-identical to upstream rather than rewritten in the reading's new
+   panel language, deliberately: this is a restoration, not a redesign. */
+/* ============================================================
+   «Мои расклады» — the history list (/my) and the way into it.
+   ============================================================ */
+
+/* Third control in the share row, and deliberately the quietest of the
+   three: the other two act on the reading in front of you, this one leaves
+   it. Same height and rhythm as .btn so the row stays one line of controls
+   rather than a button and a link that happen to sit together. */
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text-dim);
+}
+
+.btn--ghost:hover {
+  border-color: var(--gold-deep);
+  color: var(--text);
+}
+
+/* The history over the reading. A native <dialog>, so the backdrop, the
+   focus trap and Escape are the browser's job -- only the look is ours.
+   `inset: 0` plus `margin: auto` centres it without transforms, which keeps
+   it out of the way of the fixed-position ritual fog underneath. */
+.mydialog {
+  inset: 0;
+  margin: auto;
+  width: min(760px, 100% - 2 * var(--sp-4));
+  max-height: min(88vh, 100% - 2 * var(--sp-4));
+  padding: 0;
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  background: var(--cloth);
+  color: var(--text);
+  box-shadow: var(--shadow-raise);
+  overflow: hidden;
+}
+
+/* The flex column that lets the scrolling panel take the remaining height --
+   scoped to [open] deliberately. A bare `.mydialog { display: flex }`
+   overrides the browser's own `dialog:not([open]) { display: none }`,
+   because author styles beat the UA sheet whatever their specificity, and a
+   closed dialog then renders inline at the foot of the page. Caught by an
+   end-to-end test asserting the dialog is hidden after Escape. */
+.mydialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.mydialog::backdrop {
+  /* Dark enough that the reading underneath reads as set aside rather than
+     merely dimmed, with a blur so its cards don't compete with the tiles. */
+  background: rgba(8, 4, 14, .72);
+  backdrop-filter: blur(3px);
+}
+
+/* The scrolling half. Kept separate from the dialog box so the box itself
+   can stay `overflow: hidden` and keep its rounded corners clipping the
+   tiles at the top and bottom edges. */
+/* The reading behind the dialog is frozen in place by pinning the body (see
+   MyReadingsDialog): `position: fixed` with a negative `top` keeps it
+   looking exactly where it was, and closing puts the scroll back. Attempts
+   that did not work, in order: `html:has(dialog[open]) { overflow: hidden }`
+   stopped the wheel but could not undo the jump showModal itself causes,
+   because a viewport with hidden overflow cannot be scrolled programmatically
+   either; restoring on the next frame failed for the same reason. */
+.mydialog__panel {
+  /* min-height:0 is the load-bearing half: a flex item's default minimum is
+     its content, so without it the panel refuses to shrink below the full
+     height of the list and never scrolls. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-6) var(--sp-5) var(--sp-6);
+}
+
+.mydialog__close {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-s);
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+.mydialog__close:hover {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold-deep);
+}
+
+.myroot {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--sp-5) var(--sp-8);
+}
+
+.myhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-2);
+}
+
+.myhead h1 {
+  margin: 0;
+  font: 400 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--font-display);
+  color: var(--text);
+}
+
+.myhead a {
+  color: var(--text-dim);
+  font-size: var(--fs-s);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.myhead a:hover {
+  color: var(--gold-bright);
+  border-bottom-color: var(--gold-deep);
+}
+
+.mycount,
+.myempty {
+  margin: 0 0 var(--sp-5);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.mylist {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+/* The whole tile is the link -- the same convention .offer-card and
+   .road__hero already follow -- so there is no separate "open" control
+   competing with a picture that is already asking to be tapped. */
+.reading {
+  display: block;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  background: var(--cloth);
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-m);
+  overflow: hidden;
+  box-shadow: var(--shadow-raise);
+  transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.reading:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+}
+
+/* The intrinsic size of the thumbnail route's own output (600x215), so the
+   row reserves its height before the image arrives and nothing below it
+   jumps when it does. */
+.reading__shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 600 / 215;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* The two facts the picture does not carry: when the trip is, and who it is
+   for. They are what tells two readings to the same place apart. */
+.reading__facts {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+}
+
+.reading__facts b {
+  font: 400 var(--fs-m)/1.2 var(--font-display);
+  color: var(--text);
+}
+
+.reading__facts span {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .reading__facts {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .reading__facts span {
+    text-align: left;
+  }
 }

@@ -4,7 +4,7 @@ import type { NormalizedOffer } from "@/server/tutu/normalize";
 import type { RoadChoice, SourceLink } from "@/server/ritual/runRitual";
 import type { CSSProperties } from "react";
 import type { SharedReading } from "@/domain/share/code";
-import { isOutsideSeasonWindow, seasonWindowCaption } from "@/domain/travel/seasonWindow";
+import { isOutsideSeasonWindow } from "@/domain/travel/seasonWindow";
 import { formatDuration, formatPrice, stationCity } from "@/server/tutu/normalize";
 import { LEG_OUTCOME_COPY, MODE_LABELS, OfferList } from "./OfferList";
 import { RitualMist } from "./RitualMist";
@@ -122,60 +122,89 @@ function guideSourceLabel(source: TravelAtlasItem["source"]): string {
 // Russian noun declension for "день" after a count: 1/21/31 -> день,
 // 2-4/22-24/32-34 -> дня, everything else (5-20, 25-30, ...) -> дней. Every
 // routeDays value the atlas actually carries is small (2-7), but this is
-// correct for any count, not just the ones on hand today.
-function pluralDays(days: number): string {
+// correct for any count, not just the ones on hand today. Returns the word
+// alone, because the fact tiles below set the number and its unit as two
+// separate elements — the number is the thing being made big.
+function dayWord(days: number): string {
   const mod10 = days % 10;
   const mod100 = days % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${days} день`;
-  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return `${days} дня`;
-  return `${days} дней`;
+  if (mod10 === 1 && mod100 !== 11) return "день";
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return "дня";
+  return "дней";
 }
 
-// Composed only from facts this destination actually has -- never an empty
-// separator or a dangling "·" for a fact that's absent. Source label is the
-// one fixed part; day count, rating and season window are each appended
-// only when present. When none of those three exist at all (a regional geo
-// guide whose page names no overall season either -- see
-// chechnya-kezenoy-am/suzdal in atlas.ts) the destination's own region
-// fills in, so the strip is never just a bare, contentless label.
+interface GuideFact {
+  value: string;
+  label: string;
+}
+
+// The same three facts the strip used to join into one "·"-separated line,
+// split back into value/label pairs so the value can carry the visual weight
+// and the label can recede. Nothing new is read here and nothing is dropped:
+// the sources are exactly destination.routeDays / .rating / .seasonWindow,
+// with .region as the fallback, on the same all-or-nothing terms as before
+// (region appears only when none of the other three do, so the strip is
+// never just a contentless label — see the original guideStripText).
 //
-// The season window fact goes through seasonWindowCaption first, not the
-// raw atlas string: without it, "летние месяцы" next to a headline for an
-// October trip reads as a contradiction (a user reported exactly this) --
-// the caption makes explicit that this is the guide's own recommended
-// season, not a description of the dates the traveller chose. See
-// SeasonMismatchNote below for the complementary "your dates don't overlap
-// it at all" line.
-function guideStripText(destination: RitualResultViewModel["destination"]): string | null {
-  if (!destination.source) return null;
-
-  const facts = [
-    destination.routeDays ? pluralDays(destination.routeDays) : null,
-    destination.rating ?? null,
-    destination.seasonWindow ? seasonWindowCaption(destination.seasonWindow) : null,
-  ].filter((fact): fact is string => Boolean(fact));
-
-  return [guideSourceLabel(destination.source), ...(facts.length > 0 ? facts : [destination.region])].join(" · ");
+// The season label is "лучшее время по гиду", not a bare "лучшее время",
+// and that wording is load-bearing. It replaces what seasonWindowCaption
+// used to do inside the joined string: a window like «летние месяцы» sitting
+// next to a headline for an October trip reads as a contradiction unless it
+// is explicit that this is the guide's recommendation and not a description
+// of the dates the traveller picked. SeasonMismatchNote below is still the
+// complementary "your dates miss it entirely" line.
+function guideFacts(destination: RitualResultViewModel["destination"]): GuideFact[] {
+  const facts: GuideFact[] = [];
+  if (destination.routeDays) {
+    facts.push({ value: String(destination.routeDays), label: dayWord(destination.routeDays) });
+  }
+  if (destination.rating) facts.push({ value: destination.rating, label: "рейтинг" });
+  if (destination.seasonWindow) {
+    facts.push({ value: destination.seasonWindow, label: "лучшее время по гиду" });
+  }
+  return facts.length > 0 ? facts : [{ value: destination.region, label: "регион" }];
 }
 
-// The strip itself is the link to the guide page -- not a separate CTA next
-// to quiet text -- so it renders as nothing at all (not a dead span) when
-// either half is missing: no sourceUrl to link to, or no source to build a
+// Was one "·"-joined line inside a single pill; now the attribution stays a
+// link and the concrete facts become a small row of tiles beside it, so the
+// numbers a traveller actually scans for (how many days, what rating, which
+// season) carry weight instead of being punctuation in a sentence. Same
+// data, same all-or-nothing conditions — this is purely a change of form.
+//
+// The render condition is unchanged: nothing at all (not a dead span) when
+// either half is missing — no sourceUrl to link to, or no source to build a
 // label from (hand-built fixtures that predate this feature carry neither;
 // see RitualResultViewModel.destination's own comment).
+//
+// <dl> rather than <ul>: these are label/value pairs, and the pairing is the
+// content. Each tile is its own <div> inside it so the grid has something to
+// lay out — a bare dt/dt/dd/dd sequence gives no per-pair box to style.
 //
 // Exported: the shared-reading page (src/app/r/[code]/page.tsx) renders
 // this synchronously, from data resolveSharedReading already has with no
 // network call, before the road/offers half of that page streams in behind
-// its own Suspense boundary -- see that file's own comment for why.
+// its own Suspense boundary -- see that file's own comment for why. It
+// therefore picks up this new treatment too, which is the intent: the two
+// pages should not drift.
 export function GuideStrip({ destination }: { destination: RitualResultViewModel["destination"] }) {
-  const text = guideStripText(destination);
-  if (!destination.sourceUrl || !text) return null;
+  if (!destination.sourceUrl || !destination.source) return null;
+  const facts = guideFacts(destination);
 
   return (
-    <a className="guide-strip" href={destination.sourceUrl} target="_blank" rel="noreferrer">
-      {text}
-    </a>
+    <div className="guide-facts">
+      <a className="guide-strip" href={destination.sourceUrl} target="_blank" rel="noreferrer">
+        <span className="guide-strip__label">{guideSourceLabel(destination.source)}</span>
+        <span className="guide-strip__go" aria-hidden="true">→</span>
+      </a>
+      <dl className="fact-tiles">
+        {facts.map((fact) => (
+          <div className="fact-tile" key={fact.label}>
+            <dd className="fact-tile__value">{fact.value}</dd>
+            <dt className="fact-tile__label">{fact.label}</dt>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
