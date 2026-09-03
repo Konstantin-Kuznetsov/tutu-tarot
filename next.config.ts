@@ -1,18 +1,28 @@
 import type { NextConfig } from "next";
 
-// Where this deployment actually lives, as an absolute origin. On Vercel this
-// never had to be said out loud: Next falls back to VERCEL_PROJECT_PRODUCTION_URL
-// when `metadataBase` is unset (see next/dist/lib/metadata/resolvers/resolve-url.js,
-// getSocialImageMetadataBaseFallback). Self-hosted there is no such variable, and
-// the next link in that same fallback chain is `http://localhost:PORT` -- which
-// would be baked into every og:image meta tag we serve, so a shared reading would
-// unfurl to nothing in every messenger while looking perfectly fine to us.
+// Where this deployment actually lives, as an absolute origin -- and ONLY when
+// somebody has actually said. Left unset otherwise, on purpose.
 //
-// Falling back to localhost here rather than throwing is deliberate: `next build`
-// runs in CI and in Docker where the public origin is genuinely unknown, and a
-// build must not fail over metadata. The value is read at build time, so it has
-// to be present in the build environment, not just at runtime.
-const siteOrigin = process.env.NEXT_PUBLIC_SITE_ORIGIN ?? `http://localhost:${process.env.PORT ?? 3000}`;
+// The temptation is to default it to localhost so the value is never missing.
+// That is exactly wrong, and it broke production once: Next has its own
+// fallback chain for `metadataBase` (VERCEL_PROJECT_PRODUCTION_URL, then
+// localhost -- see next/dist/lib/metadata/resolvers/resolve-url.js), and that
+// chain only runs while `metadataBase` is unset. Supplying a localhost default
+// overrode Vercel's own correct answer with a wrong one, and every og:image on
+// Vercel became `http://localhost:3000/...` -- the precise failure this
+// variable exists to prevent off Vercel, reintroduced on it. The build stays
+// green either way, so nothing catches it but looking at the meta tag.
+//
+// So: set it and it wins (self-hosting, where nothing else knows the origin);
+// leave it and Next decides (Vercel, where the platform knows better than we
+// do).
+//
+// Forgetting it while self-hosting is not silent, but it is quiet: Next warns
+// only when it first resolves the metadata, which for a dynamic route is on
+// the first request -- so it appears in the server log, never in the build.
+// A green CI proves nothing here. docs/deploy.md leads with this for that
+// reason.
+const siteOrigin = process.env.NEXT_PUBLIC_SITE_ORIGIN;
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
@@ -37,9 +47,9 @@ const nextConfig: NextConfig = {
   // Vercel while the server is being provisioned.
   output: process.env.VERCEL ? undefined : "standalone",
 
-  env: {
-    NEXT_PUBLIC_SITE_ORIGIN: siteOrigin,
-  },
+  // Only injected when set -- an inlined empty string would read as "present"
+  // in the layout and defeat the whole point above.
+  ...(siteOrigin ? { env: { NEXT_PUBLIC_SITE_ORIGIN: siteOrigin } } : {}),
 
   async headers() {
     return [
