@@ -22,7 +22,20 @@ const nextConfig: NextConfig = {
   // files it actually needs, so the runtime image needs no `npm install` and
   // no node_modules of its own. `public` and `.next/static` are NOT included
   // by design -- the Dockerfile copies them in explicitly.
-  output: "standalone",
+  //
+  // Off on Vercel, and that is not a preference -- it is the difference
+  // between a build and a failed one. Both this mode and Vercel's own build
+  // adapter consume the same output: the `@vercel/nft` traces Next writes to
+  // `.next/*.nft.json`. Standalone eats them to assemble `.next/standalone/`,
+  // and Vercel's `onBuildComplete` then cannot find what it needs to build
+  // its functions, failing with `ENOENT ... .next/next-server.js.nft.json`.
+  // It reproduces nowhere else: a local build emits those files either way,
+  // so this only ever appears on Vercel.
+  //
+  // Kept conditional rather than removed because this branch has to build in
+  // both places until the move actually happens -- production is still on
+  // Vercel while the server is being provisioned.
+  output: process.env.VERCEL ? undefined : "standalone",
 
   env: {
     NEXT_PUBLIC_SITE_ORIGIN: siteOrigin,
