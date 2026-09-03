@@ -48,7 +48,19 @@ const fontVariableStyle = {
   "--font-lumora": lumoraFont.style.fontFamily,
 } as CSSProperties;
 
+// `metadataBase` is what turns the relative image path Next generates for
+// `opengraph-image` into the absolute URL a messenger can actually fetch.
+//
+// Set only when an origin was actually configured, and left undefined
+// otherwise so Next's own fallback still runs -- on Vercel that resolves to
+// the deployment's real URL, which is what kept sharing working before this
+// line existed. Hardcoding a localhost default here instead broke exactly
+// that, silently and with a green build. See next.config.ts for the full
+// account.
 export const metadata: Metadata = {
+  metadataBase: process.env.NEXT_PUBLIC_SITE_ORIGIN
+    ? new URL(process.env.NEXT_PUBLIC_SITE_ORIGIN)
+    : undefined,
   title: "Таро-турагент",
   description: "Мистический подбор путешествий по России с маршрутами и отелями Туту.",
 };

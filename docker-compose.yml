@@ -1,0 +1,58 @@
+# Production shape: N identical app containers behind nginx.
+#
+# This is the answer to "a Node server is single-threaded". One process uses
+# one core, and the app's own work is almost entirely waiting on Tutu -- so
+# the event loop handles concurrency fine on its own. What it cannot do is
+# use the machine's other cores, and there is one genuinely CPU-bound job
+# here: Satori rendering the share images. Replicas are what put that on more
+# than one core, and unlike `cluster` they also survive one process dying.
+#
+# Start with replicas = number of cores, minus one for nginx and the OS.
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        # Build-time on purpose: Next inlines this into the bundle and resolves
+        # metadataBase during the build. Setting it only under `environment`
+        # below would be too late -- see the Dockerfile comment.
+        NEXT_PUBLIC_SITE_ORIGIN: ${NEXT_PUBLIC_SITE_ORIGIN:?задайте публичный origin, например https://taro.tutu.ru}
+    restart: unless-stopped
+    environment:
+      TUTU_MCP_URL: ${TUTU_MCP_URL:-https://mcp.tutu.ru/mcp}
+      # Every AI_* var is optional. With none of them set the oracle uses its
+      # written-in texts -- a supported mode, not a degraded one.
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_AUTH_HEADER: ${AI_AUTH_HEADER:-}
+      AI_AUTH_PREFIX: ${AI_AUTH_PREFIX:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    deploy:
+      replicas: ${APP_REPLICAS:-3}
+    # No `ports:` -- the app is only reachable through nginx, which is the
+    # whole point of putting a reverse proxy in front of it (malformed
+    # requests, slow-connection attacks, rate limiting, TLS).
+    expose:
+      - "3000"
+    # Long enough to outlast one in-flight ritual: a Tutu search has an 18s
+    # budget, and killing the process mid-search would drop a reading someone
+    # is watching load.
+    stop_grace_period: 25s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Where nginx keeps the share images it has already fetched from the app.
+      # This is the CDN Vercel used to provide, in its smallest useful form.
+      - nginx-cache:/var/cache/nginx/tarot
+
+volumes:
+  nginx-cache:

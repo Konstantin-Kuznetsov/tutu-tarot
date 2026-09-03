@@ -5,6 +5,7 @@ import { roadUnavailableNote } from "@/domain/travel/roadUnavailable";
 import { selectDestination } from "@/domain/travel/scoring";
 import type { DrawnTarotCard, InterchangePlan, LegOutcome, ModesSummary, TransportMode, TravelAtlasItem, TripIntent } from "@/domain/types";
 import { createPrediction, type PredictionText } from "@/server/oracle/narrator";
+import { logRitual } from "@/server/observability/ritualLog";
 import { searchTutuOffers } from "@/server/tutu/mcpClient";
 import { formatDuration, formatPrice, type NormalizedOffer } from "@/server/tutu/normalize";
 
@@ -191,6 +192,8 @@ export interface RitualDeps {
 }
 
 export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promise<RitualResult> {
+  const startedAt = Date.now();
+
   // Phase 1: two cards choose where.
   const draw = drawDestinationCards(input);
   const selection = selectDestination({
@@ -240,6 +243,29 @@ export async function runRitual(input: TripIntent, deps: RitualDeps = {}): Promi
     selection,
     roadChoice,
     aiApiKey: deps.aiApiKey ?? process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY,
+  });
+
+  // Logged here rather than in the route so the shared-link path gets the
+  // same accounting -- it runs the same search and costs the same, it just
+  // does not come through /api/ritual. See observability/ritualLog.ts for
+  // what these lines answer that nginx cannot.
+  logRitual({
+    startedAt,
+    destinationId: selection.destination.id,
+    mode,
+    transport: offers.transportOutcome,
+    hotels: offers.hotelsOutcome,
+    // NOT offers.transport.length: when the search finds nothing, mcpClient
+    // fills the array with a single placeholder so the page always has
+    // something to render (`if (transport.length === 0) transport =
+    // [transportFallback(input)]`). Counting that would report offers=1 for
+    // every empty and every failed search -- the exact cases this line exists
+    // to make visible. "served" is set precisely when real offers came back.
+    offerCount: offers.transportOutcome === "served" ? offers.transport.length : 0,
+    // `closingLine` exists only when the AI wrote one and it passed
+    // validation -- the template path never sets it (see PredictionText).
+    aiAnswered: Boolean(prediction.closingLine),
+    via: "ritual",
   });
 
   return {

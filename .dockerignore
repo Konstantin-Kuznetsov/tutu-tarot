@@ -1,0 +1,23 @@
+# Build output and dependencies are produced inside the image, never copied in:
+# copying a host node_modules would drag in the wrong platform's binaries.
+node_modules
+.next
+.git
+.github
+
+# Nothing that runs tests or the browser belongs in a production image.
+tests
+playwright-report
+test-results
+playwright.config.ts
+vitest.config.ts
+
+# Secrets. .env.example is kept -- it is the contract, not a credential.
+.env
+.env.local
+.env.*.local
+
+docs
+README.md
+AGENTS.md
+CLAUDE.md

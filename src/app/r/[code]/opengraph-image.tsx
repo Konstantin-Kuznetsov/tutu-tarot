@@ -18,6 +18,20 @@ export default async function Image({ params }: { params: Promise<{ code: string
 
   return new ImageResponse(
     resolved ? await ReadingArt(resolved) : <FallbackArt />,
-    { ...size, fonts: await readingArtFonts() },
+    {
+      ...size,
+      fonts: await readingArtFonts(),
+      // Measured on the Vercel deployment: this route answered MISS on every
+      // request and spent ~1.25s re-rendering the same PNG, because unlike the
+      // thumbnail next door it sent `max-age=0, must-revalidate`. The drawing
+      // is a pure function of the code in the URL -- the same link can only
+      // ever produce the same image -- so there is nothing to revalidate.
+      //
+      // It matters more off Vercel than on it: every unfurl of one link in a
+      // group chat is a separate Satori render, and Satori is the only genuinely
+      // CPU-bound work this app does. On a single-process `next start` those
+      // renders compete with real requests for the one thread.
+      headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+    },
   );
 }
