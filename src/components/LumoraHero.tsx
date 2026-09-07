@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TripSearchForm } from "@/components/TripSearchForm";
 import type { TripIntent } from "@/domain/types";
 
@@ -62,6 +62,12 @@ const OVERLAY_SRC = "/hero/train-window-overlay.png";
 // switcher required. This is the one number to change to re-pace the reel.
 const ROTATE_MS = 7000;
 
+// Must match the opacity transition on `.lumora__video` in globals.css. Used
+// to decide when the outgoing clip may be paused: pausing it the instant it
+// stops being active would freeze it on one frame while it is still half
+// visible, which reads worse than the drift it is meant to fix.
+const CROSSFADE_MS = 1000;
+
 // "Deep Woods" — the one clip bright enough that white copy stops being
 // legible over it, so the hero content (but never the logo or the bottom
 // line) swaps to the spec's dark ink.
@@ -69,6 +75,51 @@ const DARK_VIDEO_INDEX = 2;
 
 export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void }) {
   const [activeVideo, setActiveVideo] = useState(0);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+
+  // Only the clip on screen plays, and it always plays from its first frame.
+  //
+  // Every clip used to carry `autoPlay`, so all four ran the whole time
+  // behind the ones on top of them -- measured, all four reporting the same
+  // currentTime with three of them at opacity 0. That is invisible for the
+  // first 28 seconds and then becomes the whole problem: a clip is 10.04s and
+  // its turn comes round every 4 x 7s, so it reappeared at 28 % 10.04 = 7.9s,
+  // played its last two seconds, wrapped through `loop`, and started again in
+  // full view. It read exactly as viewers described it -- the same short
+  // fragment playing twice.
+  //
+  // Resetting to 0 also means the loop point is never reached during a turn
+  // (7s of a 10.04s clip), so every appearance is the same deliberate opening
+  // rather than whatever frame the clock happened to land on.
+  useEffect(() => {
+    const active = videoRefs.current[activeVideo];
+    if (active) {
+      active.currentTime = 0;
+      // Muted playback is allowed to start programmatically, but a rejected
+      // promise here (a browser that blocks it anyway, an element torn down
+      // mid-flight) must not surface as an unhandled rejection over a
+      // decorative background.
+      //
+      // The return value is checked rather than chained blind: `play()` only
+      // returns a promise in browsers that implement the modern signature, and
+      // returns undefined elsewhere -- jsdom among them, which is how a bare
+      // `.catch()` here turned every test that renders this hero into a
+      // TypeError.
+      const started = active.play();
+      if (started) void started.catch(() => {});
+    }
+
+    // The outgoing clip keeps playing until the crossfade is over, then stops.
+    // Both halves of the fade are on screen for that second, and a frozen
+    // frame fading out is more noticeable than a moving one.
+    const timer = window.setTimeout(() => {
+      for (const [index, video] of videoRefs.current.entries()) {
+        if (video && index !== activeVideo) video.pause();
+      }
+    }, CROSSFADE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [activeVideo]);
 
   // Functional update, so the interval never closes over a stale index and
   // this can stay a mount-once effect rather than tearing down and
@@ -95,6 +146,7 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
   }, []);
 
   const dark = activeVideo === DARK_VIDEO_INDEX;
+  const nextVideo = (activeVideo + 1) % VIDEOS.length;
 
   return (
     <section className="lumora">
@@ -102,15 +154,31 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
         {VIDEOS.map((video, index) => (
           <video
             key={video.src}
+            ref={(element) => {
+              videoRefs.current[index] = element;
+            }}
             className="lumora__video"
             data-active={index === activeVideo}
             src={video.src}
             poster={video.poster}
-            autoPlay
             muted
+            // Kept even though a clip never reaches its own end during a 7s
+            // turn: under reduced motion the reel does not advance at all, and
+            // the first clip has to keep going on its own.
             loop
             playsInline
-            preload="auto"
+            // No `autoPlay`. Playback is driven entirely by the effect above,
+            // so there is one place that decides what is running -- with the
+            // attribute here as well, all four would start themselves again
+            // and the effect would be racing them.
+            //
+            // Only the clip on screen and the one after it are worth
+            // buffering eagerly. With `preload="auto"` on all four the browser
+            // pulled all of them at once -- measured at 24 requests for ~80MB
+            // competing for the connection while the first frame was still
+            // what the visitor was waiting for. The next clip still gets a
+            // full 7 seconds of head start before its turn.
+            preload={index === activeVideo || index === nextVideo ? "auto" : "metadata"}
           />
         ))}
       </div>
