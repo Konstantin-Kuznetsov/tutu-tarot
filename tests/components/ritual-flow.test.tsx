@@ -10,6 +10,10 @@ function okResponse(payload: unknown): Response {
   });
 }
 
+function isSuggestRequest(input: RequestInfo | URL): boolean {
+  return String(input).startsWith("https://ptt.tutu.ru/v1/suggest/search/");
+}
+
 function stubCard(position: TarotPosition, id: string): DrawnTarotCard {
   return {
     id,
@@ -124,9 +128,10 @@ describe("continuous ritual flow", () => {
     // no way to know the executor closure runs between the assignment and
     // that read.
     const pending: { resolve: ((response: Response) => void) | null } = { resolve: null };
-    const fetchMock = vi.fn(
-      () => new Promise<Response>((resolve) => { pending.resolve = resolve; }),
-    );
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (isSuggestRequest(input)) return Promise.resolve(okResponse({ hits: { hits: [] } }));
+      return new Promise<Response>((resolve) => { pending.resolve = resolve; });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<RitualStage />);
@@ -139,7 +144,8 @@ describe("continuous ritual flow", () => {
 
     // The guard rejects the re-entrant call before it ever builds a
     // request: exactly one fetch went out, not two competing ones.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const ritualRequests = fetchMock.mock.calls.filter(([input]) => input === "/api/ritual");
+    expect(ritualRequests).toHaveLength(1);
 
     // Let the deal timers and the dealtFloor elapse, then let the one real
     // request resolve successfully.
