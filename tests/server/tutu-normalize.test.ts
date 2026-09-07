@@ -62,6 +62,7 @@ function sseContentResponse(payload: unknown, id?: string, contentType?: string)
 // request body -- used by the retry tests below to route/count per leg
 // instead of relying on call order, which retries make unpredictable.
 function toolNameOf(init?: RequestInit): string {
+  if (!init?.body) return "";
   const body = JSON.parse(String(init?.body)) as { params?: { name?: unknown } };
   return typeof body.params?.name === "string" ? body.params.name : "";
 }
@@ -92,7 +93,14 @@ type MockedTool =
   | "search_bus"
   | "search_etrain"
   | "search_hotels";
-type MockedToolQueue = Array<() => Response | Promise<Response>>;
+type MockedFetchResponse = (url: string | URL, init?: RequestInit) => Response | Promise<Response>;
+type MockedToolQueue = Array<MockedFetchResponse>;
+type MockedSuggest =
+  | "suggest_avia"
+  | "suggest_rail"
+  | "suggest_bus"
+  | "suggest_etrain"
+  | "suggest_hotels";
 
 const transportToolNames = ["search_avia", "search_rail", "search_bus", "search_etrain"] as const;
 
@@ -100,24 +108,39 @@ function transportQueues(factory: (name: (typeof transportToolNames)[number]) =>
   return Object.fromEntries(transportToolNames.map((name) => [name, factory(name)]));
 }
 
-function routedFetchMock(responses: Partial<Record<MockedTool, MockedToolQueue>>): ReturnType<typeof vi.fn> {
-  const queues: Record<string, Array<() => Response | Promise<Response>>> = {
+function suggestNameOf(url: string | URL): MockedSuggest | null {
+  const href = String(url);
+  if (href.startsWith("https://suggester-avia.tutu.ru/api/location_suggest/v2")) return "suggest_avia";
+  if (href.startsWith("https://www.tutu.ru/suggest/railway_simple/")) return "suggest_rail";
+  if (href.startsWith("https://bus.tutu.ru/api/v1/geo/suggest")) return "suggest_bus";
+  if (href.startsWith("https://www.tutu.ru/station/suggest.php")) return "suggest_etrain";
+  if (href.startsWith("https://hotels-geo-suggest.tutu.ru/api/v1/suggest")) return "suggest_hotels";
+  return null;
+}
+
+function routedFetchMock(responses: Partial<Record<MockedTool | MockedSuggest, MockedToolQueue>>): ReturnType<typeof vi.fn> {
+  const queues: Record<string, MockedToolQueue> = {
     search_multitransport: [...(responses.search_multitransport ?? [])],
     search_avia: [...(responses.search_avia ?? [])],
     search_rail: [...(responses.search_rail ?? [])],
     search_bus: [...(responses.search_bus ?? [])],
     search_etrain: [...(responses.search_etrain ?? [])],
     search_hotels: [...(responses.search_hotels ?? [])],
+    suggest_avia: [...(responses.suggest_avia ?? [])],
+    suggest_rail: [...(responses.suggest_rail ?? [])],
+    suggest_bus: [...(responses.suggest_bus ?? [])],
+    suggest_etrain: [...(responses.suggest_etrain ?? [])],
+    suggest_hotels: [...(responses.suggest_hotels ?? [])],
   };
-  return vi.fn((_url: string, init?: RequestInit) => {
-    const name = toolNameOf(init);
+  return vi.fn((_url: string | URL, init?: RequestInit) => {
+    const name = init?.body ? toolNameOf(init) : suggestNameOf(_url) ?? "";
     const next = queues[name]?.shift();
     return Promise.resolve().then(() => {
       if (!next && transportToolNames.includes(name as (typeof transportToolNames)[number])) {
         return contentResponse({ offers: [] });
       }
       if (!next) throw new Error(`routedFetchMock: no more mocked responses queued for ${name}`);
-      return next();
+      return next(_url, init);
     });
   });
 }
@@ -134,6 +157,24 @@ function callsOf(fetchMock: ReturnType<typeof vi.fn>, name: string) {
 
 function hotelCallsOf(fetchMock: ReturnType<typeof vi.fn>) {
   return fetchMock.mock.calls.filter((call) => toolNameOf(call[1] as RequestInit) === "search_hotels");
+}
+
+function suggestCallsOf(fetchMock: ReturnType<typeof vi.fn>, name: MockedSuggest) {
+  return fetchMock.mock.calls.filter((call) => suggestNameOf(String(call[0])) === name);
+}
+
+function originsOf(fetchMock: ReturnType<typeof vi.fn>, name: MockedTool) {
+  return callsOf(fetchMock, name).map((call) => {
+    const body = JSON.parse(call[1]?.body as string) as { params?: { arguments?: { origin?: unknown } } };
+    return body.params?.arguments?.origin;
+  });
+}
+
+function destinationsOf(fetchMock: ReturnType<typeof vi.fn>, name: MockedTool) {
+  return callsOf(fetchMock, name).map((call) => {
+    const body = JSON.parse(call[1]?.body as string) as { params?: { arguments?: { destination?: unknown } } };
+    return body.params?.arguments?.destination;
+  });
 }
 
 afterEach(() => {
@@ -234,7 +275,7 @@ describe("Tutu offer normalization", () => {
     expect(result.transport[0].title).toBe("Москва - Пермь");
     expect(result.hotels[0].title).toBe("Отель Пермь");
     expect(result.warnings).toEqual([]);
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+    expect(callsOf(fetchMock, "search_rail")[0][1]).toMatchObject({
       headers: { Accept: "application/json, text/event-stream" },
     });
     expect(JSON.parse(callsOf(fetchMock, "search_hotels")[0][1]?.body as string).params).toEqual({
@@ -281,6 +322,76 @@ describe("Tutu offer normalization", () => {
       departure_date: "2026-09-10",
       adults: 2,
     });
+  });
+
+  it("resolves departure city through product suggesters before searching", async () => {
+    const khimkiIntent = { ...intent, departureCity: "Химки" };
+    const kazanDestination = { ...destination, nearestTransportHub: "Казань", hotelSearchCity: "Казань" };
+    const aviaSuggest = (url: string | URL) => {
+      const query = new URL(url).searchParams.get("name");
+      return jsonResponse({
+        suggestions: [
+          {
+            geo_type: "LOCALITY",
+            city: { name: query === "Химки" ? "Москва" : "Казань" },
+            country: { name: "Россия" },
+          },
+        ],
+      });
+    };
+    const railSuggest = (url: string | URL) => jsonResponse([
+      { id: "x", value: new URL(url).searchParams.get("name") === "Химки" ? "Химки" : "Казань" },
+    ]);
+    const busSuggest = (url: string | URL) => jsonResponse({
+      data: { geopoints: [{ name: new URL(url).searchParams.get("name") === "Химки" ? "Химки" : "Казань" }] },
+      error: null,
+    });
+    const etrainSuggest = (url: string | URL) => jsonResponse([
+      { geoId: 1, value: "station", label: new URL(url).searchParams.get("name") === "Химки" ? "Химки (МЦД-3)" : "Казань" },
+    ]);
+    const fetchMock = routedFetchMock({
+      suggest_avia: [aviaSuggest, aviaSuggest],
+      suggest_rail: [railSuggest, railSuggest],
+      suggest_bus: [busSuggest, busSuggest],
+      suggest_etrain: [etrainSuggest, etrainSuggest],
+      suggest_hotels: [() => jsonResponse({ items: [{ geoType: "locality", name: "Казань" }] })],
+      search_avia: [() => contentResponse({ offers: [{ transport: "avia", title: "Самолёт: Москва - Казань" }] })],
+      search_rail: [
+        () => contentResponse({ variants: [] }),
+        () => contentResponse({ variants: [{ transport: "railway", title: "Поезд: Москва - Казань" }] }),
+      ],
+      search_bus: [
+        () => contentResponse({ offers: [] }),
+        () => contentResponse({ offers: [{ transport: "bus", title: "Автобус: Москва - Казань" }] }),
+      ],
+      search_etrain: [() => contentResponse({ items: [] })],
+      search_hotels: [() => contentResponse({ items: [{ name: "Отель Казань" }] })],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({
+      intent: khimkiIntent,
+      destination: kazanDestination,
+      endpoint: "https://mcp.example/mcp",
+    });
+
+    expect(suggestCallsOf(fetchMock, "suggest_avia")).toHaveLength(2);
+    expect(suggestCallsOf(fetchMock, "suggest_rail")).toHaveLength(2);
+    expect(suggestCallsOf(fetchMock, "suggest_bus")).toHaveLength(2);
+    expect(suggestCallsOf(fetchMock, "suggest_etrain")).toHaveLength(2);
+    expect(suggestCallsOf(fetchMock, "suggest_hotels")).toHaveLength(1);
+    expect(originsOf(fetchMock, "search_avia")).toEqual(["Москва"]);
+    expect(originsOf(fetchMock, "search_rail")).toEqual(["Химки", "Москва"]);
+    expect(originsOf(fetchMock, "search_bus")).toEqual(["Химки", "Москва"]);
+    expect(originsOf(fetchMock, "search_etrain")).toEqual(["Химки"]);
+    expect(destinationsOf(fetchMock, "search_avia")).toEqual(["Казань"]);
+    expect(destinationsOf(fetchMock, "search_rail")).toEqual(["Казань", "Казань"]);
+    expect(JSON.parse(callsOf(fetchMock, "search_hotels")[0][1]?.body as string).params.arguments.city_name).toBe("Казань");
+    expect(result.transport.map((offer) => offer.title)).toEqual([
+      "Самолёт: Москва - Казань",
+      "Поезд: Москва - Казань",
+      "Автобус: Москва - Казань",
+    ]);
   });
 
   it("keeps visible offers from different transport modes before filling with extras", async () => {
