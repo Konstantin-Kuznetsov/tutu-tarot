@@ -83,20 +83,39 @@ function toolTextErrorResponse(name: string, message: string): Response {
 
 // A fetch stub that routes each call by the JSON-RPC request body's tool
 // name into its own queue, popped in order -- unlike a plain
-// mockResolvedValueOnce chain, this stays correct once retries mean the two
-// legs no longer make a predictable, interleaved number of total calls.
-function routedFetchMock(responses: {
-  search_multitransport?: Array<() => Response | Promise<Response>>;
-  search_hotels?: Array<() => Response | Promise<Response>>;
-}): ReturnType<typeof vi.fn> {
+// mockResolvedValueOnce chain, this stays correct once retries mean product
+// tools no longer make a predictable, interleaved number of total calls.
+type MockedTool =
+  | "search_multitransport"
+  | "search_avia"
+  | "search_rail"
+  | "search_bus"
+  | "search_etrain"
+  | "search_hotels";
+type MockedToolQueue = Array<() => Response | Promise<Response>>;
+
+const transportToolNames = ["search_avia", "search_rail", "search_bus", "search_etrain"] as const;
+
+function transportQueues(factory: (name: (typeof transportToolNames)[number]) => MockedToolQueue): Partial<Record<MockedTool, MockedToolQueue>> {
+  return Object.fromEntries(transportToolNames.map((name) => [name, factory(name)]));
+}
+
+function routedFetchMock(responses: Partial<Record<MockedTool, MockedToolQueue>>): ReturnType<typeof vi.fn> {
   const queues: Record<string, Array<() => Response | Promise<Response>>> = {
     search_multitransport: [...(responses.search_multitransport ?? [])],
+    search_avia: [...(responses.search_avia ?? [])],
+    search_rail: [...(responses.search_rail ?? [])],
+    search_bus: [...(responses.search_bus ?? [])],
+    search_etrain: [...(responses.search_etrain ?? [])],
     search_hotels: [...(responses.search_hotels ?? [])],
   };
   return vi.fn((_url: string, init?: RequestInit) => {
     const name = toolNameOf(init);
     const next = queues[name]?.shift();
     return Promise.resolve().then(() => {
+      if (!next && transportToolNames.includes(name as (typeof transportToolNames)[number])) {
+        return contentResponse({ offers: [] });
+      }
       if (!next) throw new Error(`routedFetchMock: no more mocked responses queued for ${name}`);
       return next();
     });
@@ -104,7 +123,13 @@ function routedFetchMock(responses: {
 }
 
 function transportCallsOf(fetchMock: ReturnType<typeof vi.fn>) {
-  return fetchMock.mock.calls.filter((call) => toolNameOf(call[1] as RequestInit) === "search_multitransport");
+  return fetchMock.mock.calls.filter((call) =>
+    [...transportToolNames, "search_multitransport"].includes(toolNameOf(call[1] as RequestInit)),
+  );
+}
+
+function callsOf(fetchMock: ReturnType<typeof vi.fn>, name: string) {
+  return fetchMock.mock.calls.filter((call) => toolNameOf(call[1] as RequestInit) === name);
 }
 
 function hotelCallsOf(fetchMock: ReturnType<typeof vi.fn>) {
@@ -194,13 +219,14 @@ describe("Tutu offer normalization", () => {
   });
 
   it("unwraps JSON-RPC result content for transport and hotels", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(contentResponse({
+    const fetchMock = routedFetchMock({
+      search_rail: [() => contentResponse({
         items: [{ title: "Москва - Пермь", price: { amount: 4200, currency: "RUB" } }],
-      }))
-      .mockResolvedValueOnce(contentResponse({
+      })],
+      search_hotels: [() => contentResponse({
         items: [{ name: "Отель Пермь", price: { amount: 6000, currency: "RUB" } }],
-      }));
+      })],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
@@ -211,24 +237,7 @@ describe("Tutu offer normalization", () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       headers: { Accept: "application/json, text/event-stream" },
     });
-    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).params).toEqual({
-      name: "search_multitransport",
-      arguments: {
-        origin: "Москва",
-        destination: "Пермь",
-        departure_date: "2026-09-10",
-        adults: 2,
-        // etrain joined the request when suburban trains became a real
-        // road the deck can name (see TransportMode). search_multitransport
-        // runs all four modes in parallel, so asking for the fourth costs
-        // nothing in latency.
-        modes: ["avia", "railway", "bus", "etrain"],
-        optimize_for: "price",
-        page_size: 20,
-        view: "compact",
-      },
-    });
-    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string).params).toEqual({
+    expect(JSON.parse(callsOf(fetchMock, "search_hotels")[0][1]?.body as string).params).toEqual({
       name: "search_hotels",
       arguments: {
         city_name: "Пермь",
@@ -241,17 +250,71 @@ describe("Tutu offer normalization", () => {
     });
   });
 
+  it("searches each transport mode through its own product resolver", async () => {
+    const fetchMock = routedFetchMock({
+      search_avia: [() => contentResponse({ offers: [{ transport: "avia", title: "Самолёт: Москва - Пермь" }] })],
+      search_rail: [() => contentResponse({ variants: [{ transport: "railway", title: "Поезд: Москва - Пермь" }] })],
+      search_bus: [() => contentResponse({ offers: [{ transport: "bus", title: "Автобус: Москва - Пермь" }] })],
+      search_etrain: [() => contentResponse({ items: [{ transport: "etrain", title: "Электричка: Москва - Пермь" }] })],
+      search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+
+    expect(result.transport.map((offer) => offer.mode)).toEqual(["avia", "railway", "bus", "etrain"]);
+    expect(callsOf(fetchMock, "search_multitransport")).toHaveLength(0);
+    expect(callsOf(fetchMock, "search_avia")).toHaveLength(1);
+    expect(callsOf(fetchMock, "search_rail")).toHaveLength(1);
+    expect(callsOf(fetchMock, "search_bus")).toHaveLength(1);
+    expect(callsOf(fetchMock, "search_etrain")).toHaveLength(1);
+
+    expect(JSON.parse(callsOf(fetchMock, "search_rail")[0][1]?.body as string).params.arguments).toMatchObject({
+      origin: "Москва",
+      destination: "Пермь",
+      departure_date: "2026-09-10",
+      passengers: 2,
+    });
+    expect(JSON.parse(callsOf(fetchMock, "search_bus")[0][1]?.body as string).params.arguments).toMatchObject({
+      origin: "Москва",
+      destination: "Пермь",
+      departure_date: "2026-09-10",
+      adults: 2,
+    });
+  });
+
+  it("keeps visible offers from different transport modes before filling with extras", async () => {
+    const fetchMock = routedFetchMock({
+      search_avia: [() => contentResponse({
+        offers: Array.from({ length: 5 }, (_, index) => ({
+          transport: "avia",
+          title: `Самолёт ${index + 1}: Москва - Пермь`,
+        })),
+      })],
+      search_rail: [() => contentResponse({ variants: [{ transport: "railway", title: "Поезд: Москва - Пермь" }] })],
+      search_bus: [() => contentResponse({ offers: [{ transport: "bus", title: "Автобус: Москва - Пермь" }] })],
+      search_etrain: [() => contentResponse({ items: [{ transport: "etrain", title: "Электричка: Москва - Пермь" }] })],
+      search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
+
+    expect(result.transport.map((offer) => offer.mode)).toEqual(["avia", "railway", "bus", "etrain", "avia"]);
+  });
+
   it("unwraps SSE JSON-RPC result content for transport and hotels", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
     const requestTime = Date.now();
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(sseContentResponse({
+    const fetchMock = routedFetchMock({
+      search_rail: [() => sseContentResponse({
         items: [{ title: "Москва - Пермь", price: { amount: 4200, currency: "RUB" } }],
-      }, `search_multitransport-${requestTime}`))
-      .mockResolvedValueOnce(sseContentResponse({
+      }, `search_rail-${requestTime}`)],
+      search_hotels: [() => sseContentResponse({
         items: [{ name: "Отель Пермь", price: { amount: 6000, currency: "RUB" } }],
-      }, `search_hotels-${requestTime}`));
+      }, `search_hotels-${requestTime}`)],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
@@ -265,7 +328,7 @@ describe("Tutu offer normalization", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
     const requestTime = Date.now();
-    const transportId = `search_multitransport-${requestTime}`;
+    const transportId = `search_rail-${requestTime}`;
     const hotelId = `search_hotels-${requestTime}`;
     const progress = { jsonrpc: "2.0", method: "notifications/progress", params: { progress: 50 } };
     const unexpectedResult = {
@@ -273,24 +336,25 @@ describe("Tutu offer normalization", () => {
       id: "another-request",
       result: { content: [{ type: "text", text: JSON.stringify({ items: [] }) }] },
     };
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(sseResponse([
+    const fetchMock = routedFetchMock({
+      search_rail: [() => sseResponse([
         progress,
         unexpectedResult,
         {
           jsonrpc: "2.0",
           id: transportId,
-          result: { content: [{ type: "text", text: JSON.stringify({ items: [{ title: "Москва - Пермь" }] }) }] },
-        },
-      ]))
-      .mockResolvedValueOnce(sseResponse([
+            result: { content: [{ type: "text", text: JSON.stringify({ items: [{ title: "Москва - Пермь" }] }) }] },
+          },
+      ])],
+      search_hotels: [() => sseResponse([
         progress,
         {
           jsonrpc: "2.0",
           id: hotelId,
-          result: { content: [{ type: "text", text: JSON.stringify({ items: [{ name: "Отель Пермь" }] }) }] },
-        },
-      ]));
+            result: { content: [{ type: "text", text: JSON.stringify({ items: [{ name: "Отель Пермь" }] }) }] },
+          },
+      ])],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
@@ -304,17 +368,18 @@ describe("Tutu offer normalization", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
     const requestTime = Date.now();
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(sseContentResponse(
+    const fetchMock = routedFetchMock({
+      search_rail: [() => sseContentResponse(
         { items: [{ title: "Москва - Пермь" }] },
-        `search_multitransport-${requestTime}`,
+        `search_rail-${requestTime}`,
         "Text/Event-Stream; charset=utf-8",
-      ))
-      .mockResolvedValueOnce(sseContentResponse(
+      )],
+      search_hotels: [() => sseContentResponse(
         { items: [{ name: "Отель Пермь" }] },
         `search_hotels-${requestTime}`,
         "Text/Event-Stream; charset=utf-8",
-      ));
+      )],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
@@ -325,14 +390,15 @@ describe("Tutu offer normalization", () => {
   });
 
   it("turns a JSON-RPC error into a warning and keeps successful hotels", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({
+    const fetchMock = routedFetchMock({
+      ...transportQueues((name) => [() => jsonResponse({
         jsonrpc: "2.0",
         error: { code: -32000, message: "Transport unavailable" },
-      }))
-      .mockResolvedValueOnce(contentResponse({
+      })]),
+      search_hotels: [() => contentResponse({
         items: [{ name: "Отель Пермь" }],
-      }));
+      })],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
@@ -346,20 +412,26 @@ describe("Tutu offer normalization", () => {
       },
     ]);
     expect(result.hotels[0].title).toBe("Отель Пермь");
-    expect(result.warnings).toEqual(["Tutu MCP search_multitransport failed: Transport unavailable"]);
+    expect(result.warnings).toHaveLength(4);
+    expect(result.warnings).toContain("Tutu MCP search_avia failed: Transport unavailable");
+    expect(result.warnings).toContain("Tutu MCP search_rail failed: Transport unavailable");
   });
 
   // A network-level failure (fetch() itself rejecting -- see TutuNetworkError
   // in mcpClient.ts) is transient and now retried up to 3 attempts, unlike
   // before this task. The mock routes on the request body's tool name
   // (rather than call order/count) precisely because retries change how
-  // many times each leg's fetch actually fires: transport fails on every
-  // attempt (exhausting all 3), hotels succeeds on its first and only one.
+  // many times each tool's fetch actually fires: transport tools fail on
+  // every attempt (exhausting all 3), hotels succeeds on its first and only one.
   it("keeps hotel offers when the transport leg's network fails on every attempt", async () => {
     vi.useFakeTimers();
-    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
-      if (toolNameOf(init) === "search_multitransport") return Promise.reject(new Error("network unavailable"));
-      return Promise.resolve(contentResponse({ items: [{ name: "Отель Пермь" }] }));
+    const fetchMock = routedFetchMock({
+      ...transportQueues(() => [
+        () => Promise.reject(new Error("network unavailable")),
+        () => Promise.reject(new Error("network unavailable")),
+        () => Promise.reject(new Error("network unavailable")),
+      ]),
+      search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -380,58 +452,60 @@ describe("Tutu offer normalization", () => {
     expect(result.transportOutcome).toBe("failed");
     expect(result.hotels[0].title).toBe("Отель Пермь");
     expect(result.hotelsOutcome).toBe("served");
-    // Same final message as before this task -- TutuNetworkError preserves
-    // the original error's text verbatim, and every attempt fails the same
-    // way, so the last (and only) warning pushed is unchanged.
-    expect(result.warnings).toEqual(["network unavailable"]);
+    // TutuNetworkError preserves the original error's text verbatim; each
+    // product tool contributes one warning after exhausting its own retries.
+    expect(result.warnings).toEqual([
+      "network unavailable",
+      "network unavailable",
+      "network unavailable",
+      "network unavailable",
+    ]);
 
-    const transportCalls = fetchMock.mock.calls.filter((call) => toolNameOf(call[1] as RequestInit) === "search_multitransport");
     const hotelCalls = fetchMock.mock.calls.filter((call) => toolNameOf(call[1] as RequestInit) === "search_hotels");
-    expect(transportCalls).toHaveLength(3);
+    expect(transportCallsOf(fetchMock)).toHaveLength(12);
     expect(hotelCalls).toHaveLength(1);
   });
 
   it("aborts a stalled Tutu transport request after the shared 18 second deadline", async () => {
     vi.useFakeTimers();
-    let transportSignal: AbortSignal | undefined;
-    const fetchMock = vi.fn()
-      .mockImplementationOnce((_url: string, init?: RequestInit) => {
-        transportSignal = init?.signal ?? undefined;
-        const signal = transportSignal;
+    const transportSignals: AbortSignal[] = [];
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      const name = toolNameOf(init);
+      if (transportToolNames.includes(name as (typeof transportToolNames)[number])) {
+        const signal = init?.signal ?? undefined;
         if (!signal) return Promise.reject(new Error("missing abort signal"));
-        // Create a Promise that rejects when the signal aborts
+        transportSignals.push(signal);
         return new Promise<Response>((_resolve, reject) => {
-          // Handle abort event - reject with the error message a real fetch produces
-          // In Node.js fetch, an aborted request rejects with a message "This operation was aborted"
           const abortHandler = () => {
             reject(new Error("This operation was aborted"));
           };
           signal.addEventListener("abort", abortHandler, { once: true });
-          // Also check if already aborted (race condition)
           if (signal.aborted) {
             reject(new Error("This operation was aborted"));
           }
         });
-      })
-      .mockResolvedValueOnce(contentResponse({ items: [{ name: "Отель Пермь" }] }));
+      }
+      return Promise.resolve(contentResponse({ items: [{ name: "Отель Пермь" }] }));
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const resultPromise = searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
     await vi.advanceTimersByTimeAsync(17_999);
-    expect(transportSignal?.aborted).toBe(false);
+    expect(transportSignals).toHaveLength(4);
+    expect(transportSignals.every((signal) => !signal.aborted)).toBe(true);
     await vi.advanceTimersByTimeAsync(1);
     const result = await resultPromise;
 
-    expect(transportSignal?.aborted).toBe(true);
+    expect(transportSignals.every((signal) => signal.aborted)).toBe(true);
     expect(result.hotels[0].title).toBe("Отель Пермь");
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.warnings.join(" ")).toMatch(/abort/i);
   });
 
   it("returns Tutu search entry points when both MCP tools produce no offers", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(contentResponse({ offers: [] }))
-      .mockResolvedValueOnce(contentResponse({ hotels: [] }));
+    const fetchMock = routedFetchMock({
+      search_hotels: [() => contentResponse({ hotels: [] })],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
@@ -497,18 +571,10 @@ describe("multitransport normalization", () => {
 
 describe("tool errors delivered as text", () => {
   it("surfaces the tool message instead of a JSON parse complaint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: "x",
-          result: {
-            content: [{ type: "text", text: "Error executing tool search_multitransport: 1 validation error" }],
-          },
-        }),
-        { headers: { "content-type": "application/json" } },
-      ),
-    );
+    const fetchMock = routedFetchMock({
+      ...transportQueues((name) => [() => toolTextErrorResponse(name, "1 validation error")]),
+      search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await searchTutuOffers({ intent, destination });
@@ -519,16 +585,15 @@ describe("tool errors delivered as text", () => {
   });
 });
 
-// Task: retry transient MCP failures per leg, inside the existing shared
+// Task: retry transient MCP failures per tool, inside the existing shared
 // 18s budget. Every test here uses routedFetchMock (see its own comment)
-// because retries make the plain "call N is for tool X" assumption the rest
-// of this file relies on unsafe -- a leg that retries makes more than one
-// call, and the two legs no longer interleave predictably.
+// because retries make the plain "call N is for tool X" assumption unsafe:
+// one retrying tool makes more than one call, so total order is not stable.
 describe("retry policy", () => {
   it("retries a single transient 503 and returns the successful result with no warning surfaced", async () => {
     vi.useFakeTimers();
     const fetchMock = routedFetchMock({
-      search_multitransport: [
+      search_rail: [
         () => statusResponse(503),
         () => contentResponse({ items: [{ title: "Москва - Пермь" }] }),
       ],
@@ -544,13 +609,14 @@ describe("retry policy", () => {
     expect(result.transport[0].title).toBe("Москва - Пермь");
     expect(result.transportOutcome).toBe("served");
     expect(result.warnings).toEqual([]);
-    expect(transportCallsOf(fetchMock)).toHaveLength(2);
+    expect(callsOf(fetchMock, "search_rail")).toHaveLength(2);
+    expect(transportCallsOf(fetchMock)).toHaveLength(5);
   });
 
   it("gives up after three consecutive 503s and reports failure, with exactly three attempts", async () => {
     vi.useFakeTimers();
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => statusResponse(503), () => statusResponse(503), () => statusResponse(503)],
+      ...transportQueues(() => [() => statusResponse(503), () => statusResponse(503), () => statusResponse(503)]),
       search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -562,13 +628,15 @@ describe("retry policy", () => {
     const result = await resultPromise;
 
     expect(result.transportOutcome).toBe("failed");
-    expect(result.warnings).toEqual(["Tutu MCP search_multitransport failed with 503"]);
-    expect(transportCallsOf(fetchMock)).toHaveLength(3);
+    expect(result.warnings).toHaveLength(4);
+    expect(result.warnings).toContain("Tutu MCP search_avia failed with 503");
+    expect(result.warnings).toContain("Tutu MCP search_etrain failed with 503");
+    expect(transportCallsOf(fetchMock)).toHaveLength(12);
   });
 
   it("does not retry a 400 — exactly one attempt, since a malformed request fails identically twice", async () => {
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => statusResponse(400)],
+      ...transportQueues(() => [() => statusResponse(400)]),
       search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -576,13 +644,15 @@ describe("retry policy", () => {
     const result = await searchTutuOffers({ intent, destination, endpoint: "https://mcp.example/mcp" });
 
     expect(result.transportOutcome).toBe("failed");
-    expect(result.warnings).toEqual(["Tutu MCP search_multitransport failed with 400"]);
-    expect(transportCallsOf(fetchMock)).toHaveLength(1);
+    expect(result.warnings).toHaveLength(4);
+    expect(result.warnings).toContain("Tutu MCP search_avia failed with 400");
+    expect(result.warnings).toContain("Tutu MCP search_bus failed with 400");
+    expect(transportCallsOf(fetchMock)).toHaveLength(4);
   });
 
   it("does not retry a tool-level error delivered as text — exactly one attempt", async () => {
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => toolTextErrorResponse("search_multitransport", "1 validation error")],
+      ...transportQueues((name) => [() => toolTextErrorResponse(name, "1 validation error")]),
       search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -591,15 +661,15 @@ describe("retry policy", () => {
 
     expect(result.transportOutcome).toBe("failed");
     expect(result.warnings.join(" ")).toContain("Error executing tool");
-    expect(transportCallsOf(fetchMock)).toHaveLength(1);
+    expect(transportCallsOf(fetchMock)).toHaveLength(4);
   });
 
-  it("retries the two legs independently — the transport leg exhausting its retries does not touch the hotel leg's own attempt count", async () => {
+  it("retries transport tools and the hotel leg independently", async () => {
     vi.useFakeTimers();
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => statusResponse(503), () => statusResponse(503), () => statusResponse(503)],
+      ...transportQueues(() => [() => statusResponse(503), () => statusResponse(503), () => statusResponse(503)]),
       // The hotel leg needs one retry of its own to succeed -- proves each
-      // leg keeps its own attempt count rather than sharing one budget.
+      // tool keeps its own attempt count rather than sharing one budget.
       search_hotels: [() => statusResponse(503), () => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -611,7 +681,7 @@ describe("retry policy", () => {
     expect(result.transportOutcome).toBe("failed");
     expect(result.hotelsOutcome).toBe("served");
     expect(result.hotels[0].title).toBe("Отель Пермь");
-    expect(transportCallsOf(fetchMock)).toHaveLength(3);
+    expect(transportCallsOf(fetchMock)).toHaveLength(12);
     expect(hotelCallsOf(fetchMock)).toHaveLength(2);
   });
 
@@ -629,7 +699,7 @@ describe("retry policy", () => {
     const deadlineAt = Date.now() + 10_000; // plenty of nominal budget left
     const promise = callToolWithRetry(
       "https://mcp.example/mcp",
-      "search_multitransport",
+      "search_rail",
       {},
       controller.signal,
       deadlineAt,
@@ -655,7 +725,7 @@ describe("retry policy", () => {
     const deadlineAt = Date.now() + 100;
     const promise = callToolWithRetry(
       "https://mcp.example/mcp",
-      "search_multitransport",
+      "search_rail",
       {},
       controller.signal,
       deadlineAt,
@@ -669,7 +739,6 @@ describe("retry policy", () => {
 describe("leg outcome", () => {
   it("marks a leg as empty when Tutu answers with nothing usable for these dates", async () => {
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => contentResponse({ offers: [] })],
       search_hotels: [() => contentResponse({ hotels: [] })],
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -682,7 +751,7 @@ describe("leg outcome", () => {
 
   it("marks a leg as served when real offers come back", async () => {
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => contentResponse({ items: [{ title: "Москва - Пермь" }] })],
+      search_rail: [() => contentResponse({ items: [{ title: "Москва - Пермь" }] })],
       search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -696,7 +765,7 @@ describe("leg outcome", () => {
   it("marks a leg as failed once every retry is exhausted, distinct from empty", async () => {
     vi.useFakeTimers();
     const fetchMock = routedFetchMock({
-      search_multitransport: [() => statusResponse(503), () => statusResponse(503), () => statusResponse(503)],
+      ...transportQueues(() => [() => statusResponse(503), () => statusResponse(503), () => statusResponse(503)]),
       search_hotels: [() => contentResponse({ items: [{ name: "Отель Пермь" }] })],
     });
     vi.stubGlobal("fetch", fetchMock);

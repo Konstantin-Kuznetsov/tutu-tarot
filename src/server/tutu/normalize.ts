@@ -398,7 +398,7 @@ function transportSubtitle(record: Record<string, unknown>): string | undefined 
   return base ? `${base} · ${pluralTransfers(transfers)}` : pluralTransfers(transfers);
 }
 
-export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
+export function normalizeTransportOffers(raw: unknown, defaultMode?: TransportMode): NormalizedOffer[] {
   return readItems(raw).slice(0, 5).map((item, index) => {
     const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
     const segments = readSegments(record);
@@ -430,7 +430,7 @@ export function normalizeTransportOffers(raw: unknown): NormalizedOffer[] {
         readString(record.checkout_url) ||
         readString(record.checkoutUrl) ||
         readString(record.url),
-      mode: readMode(record.transport),
+      mode: readMode(record.transport) ?? defaultMode,
     };
   });
 }

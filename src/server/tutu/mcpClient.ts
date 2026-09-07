@@ -1,4 +1,4 @@
-import type { InterchangePlan } from "@/domain/types";
+import { TRANSPORT_MODES, type InterchangePlan, type TransportMode } from "@/domain/types";
 import type { ModeUnavailable } from "@/domain/travel/roadUnavailable";
 import type { LegOutcome, ModesSummary, TravelAtlasItem, TripIntent } from "@/domain/types";
 import { normalizeHotelOffers, normalizeTransportOffers, readInterchangePlan, readModesSummary, readUnavailable, type NormalizedOffer } from "./normalize";
@@ -9,8 +9,8 @@ const DEFAULT_MCP_URL = "https://mcp.tutu.ru/mcp";
 // policy (see isTransientError below) can tell a fast refusal (503/502/504,
 // or 429 rate limiting) from a malformed request (any other 4xx) without
 // parsing the message string back apart. Message format is unchanged from
-// before retries existed -- it is the exact text production logs already
-// show ("Tutu MCP search_multitransport failed with 503").
+// before retries existed -- it is the exact text production logs now show
+// ("Tutu MCP search_rail failed with 503", for example).
 class TutuHttpError extends Error {
   readonly status: number;
 
@@ -107,7 +107,7 @@ async function callTool(
   return unwrapMcpResponse(raw, name);
 }
 
-// Up to two retries (three attempts total) per leg, only for transient
+// Up to two retries (three attempts total) per tool, only for transient
 // signals (see isTransientError) -- 503/502/504/429 and a fetch() that
 // never reached the server. A malformed request (any other 4xx) or a
 // tool-level rejection delivered as text inside result.content[] fails
@@ -116,9 +116,9 @@ async function callTool(
 // generally aren't either.
 const MAX_ATTEMPTS = 3;
 // Base backoff before attempt 2 and attempt 3, in ms -- jittered below so
-// two legs (or two concurrent users) retrying on the same schedule don't
-// resynchronise. A production 503 refusal comes back in 0.5-1.5s, so both
-// steps fit comfortably inside the 18s search budget.
+// several tools (or two concurrent users) retrying on the same schedule
+// don't resynchronise. A production 503 refusal comes back in 0.5-1.5s, so
+// both steps fit comfortably inside the 18s search budget.
 const BASE_BACKOFF_MS = [300, 900];
 // The minimum time a retry attempt plausibly needs to have a chance of
 // finishing -- the upper end of the observed refusal latency (see
@@ -269,6 +269,54 @@ function unwrapMcpResponse(raw: unknown, name: string): unknown {
 
 const SEARCH_BUDGET_MS = 18_000;
 
+const MODE_TOOL: Record<TransportMode, string> = {
+  avia: "search_avia",
+  railway: "search_rail",
+  bus: "search_bus",
+  etrain: "search_etrain",
+};
+
+function transportArgsFor(mode: TransportMode, input: TutuSearchInput): Record<string, unknown> {
+  const common = {
+    origin: input.intent.departureCity,
+    destination: input.destination.nearestTransportHub,
+    departure_date: input.intent.dateFrom,
+    page_size: 5,
+    view: "compact",
+  };
+
+  if (mode === "railway") {
+    return { ...common, passengers: input.intent.travelerCount, sort: "price_asc" };
+  }
+
+  if (mode === "bus") {
+    return { ...common, adults: input.intent.travelerCount, children: 0, sort: "price_asc" };
+  }
+
+  if (mode === "avia") {
+    return { ...common, adults: input.intent.travelerCount, children: 0, infants: 0, sort: "price_asc" };
+  }
+
+  return { ...common, sort: "price_asc" };
+}
+
+function summaryForMode(mode: TransportMode, offers: NormalizedOffer[]): ModesSummary {
+  if (offers.length === 0) return {};
+  return {
+    [mode]: {
+      count: offers.length,
+      minPrice: null,
+      minDurationMin: null,
+    },
+  };
+}
+
+function interleaveModeOffers(offersByMode: Map<TransportMode, NormalizedOffer[]>): NormalizedOffer[] {
+  const firstPerMode = TRANSPORT_MODES.flatMap((mode) => offersByMode.get(mode)?.slice(0, 1) ?? []);
+  const extras = TRANSPORT_MODES.flatMap((mode) => offersByMode.get(mode)?.slice(1) ?? []);
+  return [...firstPerMode, ...extras].slice(0, 5);
+}
+
 export interface TutuSearchResult {
   transport: NormalizedOffer[];
   hotels: NormalizedOffer[];
@@ -297,26 +345,21 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
   const warnings: string[] = [];
 
   try {
-    // Each leg retries independently (see callToolWithRetry) -- they
-    // already fail independently today, this just gives each its own
-    // attempt budget within the one shared deadline/signal.
+    // Each tool retries independently (see callToolWithRetry), with its own
+    // attempt budget inside the one shared deadline/signal.
     const [roads, stays] = await Promise.allSettled([
-      callToolWithRetry(endpoint, "search_multitransport", {
-        origin: input.intent.departureCity,
-        destination: input.destination.nearestTransportHub,
-        departure_date: input.intent.dateFrom,
-        adults: input.intent.travelerCount,
-        // etrain (пригородные электрички) is requested alongside the other
-        // three because search_multitransport runs all four in parallel for
-        // the same price in latency, and because it is the only road that
-        // exists for some short hops. Every layer that consumes a mode knows
-        // it -- see TransportMode's own comment for why adding it cannot
-        // change an existing draw.
-        modes: ["avia", "railway", "bus", "etrain"],
-        optimize_for: "price",
-        page_size: 20,
-        view: "compact",
-      }, controller.signal, deadlineAt),
+      Promise.allSettled(
+        TRANSPORT_MODES.map(async (mode) => {
+          const raw = await callToolWithRetry(
+            endpoint,
+            MODE_TOOL[mode],
+            transportArgsFor(mode, input),
+            controller.signal,
+            deadlineAt,
+          );
+          return { mode, raw };
+        }),
+      ),
       callToolWithRetry(endpoint, "search_hotels", {
         city_name: input.destination.hotelSearchCity,
         check_in: input.intent.dateFrom,
@@ -328,16 +371,33 @@ export async function searchTutuOffers(input: TutuSearchInput): Promise<TutuSear
     ]);
 
     let transport: NormalizedOffer[] = [];
+    const offersByMode = new Map<TransportMode, NormalizedOffer[]>();
     let modesSummary: ModesSummary = {};
     let unavailable: ModeUnavailable[] = [];
     let interchangePlan: InterchangePlan | null = null;
     let transportOutcome: LegOutcome;
     if (roads.status === "fulfilled") {
-      transport = normalizeTransportOffers(roads.value);
-      modesSummary = readModesSummary(roads.value);
-      unavailable = readUnavailable(roads.value);
-      interchangePlan = readInterchangePlan(roads.value);
-      transportOutcome = transport.length > 0 ? "served" : "empty";
+      const failedModes: ModeUnavailable[] = [];
+      let answeredModes = 0;
+      for (const result of roads.value) {
+        if (result.status === "rejected") {
+          warnings.push(result.reason instanceof Error ? result.reason.message : "Tutu transport search failed");
+          continue;
+        }
+
+        answeredModes += 1;
+        const offers = normalizeTransportOffers(result.value.raw, result.value.mode);
+        offersByMode.set(result.value.mode, offers);
+        modesSummary = { ...modesSummary, ...readModesSummary(result.value.raw), ...summaryForMode(result.value.mode, offers) };
+        unavailable.push(...readUnavailable(result.value.raw));
+        if (offers.length === 0) failedModes.push({ mode: result.value.mode, reason: "no_route" });
+        if (!interchangePlan && result.value.mode === "railway") {
+          interchangePlan = readInterchangePlan(result.value.raw);
+        }
+      }
+      if (unavailable.length === 0) unavailable = failedModes;
+      transport = interleaveModeOffers(offersByMode);
+      transportOutcome = transport.length > 0 ? "served" : answeredModes > 0 ? "empty" : "failed";
     } else {
       warnings.push(roads.reason instanceof Error ? roads.reason.message : "Tutu transport search failed");
       transportOutcome = "failed";
