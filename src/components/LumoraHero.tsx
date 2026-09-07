@@ -50,7 +50,7 @@ const VIDEOS = [
   },
 ] as const;
 
-const OVERLAY_SRC = "/hero/train-window-overlay.svg";
+const OVERLAY_SRC = "/hero/train-window-overlay.png";
 
 // How long each clip holds before the next one fades in. Comfortably longer
 // than the 1000ms crossfade in globals.css, so a fade is always finished well

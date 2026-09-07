@@ -38,8 +38,8 @@ describe("entry screen", () => {
     const overlay = document.querySelector(".lumora__overlay");
 
     expect(overlay).toBeInstanceOf(HTMLImageElement);
-    expect(overlay).toHaveAttribute("src", "/hero/train-window-overlay.svg");
-    expect(existsSync(join(process.cwd(), "public", "hero", "train-window-overlay.svg"))).toBe(true);
+    expect(overlay).toHaveAttribute("src", "/hero/train-window-overlay.png");
+    expect(existsSync(join(process.cwd(), "public", "hero", "train-window-overlay.png"))).toBe(true);
   });
 
   it("uses committed local background videos", () => {
