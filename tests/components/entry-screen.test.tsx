@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import Page from "@/app/page";
@@ -28,6 +30,16 @@ describe("entry screen", () => {
   it("carries the Tutu strapline", () => {
     render(<Page />);
     expect(screen.getByText("Путешествуйте выгодно с Туту")).toBeInTheDocument();
+  });
+
+  it("uses a committed local train-window overlay", () => {
+    render(<Page />);
+
+    const overlay = document.querySelector(".lumora__overlay");
+
+    expect(overlay).toBeInstanceOf(HTMLImageElement);
+    expect(overlay).toHaveAttribute("src", "/hero/train-window-overlay.svg");
+    expect(existsSync(join(process.cwd(), "public", "hero", "train-window-overlay.svg"))).toBe(true);
   });
 
   it("exposes exactly one main landmark", () => {

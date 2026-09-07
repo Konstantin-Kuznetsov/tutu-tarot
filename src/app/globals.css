@@ -2861,7 +2861,7 @@ a.offer-card:focus-visible {
   opacity: 1;
 }
 
-/* ── Transparent PNG overlay (z 1) ──
+/* ── Transparent train-window overlay (z 1) ──
    The constant scale(1.03) is what keeps the ±6px bob from ever revealing
    an edge: the image is always drawn 3% larger than the viewport, so the
    travel stays inside the overscan. */

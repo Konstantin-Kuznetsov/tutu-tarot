@@ -50,8 +50,7 @@ const VIDEOS = [
   },
 ] as const;
 
-const OVERLAY_SRC =
-  "https://soft-zoom-63098134.figma.site/_assets/v11/0b4a435b2df2747593c43d7a1c9b4578f7d8d90c.png";
+const OVERLAY_SRC = "/hero/train-window-overlay.svg";
 
 // How long each clip holds before the next one fades in. Comfortably longer
 // than the 1000ms crossfade in globals.css, so a fade is always finished well
@@ -112,7 +111,7 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
       </div>
 
       {/* eslint-disable-next-line @next/next/no-img-element -- a decorative
-          full-bleed overlay from an external host; next/image would add a
+          full-bleed overlay served from public/; next/image would add a
           loader round-trip and buy nothing for a purely presentational layer. */}
       <img src={OVERLAY_SRC} alt="" aria-hidden="true" className="lumora__overlay" />
 
