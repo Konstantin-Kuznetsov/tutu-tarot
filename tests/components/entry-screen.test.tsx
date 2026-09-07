@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -55,6 +55,28 @@ describe("entry screen", () => {
       expect(src).not.toMatch(/^https?:\/\//);
       expect(existsSync(join(process.cwd(), "public", src ?? ""))).toBe(true);
     }
+  });
+
+  it("uses committed local video posters before the videos decode", () => {
+    render(<Page />);
+
+    const videos = Array.from(document.querySelectorAll("video.lumora__video"));
+
+    expect(videos).toHaveLength(4);
+    for (const video of videos) {
+      const poster = video.getAttribute("poster");
+
+      expect(poster).not.toBeNull();
+      expect(poster).toMatch(/^\/hero\/posters\/.+\.jpg$/);
+      expect(poster).not.toMatch(/^https?:\/\//);
+      expect(existsSync(join(process.cwd(), "public", poster ?? ""))).toBe(true);
+    }
+  });
+
+  it("fills the video layer with the first poster before video paint", () => {
+    const css = readFileSync(join(process.cwd(), "src", "app", "globals.css"), "utf8");
+
+    expect(css).toContain("url('/hero/posters/golden-hour.jpg')");
   });
 
   it("exposes exactly one main landmark", () => {

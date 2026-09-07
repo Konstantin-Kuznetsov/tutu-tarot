@@ -35,18 +35,22 @@ const VIDEOS = [
   {
     label: "Golden Hour",
     src: "/hero/videos/golden-hour.mp4",
+    poster: "/hero/posters/golden-hour.jpg",
   },
   {
     label: "Still Water",
     src: "/hero/videos/still-water.mp4",
+    poster: "/hero/posters/still-water.jpg",
   },
   {
     label: "Deep Woods",
     src: "/hero/videos/deep-woods.mp4",
+    poster: "/hero/posters/deep-woods.jpg",
   },
   {
     label: "Quiet Dawn",
     src: "/hero/videos/quiet-dawn.mp4",
+    poster: "/hero/posters/quiet-dawn.jpg",
   },
 ] as const;
 
@@ -101,6 +105,7 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
             className="lumora__video"
             data-active={index === activeVideo}
             src={video.src}
+            poster={video.poster}
             autoPlay
             muted
             loop

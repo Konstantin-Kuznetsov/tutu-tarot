@@ -2845,6 +2845,7 @@ a.offer-card:focus-visible {
   position: absolute;
   inset: 0;
   z-index: 0;
+  background: #000 url('/hero/posters/golden-hour.jpg') center / cover no-repeat;
 }
 
 .lumora__video {
