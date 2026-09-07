@@ -5,7 +5,7 @@
 // departure city only to exclude "you're already there" trips (see
 // homeCity.ts). This list answers a different question -- "where do
 // travellers set out from" -- so it is the population/hub-weighted set of
-// major Russian cities a traveller is likely typing, not the 31-item
+// major Russian cities a traveller is likely typing, not the 91-item
 // destination set. The two lists are expected to overlap in places (Москва,
 // Казань...) without being the same list.
 //

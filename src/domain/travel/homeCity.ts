@@ -15,17 +15,20 @@ import type { TravelAtlasItem } from "@/domain/types";
 // contrast, carries Казань as both its name and its anchor, and Псков is
 // simply Псков.
 //
-// Measured across the atlas of 31: Москва and Санкт-Петербург collide with
-// nothing at all, Казань and Псков each collide with exactly one, and Пермь
-// collides only through a hub and is therefore left alone.
+// Measured across the atlas before the route-catalog expansion: Москва and
+// Санкт-Петербург collided with nothing at all, Казань and Псков each
+// collided with exactly one, and Пермь collided only through a hub and was
+// therefore left alone. The expanded atlas intentionally includes Москва
+// routes too; the rule stays the same, only the data got wider.
 
 // Lowercase, «ё» folded to «е», and whitespace collapsed. The ё/е fold is
 // not decoration: a traveller in Орёл who types «Орел» -- as most people do,
 // and as most keyboards encourage -- must still be recognised as being in
 // the same city the atlas might spell with ё.
 // Memoised because the strings on the other side of the comparison are
-// static: the atlas's 31 names and anchors never change, and normalising all
-// 62 of them on every call is pure waste. The reachability test makes that
+// static: the atlas's names and anchors change only when the static atlas
+// changes, and normalising all of them on every call is pure waste. The
+// reachability test makes that
 // visible -- it runs 29 568 draws, and the uncached version pushed it from
 // comfortably passing to timing out at 5s. Bounded by construction: the keys
 // are atlas strings plus whatever one city a caller typed.
@@ -48,7 +51,7 @@ function normalize(value: string): string {
 // Built once per departure city, never once per destination. The first
 // version constructed a RegExp inside the per-destination loop, which is
 // invisible on a single request and ruinous in the reachability test: 29 568
-// draws x 31 destinations x 2 fields is nearly two million compilations, and
+// draws x 91 destinations x 2 fields is over five million compilations, and
 // the suite went from passing to timing out at 5s.
 function matcherFor(departureCity: string): RegExp | null {
   const city = normalize(departureCity);
@@ -73,7 +76,7 @@ export function isDeparturePlace(departureCity: string, destination: TravelAtlas
 // The atlas minus wherever the traveller already is. Falls back to the full
 // list if the filter somehow empties it: a reading with no destination at all
 // is a far worse outcome than one that suggests the city you are standing in,
-// and with 31 destinations against one departure city it cannot happen today.
+// and with 91 destinations against one departure city it cannot happen today.
 export function withoutHomeCity(
   destinations: TravelAtlasItem[],
   departureCity: string,

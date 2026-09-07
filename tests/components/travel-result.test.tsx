@@ -333,7 +333,7 @@ describe("TravelResult guide strip", () => {
     expect(document.querySelector(".guide-strip")).not.toBeInTheDocument();
   });
 
-  it("is itself the link to the guide page, and shows source, days, rating and season for a rated route", () => {
+  it("links to the guide page, and shows source, days, rating and season for a rated route", () => {
     render(
       <TravelResult
         result={{
@@ -350,8 +350,15 @@ describe("TravelResult guide strip", () => {
       />,
     );
 
-    const strip = screen.getByRole("link", { name: "Проверено Туту · 6 дней · 9,3 · лучшее время: май-октябрь" });
+    const strip = screen.getByRole("link", { name: "Проверено Туту" });
     expect(strip).toHaveAttribute("href", "https://provereno.tutu.ru/kaliningradskaya-2025");
+    const facts = document.querySelector(".fact-tiles");
+    expect(facts).not.toBeNull();
+    expect(within(facts as HTMLElement).getByText("6")).toBeInTheDocument();
+    expect(within(facts as HTMLElement).getByText("дней")).toBeInTheDocument();
+    expect(within(facts as HTMLElement).getByText("9,3")).toBeInTheDocument();
+    expect(within(facts as HTMLElement).getByText("май-октябрь")).toBeInTheDocument();
+    expect(within(facts as HTMLElement).getByText("лучшее время по гиду")).toBeInTheDocument();
   });
 
   it("declines the day count correctly (2 дня, not 2 день/2 дней)", () => {
@@ -369,7 +376,11 @@ describe("TravelResult guide strip", () => {
       />,
     );
 
-    expect(screen.getByRole("link", { name: "Проверено Туту · 2 дня" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Проверено Туту" })).toBeInTheDocument();
+    const facts = document.querySelector(".fact-tiles");
+    expect(facts).not.toBeNull();
+    expect(within(facts as HTMLElement).getByText("2")).toBeInTheDocument();
+    expect(within(facts as HTMLElement).getByText("дня")).toBeInTheDocument();
   });
 
   // A regional geo guide (no routeDays/rating -- ten atlas entries are this
@@ -393,10 +404,14 @@ describe("TravelResult guide strip", () => {
       />,
     );
 
-    const strip = screen.getByRole("link", { name: "Путеводитель Туту · Чеченская Республика" });
+    const facts = document.querySelector(".guide-facts");
+    expect(facts).not.toBeNull();
+    const strip = within(facts as HTMLElement).getByRole("link", { name: "Путеводитель Туту" });
     expect(strip).toHaveAttribute("href", "https://www.tutu.ru/geo/rossiya/kurort/chechnya/");
-    expect(strip.textContent).not.toMatch(/·\s*$/);
-    expect(strip.textContent).not.toMatch(/^\s*·/);
+    const tiles = document.querySelector(".fact-tiles");
+    expect(tiles).not.toBeNull();
+    expect(within(tiles as HTMLElement).getByText("Чеченская Республика")).toBeInTheDocument();
+    expect(within(tiles as HTMLElement).getByText("регион")).toBeInTheDocument();
   });
 
   it("sits above the spread, right after the headline", () => {
@@ -415,7 +430,7 @@ describe("TravelResult guide strip", () => {
       />,
     );
 
-    const strip = screen.getByRole("link", { name: "Проверено Туту · 6 дней · 8,8" });
+    const strip = screen.getByRole("link", { name: "Проверено Туту" });
     const spread = screen.getByRole("region", { name: "Расклад карт" });
     expect(strip.compareDocumentPosition(spread) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Lives inside the prediction block, not a new [data-block] step of its

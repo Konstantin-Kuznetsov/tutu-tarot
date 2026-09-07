@@ -31,6 +31,7 @@ describe("every animation named in globals.css has keyframes", () => {
     "linear", "ease", "ease-in", "ease-out", "ease-in-out", "step-start", "step-end",
     "normal", "reverse", "alternate", "alternate-reverse",
     "forwards", "backwards", "both", "running", "paused", "infinite",
+    "!important",
   ]);
 
   const used = new Map<string, number>();

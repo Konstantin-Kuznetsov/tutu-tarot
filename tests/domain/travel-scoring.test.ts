@@ -35,8 +35,8 @@ describe("selectDestination", () => {
     }
   });
 
-  it("has at least 30 destinations in the atlas", () => {
-    expect(travelAtlas.length).toBeGreaterThanOrEqual(30);
+  it("has at least 91 destinations in the atlas", () => {
+    expect(travelAtlas.length).toBeGreaterThanOrEqual(91);
   });
 
   // Regression guard for the guide-facts merge (data/tutu-guides.json):
@@ -114,12 +114,12 @@ describe("selectDestination", () => {
     expect(selectDestination(input).destination.id).toBe(selectDestination(input).destination.id);
   });
 
-  it("picks a different destination on a tie when the seed differs, but stays put for a repeat of the same seed", () => {
-    // pskov-kremlin and mari-el-fairytale carry the identical archetype set
-    // and identical season coverage (see the reachability test below), so
-    // any archetype weighting that favours neither breaks the tie purely on
-    // seed -- this is the alphabetical-tie-break bug from the bug report,
-    // now fixed.
+  it("rotates close-scored destinations when the seed differs, but stays put for a repeat of the same seed", () => {
+    // This guards the old alphabetical-tie-break bug without pinning the
+    // result to one historic pair from the smaller atlas. With the expanded
+    // catalog, several culture/water/mystery routes can compete in this
+    // shape; different seeds should let more than one surface, while replaying
+    // the exact same seed must still reproduce the same choice.
     const input = {
       archetypeWeights: { culture: 1, water: 1, mystery: 1 } satisfies ArchetypeWeights,
       dateFrom: "2026-05-01",
@@ -139,6 +139,6 @@ describe("selectDestination", () => {
       expect(selectDestination({ ...input, seed }).destination.id).toBe(result.destination.id);
     }
 
-    expect(winners).toEqual(new Set(["pskov-kremlin", "mari-el-fairytale"]));
+    expect(winners.size).toBeGreaterThan(1);
   });
 });

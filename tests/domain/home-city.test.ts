@@ -36,10 +36,12 @@ describe("the oracle does not send you where you already are", () => {
     expect(withoutHomeCity(travelAtlas, "Пермь")).toContain(usva);
   });
 
-  it("costs Москва and Санкт-Петербург nothing at all", () => {
-    // Measured across the atlas: neither collides with any destination's own
-    // identity, so the two commonest departure cities lose no options.
-    expect(withoutHomeCity(travelAtlas, "Москва")).toHaveLength(travelAtlas.length);
+  it("excludes the new Москва routes for Москва, but still costs Санкт-Петербург nothing", () => {
+    const fromMoscow = withoutHomeCity(travelAtlas, "Москва");
+    expect(fromMoscow).toHaveLength(travelAtlas.length - 3);
+    expect(fromMoscow.map((destination) => destination.id)).not.toEqual(
+      expect.arrayContaining(["moscow-vertical", "moscow-industrial", "moscow-hidden"]),
+    );
     expect(withoutHomeCity(travelAtlas, "Санкт-Петербург")).toHaveLength(travelAtlas.length);
   });
 });
