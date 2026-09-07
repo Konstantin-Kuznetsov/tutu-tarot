@@ -42,6 +42,21 @@ describe("entry screen", () => {
     expect(existsSync(join(process.cwd(), "public", "hero", "train-window-overlay.svg"))).toBe(true);
   });
 
+  it("uses committed local background videos", () => {
+    render(<Page />);
+
+    const videos = Array.from(document.querySelectorAll("video.lumora__video"));
+
+    expect(videos).toHaveLength(4);
+    for (const video of videos) {
+      const src = video.getAttribute("src");
+
+      expect(src).toMatch(/^\/hero\/videos\/.+\.mp4$/);
+      expect(src).not.toMatch(/^https?:\/\//);
+      expect(existsSync(join(process.cwd(), "public", src ?? ""))).toBe(true);
+    }
+  });
+
   it("exposes exactly one main landmark", () => {
     render(<Page />);
     expect(screen.getAllByRole("main")).toHaveLength(1);
