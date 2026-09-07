@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,22 +38,57 @@ describe("entry screen", () => {
     const overlay = document.querySelector(".lumora__overlay");
 
     expect(overlay).toBeInstanceOf(HTMLImageElement);
-    expect(overlay).toHaveAttribute("src", "/hero/train-window-overlay.png");
-    expect(existsSync(join(process.cwd(), "public", "hero", "train-window-overlay.png"))).toBe(true);
+    // WebP, not the original PNG: the same 2752px artwork was 1.8MB as a PNG
+    // and is 145KB here, and it is on the critical path -- the window frame
+    // has to be there for the first painted frame to look like anything.
+    expect(overlay).toHaveAttribute("src", "/hero/train-window-overlay.webp");
+    expect(existsSync(join(process.cwd(), "public", "hero", "train-window-overlay.webp"))).toBe(true);
   });
 
-  it("uses committed local background videos", () => {
+  it("offers a 720p cut to small screens and 1080p to everything else", () => {
     render(<Page />);
 
     const videos = Array.from(document.querySelectorAll("video.lumora__video"));
 
     expect(videos).toHaveLength(4);
     for (const video of videos) {
-      const src = video.getAttribute("src");
+      // No `src` on the element itself any more -- the two cuts are offered
+      // as <source> children so the browser picks one by viewport.
+      expect(video.getAttribute("src")).toBeNull();
 
-      expect(src).toMatch(/^\/hero\/videos\/.+\.mp4$/);
-      expect(src).not.toMatch(/^https?:\/\//);
-      expect(existsSync(join(process.cwd(), "public", src ?? ""))).toBe(true);
+      const sources = Array.from(video.querySelectorAll("source"));
+      expect(sources).toHaveLength(2);
+
+      // Narrow first: the browser takes the first source whose media query
+      // matches, so reversing these would send 1080p to every phone.
+      expect(sources[0]).toHaveAttribute("media", "(max-width: 1024px)");
+      expect(sources[0].getAttribute("src")).toMatch(/^\/hero\/videos\/.+-720\.mp4$/);
+
+      // The wide one is the fallback and must carry no media query, or a
+      // browser that ignores `media` on <source> would be left with nothing.
+      expect(sources[1].hasAttribute("media")).toBe(false);
+      expect(sources[1].getAttribute("src")).toMatch(/^\/hero\/videos\/.+-1080\.mp4$/);
+
+      for (const source of sources) {
+        const src = source.getAttribute("src");
+        expect(src).not.toBeNull();
+        expect(existsSync(join(process.cwd(), "public", src!))).toBe(true);
+      }
+    }
+  });
+
+  // The clips came out of the generator at 11-18 Mbit/s, which is three to
+  // four times what 1080p needs on the web -- a phone was pulling 14-23MB for
+  // a background. This is a budget, not a style rule: if a re-encode ever
+  // lands back at generator settings, this is what says so.
+  it("keeps every cut inside a sane weight for a background clip", () => {
+    const dir = join(process.cwd(), "public", "hero", "videos");
+    const cuts = readdirSync(dir).filter((name) => name.endsWith(".mp4"));
+
+    expect(cuts).toHaveLength(8);
+    for (const name of cuts) {
+      const mb = statSync(join(dir, name)).size / 1024 / 1024;
+      expect(mb, `${name} весит ${mb.toFixed(1)}МБ`).toBeLessThan(name.includes("-720") ? 4 : 9);
     }
   });
 

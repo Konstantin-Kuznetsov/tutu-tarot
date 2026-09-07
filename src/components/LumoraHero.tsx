@@ -34,27 +34,43 @@ import type { TripIntent } from "@/domain/types";
 const VIDEOS = [
   {
     label: "Golden Hour",
-    src: "/hero/videos/golden-hour.mp4",
+    src1080: "/hero/videos/golden-hour-1080.mp4",
+    src720: "/hero/videos/golden-hour-720.mp4",
     poster: "/hero/posters/golden-hour.jpg",
   },
   {
     label: "Still Water",
-    src: "/hero/videos/still-water.mp4",
+    src1080: "/hero/videos/still-water-1080.mp4",
+    src720: "/hero/videos/still-water-720.mp4",
     poster: "/hero/posters/still-water.jpg",
   },
   {
     label: "Deep Woods",
-    src: "/hero/videos/deep-woods.mp4",
+    src1080: "/hero/videos/deep-woods-1080.mp4",
+    src720: "/hero/videos/deep-woods-720.mp4",
     poster: "/hero/posters/deep-woods.jpg",
   },
   {
     label: "Quiet Dawn",
-    src: "/hero/videos/quiet-dawn.mp4",
+    src1080: "/hero/videos/quiet-dawn-1080.mp4",
+    src720: "/hero/videos/quiet-dawn-720.mp4",
     poster: "/hero/posters/quiet-dawn.jpg",
   },
 ] as const;
 
-const OVERLAY_SRC = "/hero/train-window-overlay.png";
+// Phones and tablets take the 720p cut, everything wider takes 1080p. The
+// clips came out of the generator at 1080p and 11-18 Mbit/s -- three to four
+// times what 1080p needs on the web -- so a phone was pulling 14-23MB to
+// paint a background behind a train window. The 720p cut is ~3MB and is
+// indistinguishable even at full width; on a 400px-wide screen there is
+// nothing left to argue about.
+//
+// A <source media> is evaluated once, when the element loads, and is not
+// re-checked on resize. That is fine here and better than the alternative:
+// a background clip that reloads itself because someone turned their phone.
+const SMALL_SCREEN = "(max-width: 1024px)";
+
+const OVERLAY_SRC = "/hero/train-window-overlay.webp";
 
 // How long each clip holds before the next one fades in. Comfortably longer
 // than the 1000ms crossfade in globals.css, so a fade is always finished well
@@ -153,13 +169,12 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
       <div className="lumora__videos" aria-hidden="true">
         {VIDEOS.map((video, index) => (
           <video
-            key={video.src}
+            key={video.label}
             ref={(element) => {
               videoRefs.current[index] = element;
             }}
             className="lumora__video"
             data-active={index === activeVideo}
-            src={video.src}
             poster={video.poster}
             muted
             // Kept even though a clip never reaches its own end during a 7s
@@ -179,7 +194,15 @@ export function LumoraHero({ onSubmit }: { onSubmit(intent: TripIntent): void })
             // what the visitor was waiting for. The next clip still gets a
             // full 7 seconds of head start before its turn.
             preload={index === activeVideo || index === nextVideo ? "auto" : "metadata"}
-          />
+          >
+            {/* Order matters: the browser takes the first source whose media
+                query matches, so the narrow cut has to come first. The wider
+                one carries no media attribute at all and is therefore the
+                fallback for everything else, including browsers that ignore
+                `media` on <source>. */}
+            <source src={video.src720} media={SMALL_SCREEN} type="video/mp4" />
+            <source src={video.src1080} type="video/mp4" />
+          </video>
         ))}
       </div>
 
