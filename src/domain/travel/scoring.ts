@@ -30,6 +30,14 @@ const SEASON_BONUS = 1;
 // small "this is a real route, not the emergency fallback" bonus avoids that
 // trap while still discounting the one fallback destination in the atlas.
 const SOURCE_BONUS = 0.3;
+// The atlas deliberately contains close siblings: several routes share a
+// region, season and tarot mood, while differing mostly by exact route shape.
+// Picking only the absolute top score makes the broader sibling shadow the
+// narrower one forever. Keep score as the meaning filter, then let the ritual
+// seed choose deterministically among destinations close enough to the best
+// match so repeated inputs stay replayable while varied inputs spread across
+// the atlas.
+const SHORTLIST_SCORE_WINDOW = 1.5;
 
 function monthToSeason(month: number): string {
   if ([12, 1, 2].includes(month)) return "winter";
@@ -89,6 +97,10 @@ export function selectDestination(input: DestinationSelectionInput): Destination
     };
   });
 
-  scored.sort((a, b) => b.score - a.score || b.tieBreak - a.tieBreak);
-  return scored[0];
+  const bestScore = scored.reduce((best, item) => Math.max(best, item.score), -Infinity);
+  const shortlist = scored.filter((item) => bestScore - item.score <= SHORTLIST_SCORE_WINDOW);
+
+  shortlist.sort((a, b) => b.score - a.score || a.destination.id.localeCompare(b.destination.id));
+  const shortlistIndex = hash(`${input.seed}|destination-shortlist`) % shortlist.length;
+  return shortlist[shortlistIndex];
 }

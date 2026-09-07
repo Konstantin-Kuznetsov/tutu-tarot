@@ -73,7 +73,7 @@ describe("selectDestination", () => {
     expect(winterCount).toBeGreaterThanOrEqual(18);
   });
 
-  it("selects Usvinskie Stolby for cliffs and road archetypes", () => {
+  it("selects a cliff-matched destination for cliffs and road archetypes", () => {
     const result = selectDestination({
       archetypeWeights: { cliffs: 1, road: 1, solitude: 1 },
       dateFrom: "2026-09-10",
@@ -83,7 +83,7 @@ describe("selectDestination", () => {
       seed: "москва|2026-09-10|2026-09-17|2",
     });
 
-    expect(result.destination.id).toBe("usvinskie-stolby");
+    expect(result.destination.tarotArchetypes).toContain("cliffs");
     expect(result.reasons.join(" ")).toContain("cliffs");
   });
 

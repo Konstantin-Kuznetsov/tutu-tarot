@@ -22,12 +22,13 @@ import type { TarotArchetype } from "@/domain/types";
 // seed variety is what actually lets a tied destination surface instead of
 // the same one winning that tie forever (the alphabetical tie-break bug).
 //
-// At the expanded 91-destination size this is no longer a strict "every
-// destination wins" invariant: several routes are intentionally near-siblings
-// from the same source catalog and can be shadowed by broader neighbors under
-// this finite sample. The invariant that matters is scale: almost everything
-// should be reachable, and nothing should dominate the draw the way one place
-// did before the scoring fix.
+// At the expanded 91-destination size the draw still needs to spread across
+// the whole curated atlas. Several routes are intentionally near-siblings from
+// the same source catalog, so exact score ordering would let broader neighbors
+// shadow them forever; the seed should rotate among close-enough candidates
+// instead. The invariant that matters is breadth: every destination should be
+// reachable in a broad deterministic sample, and no one place should dominate
+// the draw the way Краснодарский край did before the scoring fix.
 //
 // The simulated traveller departs from Тосно on purpose: this test is about
 // scoring reachability, not about home-city exclusion. Москва used to be a
@@ -56,11 +57,11 @@ const SAMPLE_SEEDS = Array.from({ length: 16 }, (_, index) => {
   return `${city}|2026-${month}-1${day}|2026-${month}-2${day}|${(index % 4) + 1}`;
 });
 
-// No single destination should dominate the readings the way Краснодарский
-// край (20.7%) did before this fix. "Roughly 10%" from the bug report, with
-// a little headroom over the measured ~10.3% ceiling so the test isn't
-// pinned to the exact float.
-const MAX_SHARE = 0.11;
+// No single destination should dominate the readings. Uniform distribution
+// across 91 destinations would be ~1.1%, but card/season fit is still supposed
+// to matter; 4% leaves room for meaningful fit while catching a destination
+// that crowds out the rest of the atlas.
+const MAX_SHARE = 0.04;
 
 function archetypeWeightsFromPair(a: string, b: string): Partial<Record<TarotArchetype, number>> {
   const weights: Partial<Record<TarotArchetype, number>> = {};
@@ -75,7 +76,7 @@ function archetypeWeightsFromPair(a: string, b: string): Partial<Record<TarotArc
 }
 
 describe("selectDestination reachability", () => {
-  it("reaches almost every atlas destination, and keeps every destination under ~10% of all draws", () => {
+  it("reaches every atlas destination, and keeps every destination under a broad share cap", () => {
     const counts = new Map<string, number>();
     for (const destination of travelAtlas) counts.set(destination.id, 0);
     let total = 0;
@@ -105,8 +106,10 @@ describe("selectDestination reachability", () => {
     expect(total).toBe(tarotCards.length * (tarotCards.length - 1) * 4 * SAMPLE_SEEDS.length);
     expect(counts.size).toBe(travelAtlas.length);
 
-    const reachable = [...counts.values()].filter((count) => count > 0).length;
-    expect(reachable / travelAtlas.length).toBeGreaterThanOrEqual(0.95);
+    const unreachable = [...counts.entries()]
+      .filter(([, count]) => count === 0)
+      .map(([id]) => id);
+    expect(unreachable).toEqual([]);
 
     const [dominantId, dominantCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
     const maxShare = dominantCount / total;
